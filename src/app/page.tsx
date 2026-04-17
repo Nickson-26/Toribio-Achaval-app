@@ -1,24 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ToastProvider } from '@/components/ui'
 import Dashboard    from '@/pages/Dashboard'
 import Facturas     from '@/pages/Facturas'
-import { Recibos }  from '@/pages/OtherPages'
-import { Clientes } from '@/pages/OtherPages'
-import { NotasCredito } from '@/pages/OtherPages'
-import { NotasDebito }  from '@/pages/OtherPages'
-import { Resumen }      from '@/pages/OtherPages'
+import { Recibos, Clientes, NotasCredito, NotasDebito, Resumen } from '@/pages/OtherPages'
 
 type Page = 'dashboard'|'facturas'|'recibos'|'clientes'|'nc'|'nd'|'resumen'
 
-const PAGES: { id: Page; label: string; icon: string; group: string }[] = [
-  { id: 'dashboard', label: 'Dashboard',        icon: '◈', group: 'Principal' },
-  { id: 'facturas',  label: 'Facturas',          icon: '◻', group: 'Principal' },
-  { id: 'recibos',   label: 'Recibos',           icon: '◻', group: 'Principal' },
-  { id: 'clientes',  label: 'Clientes',          icon: '◻', group: 'Principal' },
-  { id: 'nc',        label: 'Notas de Crédito',  icon: '◻', group: 'Documentos' },
-  { id: 'nd',        label: 'Notas de Débito',   icon: '◻', group: 'Documentos' },
-  { id: 'resumen',   label: 'Resumen Anual',     icon: '◻', group: 'Documentos' },
+const NAV: { id: Page; label: string; icon: string }[] = [
+  { id: 'dashboard', label: 'Dashboard',       icon: '◈' },
+  { id: 'facturas',  label: 'Facturas',         icon: '▦' },
+  { id: 'recibos',   label: 'Recibos',          icon: '▤' },
+  { id: 'clientes',  label: 'Clientes',         icon: '▣' },
+  { id: 'nc',        label: 'Notas de Crédito', icon: '▥' },
+  { id: 'nd',        label: 'Notas de Débito',  icon: '▥' },
 ]
 
 const TITLES: Record<Page, string> = {
@@ -32,56 +27,71 @@ const COMPONENTS: Record<Page, React.ComponentType<any>> = {
 }
 
 export default function Home() {
-  const [page, setPage]           = useState<Page>('dashboard')
+  const [page, setPage]             = useState<Page>('dashboard')
   const [pendientes, setPendientes] = useState(0)
-  const groups = Array.from(new Set(PAGES.map(p => p.group)))
+  const [menuOpen, setMenuOpen]     = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function goTo(p: Page) { setPage(p); setMenuOpen(false) }
+
   const PageComponent = COMPONENTS[page]
 
   return (
-    <div className="app">
-      <nav className="sidebar">
-        <div className="logo">
-          <div className="logo-icon">TA</div>
-          <div className="logo-text">
-            <div className="logo-title">Toribio Achaval</div>
-            <div className="logo-sub">Facturación 2026</div>
-          </div>
+    <div className="app-shell">
+      {/* TOP NAV */}
+      <header className="topnav">
+        <div className="topnav-left">
+          <div className="logo-mark">TA</div>
+          <span className="brand-name">Toribio Achaval</span>
         </div>
-        {groups.map(g => (
-          <div key={g} className="nav-section">
-            <div className="nav-label">{g}</div>
-            {PAGES.filter(p => p.group === g).map(p => (
-              <button
-                key={p.id}
-                className={`nav-item${page === p.id ? ' active' : ''}`}
-                onClick={() => setPage(p.id)}
-              >
-                <span className="nav-icon">{p.icon}</span>
-                <span>{p.label}</span>
-                {p.id === 'facturas' && pendientes > 0 && (
-                  <span className="nav-badge">{pendientes}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        ))}
-      </nav>
 
-      <div className="main">
-        <div className="topbar">
-          <div className="topbar-left">
-            <span className="page-title">{TITLES[page]}</span>
-          </div>
-          <div className="topbar-right">
-            <button className="btn btn-primary btn-sm" onClick={() => setPage('facturas')}>
-              + Nueva factura
+        <nav className="topnav-center">
+          {NAV.map(n => (
+            <button
+              key={n.id}
+              className={`topnav-item${page === n.id ? ' active' : ''}`}
+              onClick={() => goTo(n.id)}
+            >
+              {n.label}
+              {n.id === 'facturas' && pendientes > 0 && <span className="nav-pill">{pendientes}</span>}
             </button>
+          ))}
+        </nav>
+
+        <div className="topnav-right">
+          <button className="btn btn-primary btn-sm" onClick={() => goTo('facturas')}>
+            + Nueva factura
+          </button>
+          {/* Mobile menu */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button className="mobile-menu-btn" onClick={() => setMenuOpen(v => !v)}>☰</button>
+            {menuOpen && (
+              <div className="mobile-dropdown">
+                {NAV.map(n => (
+                  <button key={n.id} className={`mobile-dd-item${page === n.id ? ' active' : ''}`} onClick={() => goTo(n.id)}>
+                    {n.label}
+                    {n.id === 'facturas' && pendientes > 0 && <span className="nav-pill">{pendientes}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-        <div className="content">
-          <PageComponent onPendientesChange={setPendientes} />
-        </div>
-      </div>
+      </header>
+
+      {/* CONTENT */}
+      <main className="main-content">
+        <PageComponent onPendientesChange={setPendientes} />
+      </main>
+
       <ToastProvider />
     </div>
   )

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ToastProvider } from '@/components/ui'
 import { useAuth } from '@/components/AuthProvider'
 import LoginPage from '@/components/LoginPage'
+import { CambiarPasswordModal } from '@/components/CambiarPassword'
 import Dashboard    from '@/pages/Dashboard'
 import Facturas     from '@/pages/Facturas'
 import Usuarios     from '@/pages/Usuarios'
@@ -32,10 +33,11 @@ const TITLES: Record<Page, string> = {
 
 export default function Home() {
   const { user, loading, signOut, isAdmin } = useAuth()
-  const [page,       setPage]       = useState<Page>('dashboard')
-  const [pendientes, setPendientes] = useState(0)
-  const [menuOpen,   setMenuOpen]   = useState(false)
-  const [userMenu,   setUserMenu]   = useState(false)
+  const [page,         setPage]         = useState<Page>('dashboard')
+  const [pendientes,   setPendientes]   = useState(0)
+  const [menuOpen,     setMenuOpen]     = useState(false)
+  const [userMenu,     setUserMenu]     = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const menuRef     = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
@@ -61,8 +63,8 @@ export default function Home() {
       <div className="auth-card">
         <div className="auth-logo">TA</div>
         <h1 className="auth-title">Cuenta pendiente</h1>
-        <p className="auth-subtitle">Tu cuenta está esperando aprobación del administrador.</p>
-        <button className="btn btn-primary" style={{width:'100%',marginTop:16}} onClick={signOut}>
+        <p className="auth-subtitle">Tu cuenta está esperando aprobación del administrador. Te avisarán cuando tengas acceso.</p>
+        <button className="btn btn-primary" style={{ width:'100%', marginTop:16 }} onClick={signOut}>
           Cerrar sesión
         </button>
       </div>
@@ -74,6 +76,10 @@ export default function Home() {
   const visibleNav = NAV.filter(n => !n.adminOnly || isAdmin)
   const PageComponent = COMPONENTS[page]
 
+  const initials = user.nombre.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase()
+  const roleLabel = user.role === 'admin' ? 'Administrador' : user.role === 'editor' ? 'Editor' : 'Solo lectura'
+  const roleBadge = user.role === 'admin' ? 'badge-red' : user.role === 'editor' ? 'badge-blue' : 'badge-gray'
+
   return (
     <div className="app-shell">
       <header className="topnav">
@@ -84,13 +90,10 @@ export default function Home() {
 
         <nav className="topnav-center">
           {visibleNav.map(n => (
-            <button
-              key={n.id}
-              className={`topnav-item${page===n.id?' active':''}`}
-              onClick={() => goTo(n.id)}
-            >
+            <button key={n.id} className={`topnav-item${page===n.id?' active':''}`} onClick={() => goTo(n.id)}>
               {n.label}
               {n.id==='facturas' && pendientes>0 && <span className="nav-pill">{pendientes}</span>}
+              {n.id==='usuarios' && isAdmin && <PendingBadge />}
             </button>
           ))}
         </nav>
@@ -100,37 +103,51 @@ export default function Home() {
             <button className="btn btn-primary btn-sm" onClick={() => goTo('facturas')}>+ Nueva factura</button>
           )}
 
-          {/* User menu */}
-          <div ref={userMenuRef} style={{position:'relative'}}>
+          {/* User avatar menu */}
+          <div ref={userMenuRef} style={{ position:'relative' }}>
             <button className="user-avatar-btn" onClick={() => setUserMenu(v=>!v)}>
-              <div className="user-avatar">{user.nombre.slice(0,2).toUpperCase()}</div>
+              <div className="user-avatar">{initials}</div>
             </button>
             {userMenu && (
               <div className="user-dropdown">
                 <div className="user-dd-header">
-                  <div style={{fontWeight:500,fontSize:13}}>{user.nombre}</div>
-                  <div style={{fontSize:11,color:'var(--text-tertiary)'}}>{user.email}</div>
-                  <div style={{marginTop:4}}><span className={`badge badge-${user.role==='admin'?'red':user.role==='editor'?'blue':'gray'}`}>{user.role==='admin'?'Administrador':user.role==='editor'?'Editor':'Solo lectura'}</span></div>
+                  <div style={{ fontWeight:500, fontSize:13 }}>{user.nombre}</div>
+                  <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:2 }}>{user.email}</div>
+                  <div style={{ marginTop:6 }}>
+                    <span className={`badge ${roleBadge}`}>{roleLabel}</span>
+                  </div>
                 </div>
-                <div className="user-dd-divider"/>
-                <button className="user-dd-item" onClick={signOut}>Cerrar sesión</button>
+                <div className="user-dd-divider" />
+                <button className="user-dd-item" onClick={() => { setShowPassword(true); setUserMenu(false) }}>
+                  🔑 Cambiar contraseña
+                </button>
+                <div className="user-dd-divider" />
+                <button className="user-dd-item" onClick={signOut} style={{ color:'var(--danger)' }}>
+                  Cerrar sesión
+                </button>
               </div>
             )}
           </div>
 
           {/* Mobile hamburger */}
-          <div ref={menuRef} style={{position:'relative'}}>
+          <div ref={menuRef} style={{ position:'relative' }}>
             <button className="mobile-menu-btn" onClick={() => setMenuOpen(v=>!v)}>☰</button>
             {menuOpen && (
               <div className="mobile-dropdown">
                 {visibleNav.map(n => (
-                  <button key={n.id} className={`mobile-dd-item${page===n.id?' active':''}`} onClick={()=>goTo(n.id)}>
+                  <button key={n.id} className={`mobile-dd-item${page===n.id?' active':''}`} onClick={() => goTo(n.id)}>
                     {n.label}
-                    {n.id==='facturas' && pendientes>0 && <span className="nav-pill">{pendientes}</span>}
+                    {n.id==='facturas' && pendientes>0 && <span className="nav-pill" style={{marginLeft:6}}>{pendientes}</span>}
                   </button>
                 ))}
-                <div className="user-dd-divider"/>
-                <button className="mobile-dd-item" onClick={signOut} style={{color:'var(--danger)'}}>Cerrar sesión</button>
+                <div className="user-dd-divider" />
+                <button className="mobile-dd-item" onClick={() => { setShowPassword(true); setMenuOpen(false) }}>
+                  🔑 Cambiar contraseña
+                </button>
+                <div className="user-dd-divider" />
+                <button className="mobile-dd-item" onClick={signOut} style={{ color:'var(--danger)' }}>
+                  Cerrar sesión
+                </button>
               </div>
             )}
           </div>
@@ -141,7 +158,21 @@ export default function Home() {
         <PageComponent onPendientesChange={setPendientes} />
       </main>
 
+      {showPassword && <CambiarPasswordModal onClose={() => setShowPassword(false)} />}
       <ToastProvider />
     </div>
   )
+}
+
+// Shows red dot on Usuarios nav item when there are pending users
+function PendingBadge() {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.from('usuarios').select('id', { count: 'exact' }).eq('aprobado', false)
+        .then(({ count: c }) => setCount(c || 0))
+    })
+  }, [])
+  if (!count) return null
+  return <span className="nav-pill" style={{ marginLeft: 4 }}>{count}</span>
 }

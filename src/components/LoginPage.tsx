@@ -14,7 +14,6 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
   function reset(m: Mode) { setMode(m); setError(''); setEmail(''); setPassword(''); setNombre('') }
 
-  // ── LOGIN ──────────────────────────────────────────────────
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -33,7 +32,6 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     } finally { setLoading(false) }
   }
 
-  // ── REGISTRO ───────────────────────────────────────────────
   async function handleRegistro(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -45,18 +43,16 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
     setLoading(true)
     try {
-      // signUp con metadata del nombre — el trigger lo crea en usuarios automáticamente
-      const { data, error } = await supabase.auth.signUp({
+      // Crear usuario en Supabase Auth
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
-        options: {
-          data: { nombre: nombre.trim() }
-        }
+        options: { data: { nombre: nombre.trim() } }
       })
-      if (error) throw error
+      if (signUpError) throw signUpError
       if (!data.user) throw new Error('No se pudo crear el usuario')
 
-      // El trigger en Supabase crea el perfil, pero por si acaso también lo intentamos
+      // Insertar perfil pendiente (el trigger también lo hace, esto es por si acaso)
       await supabase.from('usuarios').upsert({
         id:       data.user.id,
         email:    email.toLowerCase().trim(),
@@ -65,7 +61,12 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         aprobado: false,
       }, { onConflict: 'id', ignoreDuplicates: true })
 
-      // Sign out — no puede entrar hasta ser aprobado
+      // Notificar al admin por email via Edge Function
+      await supabase.functions.invoke('notify-admin', {
+        body: { nombre: nombre.trim(), email: email.toLowerCase().trim() }
+      })
+
+      // Cerrar sesión — no puede entrar hasta ser aprobado
       await supabase.auth.signOut()
       setMode('pendiente')
     } catch (err: any) {
@@ -73,17 +74,17 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     } finally { setLoading(false) }
   }
 
-  // ── PANTALLA PENDIENTE ─────────────────────────────────────
   if (mode === 'pendiente') return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="auth-logo" style={{ background: 'var(--success)' }}>✓</div>
+        <div className="auth-logo" style={{ background: 'var(--success)', fontSize: 20 }}>✓</div>
         <h1 className="auth-title">Solicitud enviada</h1>
         <p className="auth-subtitle">
-          Tu solicitud fue enviada correctamente. El administrador la revisará y te dará acceso en breve.
-          Una vez aprobada, podés ingresar con tu email y contraseña.
+          Tu solicitud fue enviada. El administrador la revisará y te dará acceso en breve.
+          Una vez aprobada podés ingresar con tu email y contraseña.
         </p>
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} onClick={() => reset('login')}>
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }}
+          onClick={() => reset('login')}>
           Volver al inicio de sesión
         </button>
       </div>
@@ -110,21 +111,13 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           <form onSubmit={handleLogin}>
             <div className="auth-field">
               <label>Email corporativo</label>
-              <input
-                type="email" value={email}
-                placeholder="nombre@toribioachaval.com"
-                onChange={e => setEmail(e.target.value)}
-                required autoComplete="email"
-              />
+              <input type="email" value={email} placeholder="nombre@toribioachaval.com"
+                onChange={e => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="auth-field">
               <label>Contraseña</label>
-              <input
-                type="password" value={password}
-                placeholder="••••••••"
-                onChange={e => setPassword(e.target.value)}
-                required autoComplete="current-password"
-              />
+              <input type="password" value={password} placeholder="••••••••"
+                onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
             </div>
             {error && <div className="auth-error">{error}</div>}
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
@@ -135,30 +128,18 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           <form onSubmit={handleRegistro}>
             <div className="auth-field">
               <label>Nombre completo *</label>
-              <input
-                type="text" value={nombre}
-                placeholder="Tu nombre y apellido"
-                onChange={e => setNombre(e.target.value)}
-                required
-              />
+              <input type="text" value={nombre} placeholder="Tu nombre y apellido"
+                onChange={e => setNombre(e.target.value)} required />
             </div>
             <div className="auth-field">
               <label>Email corporativo *</label>
-              <input
-                type="email" value={email}
-                placeholder="nombre@toribioachaval.com"
-                onChange={e => setEmail(e.target.value)}
-                required autoComplete="email"
-              />
+              <input type="email" value={email} placeholder="nombre@toribioachaval.com"
+                onChange={e => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="auth-field">
               <label>Contraseña *</label>
-              <input
-                type="password" value={password}
-                placeholder="Mínimo 6 caracteres"
-                onChange={e => setPassword(e.target.value)}
-                required minLength={6}
-              />
+              <input type="password" value={password} placeholder="Mínimo 6 caracteres"
+                onChange={e => setPassword(e.target.value)} required minLength={6} />
             </div>
             {error && <div className="auth-error">{error}</div>}
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>

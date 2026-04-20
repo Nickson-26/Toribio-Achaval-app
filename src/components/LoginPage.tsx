@@ -1,9 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { auth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
-type Mode = 'login' | 'solicitar' | 'enviado'
+type Mode = 'login' | 'registro' | 'pendiente'
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [mode,     setMode]     = useState<Mode>('login')
@@ -13,73 +12,79 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
+  function reset(m: Mode) { setMode(m); setError(''); setEmail(''); setPassword(''); setNombre('') }
+
+  // ── LOGIN ──────────────────────────────────────────────────
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!email.endsWith('@toribioachaval.com')) {
+    if (!email.toLowerCase().endsWith('@toribioachaval.com')) {
       setError('Solo se permiten cuentas @toribioachaval.com')
       return
     }
     setLoading(true)
     try {
-      await auth.signIn(email, password)
-      onLogin()
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
     } catch (err: any) {
-      setError(
-        err.message === 'Invalid login credentials'
-          ? 'Email o contraseña incorrectos'
-          : err.message || 'Error al iniciar sesión'
-      )
+      setError(err.message === 'Invalid login credentials'
+        ? 'Email o contraseña incorrectos'
+        : err.message || 'Error al iniciar sesión')
     } finally { setLoading(false) }
   }
 
-  async function handleSolicitar(e: React.FormEvent) {
+  // ── REGISTRO ───────────────────────────────────────────────
+  async function handleRegistro(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
-    if (!email.endsWith('@toribioachaval.com')) {
+    if (!nombre.trim())  { setError('El nombre es obligatorio'); return }
+    if (!email.toLowerCase().endsWith('@toribioachaval.com')) {
       setError('Solo se permiten cuentas @toribioachaval.com'); return
     }
-    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return }
+    if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return }
 
     setLoading(true)
     try {
-      // Step 1: create auth user
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
+      // signUp con metadata del nombre — el trigger lo crea en usuarios automáticamente
+      const { data, error } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
         password,
-        options: { emailRedirectTo: undefined }
+        options: {
+          data: { nombre: nombre.trim() }
+        }
       })
-      if (signUpError) throw new Error('Error al crear cuenta: ' + signUpError.message)
-      if (!data.user) throw new Error('No se recibió respuesta del servidor')
+      if (error) throw error
+      if (!data.user) throw new Error('No se pudo crear el usuario')
 
-      // Step 2: insert profile
-      const { error: insertError } = await supabase.from('usuarios').insert({
+      // El trigger en Supabase crea el perfil, pero por si acaso también lo intentamos
+      await supabase.from('usuarios').upsert({
         id:       data.user.id,
-        email:    email.trim(),
+        email:    email.toLowerCase().trim(),
         nombre:   nombre.trim(),
         role:     'viewer',
         aprobado: false,
-      })
-      if (insertError) throw new Error('Error al guardar perfil: ' + insertError.message)
+      }, { onConflict: 'id', ignoreDuplicates: true })
 
-      setMode('enviado')
+      // Sign out — no puede entrar hasta ser aprobado
+      await supabase.auth.signOut()
+      setMode('pendiente')
     } catch (err: any) {
-      setError(err.message || 'Error desconocido')
+      setError(err.message || 'Error al enviar la solicitud')
     } finally { setLoading(false) }
   }
 
-  if (mode === 'enviado') return (
+  // ── PANTALLA PENDIENTE ─────────────────────────────────────
+  if (mode === 'pendiente') return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="auth-logo">TA</div>
+        <div className="auth-logo" style={{ background: 'var(--success)' }}>✓</div>
         <h1 className="auth-title">Solicitud enviada</h1>
         <p className="auth-subtitle">
-          Tu solicitud fue enviada. El administrador te dará acceso en breve.
+          Tu solicitud fue enviada correctamente. El administrador la revisará y te dará acceso en breve.
+          Una vez aprobada, podés ingresar con tu email y contraseña.
         </p>
-        <button className="btn btn-primary" style={{ width:'100%', marginTop:16 }}
-          onClick={() => { setMode('login'); setEmail(''); setPassword(''); setNombre('') }}>
-          Volver al inicio
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} onClick={() => reset('login')}>
+          Volver al inicio de sesión
         </button>
       </div>
     </div>
@@ -90,15 +95,13 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
       <div className="auth-card">
         <div className="auth-logo">TA</div>
         <h1 className="auth-title">Toribio Achaval</h1>
-        <p className="auth-subtitle">Sistema de Facturación — Acceso interno</p>
+        <p className="auth-subtitle">Sistema de Facturación</p>
 
         <div className="auth-tabs">
-          <button className={`auth-tab${mode==='login'?' active':''}`}
-            onClick={() => { setMode('login'); setError('') }}>
+          <button className={`auth-tab${mode==='login'?' active':''}`} onClick={() => reset('login')}>
             Iniciar sesión
           </button>
-          <button className={`auth-tab${mode==='solicitar'?' active':''}`}
-            onClick={() => { setMode('solicitar'); setError('') }}>
+          <button className={`auth-tab${mode==='registro'?' active':''}`} onClick={() => reset('registro')}>
             Solicitar acceso
           </button>
         </div>
@@ -107,15 +110,21 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           <form onSubmit={handleLogin}>
             <div className="auth-field">
               <label>Email corporativo</label>
-              <input type="email" placeholder="nombre@toribioachaval.com"
-                value={email} onChange={e => setEmail(e.target.value)}
-                required autoComplete="email" />
+              <input
+                type="email" value={email}
+                placeholder="nombre@toribioachaval.com"
+                onChange={e => setEmail(e.target.value)}
+                required autoComplete="email"
+              />
             </div>
             <div className="auth-field">
               <label>Contraseña</label>
-              <input type="password" placeholder="••••••••"
-                value={password} onChange={e => setPassword(e.target.value)}
-                required autoComplete="current-password" />
+              <input
+                type="password" value={password}
+                placeholder="••••••••"
+                onChange={e => setPassword(e.target.value)}
+                required autoComplete="current-password"
+              />
             </div>
             {error && <div className="auth-error">{error}</div>}
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
@@ -123,30 +132,40 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleSolicitar}>
+          <form onSubmit={handleRegistro}>
             <div className="auth-field">
-              <label>Nombre completo</label>
-              <input type="text" placeholder="Tu nombre y apellido"
-                value={nombre} onChange={e => setNombre(e.target.value)} required />
+              <label>Nombre completo *</label>
+              <input
+                type="text" value={nombre}
+                placeholder="Tu nombre y apellido"
+                onChange={e => setNombre(e.target.value)}
+                required
+              />
             </div>
             <div className="auth-field">
-              <label>Email corporativo</label>
-              <input type="email" placeholder="nombre@toribioachaval.com"
-                value={email} onChange={e => setEmail(e.target.value)}
-                required autoComplete="email" />
+              <label>Email corporativo *</label>
+              <input
+                type="email" value={email}
+                placeholder="nombre@toribioachaval.com"
+                onChange={e => setEmail(e.target.value)}
+                required autoComplete="email"
+              />
             </div>
             <div className="auth-field">
-              <label>Contraseña</label>
-              <input type="password" placeholder="Mínimo 6 caracteres"
-                value={password} onChange={e => setPassword(e.target.value)}
-                required minLength={6} />
+              <label>Contraseña *</label>
+              <input
+                type="password" value={password}
+                placeholder="Mínimo 6 caracteres"
+                onChange={e => setPassword(e.target.value)}
+                required minLength={6}
+              />
             </div>
             {error && <div className="auth-error">{error}</div>}
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? 'Enviando…' : 'Solicitar acceso'}
+              {loading ? 'Enviando solicitud…' : 'Enviar solicitud de acceso'}
             </button>
             <p className="auth-note">
-              El administrador revisará tu solicitud antes de darte acceso.
+              Un administrador revisará tu solicitud y te notificará cuando tengas acceso.
             </p>
           </form>
         )}

@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-type Mode = 'login' | 'registro' | 'pendiente'
+type Mode = 'login' | 'registro' | 'verificar'
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [mode,     setMode]     = useState<Mode>('login')
@@ -14,6 +14,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
   function reset(m: Mode) { setMode(m); setError(''); setEmail(''); setPassword(''); setNombre('') }
 
+  // ── LOGIN ──────────────────────────────────────────────────
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -23,8 +24,36 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     }
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+
+      // Si el email está confirmado pero no tiene perfil todavía, lo creamos
+      if (data.user && data.user.email_confirmed_at) {
+        const { data: profile } = await supabase
+          .from('usuarios').select('id').eq('id', data.user.id).single()
+        
+        if (!profile) {
+          // Crear perfil pendiente de aprobación
+          await supabase.from('usuarios').insert({
+            id:       data.user.id,
+            email:    data.user.email,
+            nombre:   data.user.user_metadata?.nombre || email.split('@')[0],
+            role:     'viewer',
+            aprobado: false,
+          })
+          // Notificar admin
+          await supabase.functions.invoke('notify-admin', {
+            body: { 
+              nombre: data.user.user_metadata?.nombre || email.split('@')[0], 
+              email: data.user.email 
+            }
+          }).catch(() => {})
+          // Sign out — espera aprobación
+          await supabase.auth.signOut()
+          setError('Tu email fue verificado. Tu solicitud está pendiente de aprobación por el administrador.')
+          return
+        }
+      }
     } catch (err: any) {
       setError(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos'
@@ -32,6 +61,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
     } finally { setLoading(false) }
   }
 
+  // ── REGISTRO ───────────────────────────────────────────────
   async function handleRegistro(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -43,49 +73,40 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
     setLoading(true)
     try {
-      // Crear usuario en Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
-        options: { data: { nombre: nombre.trim() } }
+        options: {
+          data: { nombre: nombre.trim() },
+          // Redirect after email confirmation
+          emailRedirectTo: `${window.location.origin}`,
+        }
       })
-      if (signUpError) throw signUpError
-      if (!data.user) throw new Error('No se pudo crear el usuario')
+      if (error) throw error
+      if (!data.user) throw new Error('No se pudo crear la cuenta')
 
-      // Insertar perfil pendiente (el trigger también lo hace, esto es por si acaso)
-      await supabase.from('usuarios').upsert({
-        id:       data.user.id,
-        email:    email.toLowerCase().trim(),
-        nombre:   nombre.trim(),
-        role:     'viewer',
-        aprobado: false,
-      }, { onConflict: 'id', ignoreDuplicates: true })
-
-      // Notificar al admin por email via Edge Function
-      await supabase.functions.invoke('notify-admin', {
-        body: { nombre: nombre.trim(), email: email.toLowerCase().trim() }
-      })
-
-      // Cerrar sesión — no puede entrar hasta ser aprobado
+      // Sign out immediately — user needs to verify email first
       await supabase.auth.signOut()
-      setMode('pendiente')
+      setMode('verificar')
     } catch (err: any) {
       setError(err.message || 'Error al enviar la solicitud')
     } finally { setLoading(false) }
   }
 
-  if (mode === 'pendiente') return (
+  // ── PANTALLA VERIFICAR ─────────────────────────────────────
+  if (mode === 'verificar') return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="auth-logo" style={{ background: 'var(--success)', fontSize: 20 }}>✓</div>
-        <h1 className="auth-title">Solicitud enviada</h1>
+        <div className="auth-logo" style={{ fontSize: 20 }}>📧</div>
+        <h1 className="auth-title">Verificá tu email</h1>
         <p className="auth-subtitle">
-          Tu solicitud fue enviada. El administrador la revisará y te dará acceso en breve.
-          Una vez aprobada podés ingresar con tu email y contraseña.
+          Te enviamos un email a <strong>{email}</strong>.<br/><br/>
+          Hacé click en el link de verificación. Una vez verificado tu email, 
+          el administrador recibirá tu solicitud de acceso y podrá aprobarte.
         </p>
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }}
           onClick={() => reset('login')}>
-          Volver al inicio de sesión
+          Ya verifiqué mi email — ir al inicio
         </button>
       </div>
     </div>
@@ -143,10 +164,11 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
             </div>
             {error && <div className="auth-error">{error}</div>}
             <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
-              {loading ? 'Enviando solicitud…' : 'Enviar solicitud de acceso'}
+              {loading ? 'Enviando…' : 'Solicitar acceso'}
             </button>
             <p className="auth-note">
-              Un administrador revisará tu solicitud y te notificará cuando tengas acceso.
+              Te enviaremos un email para verificar tu cuenta. 
+              El administrador recibirá tu solicitud una vez verificada.
             </p>
           </form>
         )}

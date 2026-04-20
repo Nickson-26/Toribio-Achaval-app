@@ -21,18 +21,27 @@ export default function Usuarios(_: any) {
   }
   useEffect(() => { load() }, [])
 
+  async function handleDelete(u: AppUser, label: string) {
+    if (!confirm(`¿${label} a ${u.nombre}? Esta acción no se puede deshacer.`)) return
+    try {
+      // Delete from usuarios table
+      await supabase.from('usuarios').delete().eq('id', u.id)
+      // Delete from auth.users via admin API
+      await supabase.auth.admin.deleteUser(u.id)
+      toast(`${u.nombre} eliminado`)
+    } catch (e: any) {
+      // If admin API fails (anon key can't do it), just remove from usuarios
+      await supabase.from('usuarios').delete().eq('id', u.id)
+      toast(`${u.nombre} eliminado de la app`)
+    }
+    load()
+  }
+
   async function handleSaveEdit(role: UserRole, aprobado: boolean) {
     if (!sel) return
     await auth.updateUser(sel.id, { role, aprobado })
     toast('✓ Usuario actualizado')
     setModal(null); setSel(null); load()
-  }
-
-  async function handleDelete(u: AppUser) {
-    if (!confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return
-    await auth.deleteUser(u.id)
-    toast(`${u.nombre} eliminado`)
-    load()
   }
 
   const pending  = users.filter(u => !u.aprobado)
@@ -46,7 +55,7 @@ export default function Usuarios(_: any) {
         </button>
       </div>
 
-      {/* Pending approval */}
+      {/* Pending */}
       {pending.length > 0 && (
         <div className="card" style={{ borderColor: 'var(--warn)', marginBottom: 16 }}>
           <div className="card-header">
@@ -70,7 +79,9 @@ export default function Usuarios(_: any) {
                           toast(`✓ ${u.nombre} aprobado`)
                           load()
                         }}>Aprobar</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u)}>Rechazar</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u, 'Rechazar')}>
+                          Rechazar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -81,7 +92,7 @@ export default function Usuarios(_: any) {
         </div>
       )}
 
-      {/* Active users */}
+      {/* Active */}
       <div className="card">
         <div className="card-header">
           <span className="card-title">Usuarios activos ({approved.length})</span>
@@ -95,16 +106,10 @@ export default function Usuarios(_: any) {
                   <tr key={u.id}>
                     <td style={{ fontWeight: 500 }}>
                       {u.nombre}
-                      {u.id === me?.id && (
-                        <span className="badge badge-gray" style={{ marginLeft: 6, fontSize: 10 }}>Vos</span>
-                      )}
+                      {u.id === me?.id && <span className="badge badge-gray" style={{ marginLeft: 6, fontSize: 10 }}>Vos</span>}
                     </td>
                     <td className="text-dim">{u.email}</td>
-                    <td>
-                      <span className={`badge ${ROLE_COLORS[u.role]}`}>
-                        {ROLE_LABELS[u.role]}
-                      </span>
-                    </td>
+                    <td><span className={`badge ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role]}</span></td>
                     <td className="text-dim">{fdate(u.created_at)}</td>
                     <td>
                       {u.id !== me?.id && (
@@ -112,7 +117,7 @@ export default function Usuarios(_: any) {
                           <button className="btn btn-sm" onClick={() => { setSel(u); setModal('edit') }}>
                             Editar rol
                           </button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u)}>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u, 'Eliminar')}>
                             Eliminar
                           </button>
                         </div>
@@ -129,19 +134,20 @@ export default function Usuarios(_: any) {
         )}
       </div>
 
-      {/* Role reference */}
+      {/* Roles reference */}
       <div className="card">
         <div className="card-header"><span className="card-title">Referencia de roles</span></div>
         <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {([['admin','Administrador','Acceso total: dashboard, facturas, recibos, gestión de usuarios'],
-             ['editor','Editor','Puede crear, editar y eliminar comprobantes y recibos'],
-             ['viewer','Solo lectura','Solo puede ver el dashboard y los listados, sin modificar nada']] as [UserRole,string,string][])
-            .map(([role, label, desc]) => (
-              <div key={role} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <span className={`badge ${ROLE_COLORS[role]}`} style={{ marginTop: 2, flexShrink: 0 }}>{label}</span>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{desc}</span>
-              </div>
-            ))}
+          {([
+            ['admin',  'Administrador', 'Acceso total: dashboard, facturas, recibos, gestión de usuarios'],
+            ['editor', 'Editor',        'Puede crear, editar y eliminar comprobantes y recibos'],
+            ['viewer', 'Solo lectura',  'Solo puede ver el dashboard y los listados, sin modificar nada'],
+          ] as [UserRole, string, string][]).map(([role, label, desc]) => (
+            <div key={role} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span className={`badge ${ROLE_COLORS[role]}`} style={{ marginTop: 2, flexShrink: 0 }}>{label}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{desc}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -155,16 +161,15 @@ export default function Usuarios(_: any) {
   )
 }
 
-// ── Invite modal — admin creates user directly ────────────────
 function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [saving,   setSaving]   = useState(false)
   const [nombre,   setNombre]   = useState('')
-  const [emailPre, setEmailPre] = useState('')  // part before @
+  const [emailPre, setEmailPre] = useState('')
   const [password, setPassword] = useState('')
   const [role,     setRole]     = useState<UserRole>('editor')
   const [error,    setError]    = useState('')
 
-  const fullEmail = emailPre.trim() + DOMAIN
+  const fullEmail = emailPre.trim().toLowerCase() + DOMAIN
 
   async function save() {
     setError('')
@@ -174,22 +179,21 @@ function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
     setSaving(true)
     try {
-      // Use Supabase admin to create user
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: fullEmail,
         password,
+        options: { data: { nombre: nombre.trim() } }
       })
       if (signUpError) throw signUpError
       if (!data.user) throw new Error('No se pudo crear el usuario')
 
-      // Insert profile as approved
-      const { error: insertError } = await supabase.from('usuarios').insert({
-        id: data.user.id,
-        email: fullEmail,
-        nombre: nombre.trim(),
+      const { error: insertError } = await supabase.from('usuarios').upsert({
+        id:       data.user.id,
+        email:    fullEmail,
+        nombre:   nombre.trim(),
         role,
         aprobado: true,
-      })
+      }, { onConflict: 'id' })
       if (insertError) throw insertError
 
       toast(`✓ Usuario ${nombre} creado`)
@@ -200,30 +204,23 @@ function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   }
 
   return (
-    <Modal
-      title="Invitar nuevo usuario"
-      onClose={onClose}
+    <Modal title="Invitar nuevo usuario" onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={save} disabled={saving}>
           {saving ? 'Creando…' : 'Crear usuario'}
         </button>
-      </>}
-    >
+      </>}>
       <div className="form-grid">
         <FG label="Nombre completo *" full>
-          <input
-            placeholder="Ej: María García"
-            value={nombre}
-            onChange={e => setNombre(e.target.value)}
-          />
+          <input placeholder="Ej: María García" value={nombre} onChange={e => setNombre(e.target.value)} />
         </FG>
         <FG label="Email *" full>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          <div style={{ display: 'flex' }}>
             <input
               placeholder="nombre.apellido"
               value={emailPre}
-              onChange={e => setEmailPre(e.target.value.replace('@',''))}
+              onChange={e => setEmailPre(e.target.value.replace('@', ''))}
               style={{ borderRadius: 'var(--radius) 0 0 var(--radius)', flex: 1 }}
             />
             <span style={{
@@ -231,20 +228,13 @@ function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
               border: '1px solid var(--border-strong)', borderLeft: 'none',
               borderRadius: '0 var(--radius) var(--radius) 0',
               fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap'
-            }}>
-              @toribioachaval.com
-            </span>
+            }}>@toribioachaval.com</span>
           </div>
         </FG>
         <FG label="Contraseña inicial *" full>
-          <input
-            type="password"
-            placeholder="Mínimo 6 caracteres"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            minLength={6}
-          />
-          <span className="calc-hint">El usuario podrá cambiarla desde su cuenta</span>
+          <input type="password" placeholder="Mínimo 6 caracteres" value={password}
+            onChange={e => setPassword(e.target.value)} minLength={6} />
+          <span className="calc-hint">El usuario puede cambiarla desde su perfil</span>
         </FG>
         <FG label="Rol" full>
           <select value={role} onChange={e => setRole(e.target.value as UserRole)}>
@@ -253,43 +243,25 @@ function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
             <option value="admin">Administrador — acceso total</option>
           </select>
         </FG>
-
-        {error && (
-          <div className="form-group full">
-            <div className="auth-error">{error}</div>
-          </div>
-        )}
-
-        <div className="form-group full" style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius)', padding: '10px 14px' }}>
-          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-            El usuario se crea directamente con acceso aprobado. Compartile el email y la contraseña para que ingrese a la app.
-          </p>
-        </div>
+        {error && <div className="form-group full"><div className="auth-error">{error}</div></div>}
       </div>
     </Modal>
   )
 }
 
-// ── Edit role modal ───────────────────────────────────────────
-function EditUserModal({
-  user, onClose, onSave
-}: {
-  user: AppUser
-  onClose: () => void
+function EditUserModal({ user, onClose, onSave }: {
+  user: AppUser; onClose: () => void
   onSave: (role: UserRole, aprobado: boolean) => void
 }) {
   const [role,     setRole]     = useState<UserRole>(user.role)
   const [aprobado, setAprobado] = useState(user.aprobado)
 
   return (
-    <Modal
-      title={`Editar — ${user.nombre}`}
-      onClose={onClose}
+    <Modal title={`Editar — ${user.nombre}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={() => onSave(role, aprobado)}>Guardar</button>
-      </>}
-    >
+      </>}>
       <div className="form-grid">
         <FG label="Nombre" full>
           <input readOnly value={user.nombre} style={{ color: 'var(--text-tertiary)', cursor: 'default' }} />

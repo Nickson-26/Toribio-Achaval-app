@@ -330,3 +330,146 @@ tbody tr:hover td { background: var(--bg-hover); }
 .user-dd-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
 .user-dd-item    { display: block; width: 100%; padding: 10px 16px; text-align: left; font-size: 13px; color: var(--text-secondary); background: none; border: none; cursor: pointer; transition: background .1s; }
 .user-dd-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ══════════════════════════════════════════════
+   TEMAS — CLARO / OSCURO / ACCESIBLE
+══════════════════════════════════════════════ */
+
+/* MODO CLARO */
+[data-theme="light"] {
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f5f5f4;
+  --bg-tertiary:   #eeeeec;
+  --bg-card:       #ffffff;
+  --bg-hover:      #f0f0ee;
+  --text-primary:  #111111;
+  --text-secondary:#555555;
+  --text-tertiary: #888888;
+  --border:        rgba(0,0,0,0.10);
+  --border-strong: rgba(0,0,0,0.18);
+  --border-red:    rgba(200,16,46,0.3);
+  --accent:        #C8102E;
+  --accent-hover:  #a80d26;
+  --accent-bg:     rgba(200,16,46,0.08);
+  --accent-text:   #9B0B22;
+  --success:       #1a7a3c;
+  --success-bg:    rgba(26,122,60,0.08);
+  --warn:          #7a4f00;
+  --warn-bg:       rgba(122,79,0,0.08);
+  --danger:        #c0392b;
+  --danger-bg:     rgba(192,57,43,0.08);
+  --info:          #1a5fa0;
+  --info-bg:       rgba(26,95,160,0.08);
+}
+
+/* MODO ACCESIBLE — alto contraste, sin dependencia de color */
+[data-theme="accessible"] {
+  --bg-primary:    #000000;
+  --bg-secondary:  #0a0a0a;
+  --bg-tertiary:   #111111;
+  --bg-card:       #0a0a0a;
+  --bg-hover:      #1a1a1a;
+  --text-primary:  #ffffff;
+  --text-secondary:#dddddd;
+  --text-tertiary: #aaaaaa;
+  --border:        rgba(255,255,255,0.25);
+  --border-strong: rgba(255,255,255,0.40);
+  --border-red:    rgba(255,255,100,0.6);
+  --accent:        #FFD700;
+  --accent-hover:  #FFC000;
+  --accent-bg:     rgba(255,215,0,0.15);
+  --accent-text:   #FFD700;
+  --success:       #00FF88;
+  --success-bg:    rgba(0,255,136,0.12);
+  --warn:          #FFB800;
+  --warn-bg:       rgba(255,184,0,0.12);
+  --danger:        #FF6B6B;
+  --danger-bg:     rgba(255,107,107,0.12);
+  --info:          #66CCFF;
+  --info-bg:       rgba(102,204,255,0.12);
+}
+
+[data-theme="accessible"] .btn-primary {
+  background: #FFD700;
+  border-color: #FFD700;
+  color: #000000;
+  font-weight: 700;
+}
+[data-theme="accessible"] .btn-primary:hover {
+  background: #FFC000;
+}
+[data-theme="accessible"] .nav-item.active {
+  background: rgba(255,215,0,0.15);
+  color: #FFD700;
+  border-right-color: #FFD700;
+}
+[data-theme="accessible"] .logo-mark {
+  background: #FFD700;
+  color: #000000;
+}
+[data-theme="accessible"] .metric-card::before {
+  background: #FFD700;
+}
+[data-theme="accessible"] .topnav-item.active {
+  background: rgba(255,215,0,0.15);
+  color: #FFD700;
+}
+[data-theme="accessible"] .auth-logo {
+  background: #FFD700;
+  color: #000000;
+}
+[data-theme="accessible"] table th {
+  border-bottom: 2px solid rgba(255,255,255,0.3);
+}
+[data-theme="accessible"] td {
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Theme switcher */
+.theme-switcher {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+.theme-btn {
+  width: 28px; height: 28px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  transition: background .1s;
+  color: var(--text-secondary);
+}
+.theme-btn:hover { background: var(--bg-hover); }
+.theme-btn.active { background: var(--accent); color: #fff; }
+[data-theme="accessible"] .theme-btn.active { background: #FFD700; color: #000; }
+
+/* Tabs para facturas */
+.fact-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.fact-tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .1s;
+  white-space: nowrap;
+}
+.fact-tab:hover { color: var(--text-primary); }
+.fact-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+[data-theme="accessible"] .fact-tab.active { color: #FFD700; border-bottom-color: #FFD700; }

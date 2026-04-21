@@ -7,9 +7,11 @@ import { CambiarPasswordModal } from '@/components/CambiarPassword'
 import Dashboard    from '@/pages/Dashboard'
 import Facturas     from '@/pages/Facturas'
 import Usuarios     from '@/pages/Usuarios'
+import Informe      from '@/pages/Informe'
 import { Recibos, Clientes, NotasCredito, NotasDebito, Resumen } from '@/pages/OtherPages'
 
-type Page = 'dashboard'|'facturas'|'recibos'|'clientes'|'nc'|'nd'|'usuarios'
+type Page = 'dashboard'|'facturas'|'recibos'|'clientes'|'nc'|'nd'|'usuarios'|'informe'
+type Theme = 'dark'|'light'|'accessible'
 
 const NAV: { id: Page; label: string; adminOnly?: boolean }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -19,16 +21,13 @@ const NAV: { id: Page; label: string; adminOnly?: boolean }[] = [
   { id: 'nc',        label: 'Notas de Crédito' },
   { id: 'nd',        label: 'Notas de Débito' },
   { id: 'usuarios',  label: 'Usuarios', adminOnly: true },
+  { id: 'informe',   label: '↓ Informe PDF', adminOnly: true },
 ]
 
 const COMPONENTS: Record<Page, React.ComponentType<any>> = {
   dashboard: Dashboard, facturas: Facturas, recibos: Recibos,
+  informe: Informe,
   clientes: Clientes, nc: NotasCredito, nd: NotasDebito, usuarios: Usuarios,
-}
-
-const TITLES: Record<Page, string> = {
-  dashboard:'Dashboard', facturas:'Facturas', recibos:'Recibos',
-  clientes:'Clientes', nc:'Notas de Crédito', nd:'Notas de Débito', usuarios:'Gestión de Usuarios',
 }
 
 export default function Home() {
@@ -38,8 +37,30 @@ export default function Home() {
   const [menuOpen,     setMenuOpen]     = useState(false)
   const [userMenu,     setUserMenu]     = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [theme,        setTheme]        = useState<Theme>('dark')
   const menuRef     = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // Apply theme to html element
+  useEffect(() => {
+    const html = document.documentElement
+    if (theme === 'dark') {
+      html.removeAttribute('data-theme')
+    } else {
+      html.setAttribute('data-theme', theme)
+    }
+  }, [theme])
+
+  // Load saved theme
+  useEffect(() => {
+    const saved = localStorage.getItem('ta-theme') as Theme
+    if (saved) setTheme(saved)
+  }, [])
+
+  function applyTheme(t: Theme) {
+    setTheme(t)
+    localStorage.setItem('ta-theme', t)
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -63,7 +84,7 @@ export default function Home() {
       <div className="auth-card">
         <div className="auth-logo">TA</div>
         <h1 className="auth-title">Cuenta pendiente</h1>
-        <p className="auth-subtitle">Tu cuenta está esperando aprobación del administrador. Te avisarán cuando tengas acceso.</p>
+        <p className="auth-subtitle">Tu cuenta está esperando aprobación del administrador.</p>
         <button className="btn btn-primary" style={{ width:'100%', marginTop:16 }} onClick={signOut}>
           Cerrar sesión
         </button>
@@ -75,10 +96,9 @@ export default function Home() {
 
   const visibleNav = NAV.filter(n => !n.adminOnly || isAdmin)
   const PageComponent = COMPONENTS[page]
-
   const initials = user.nombre.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase()
-  const roleLabel = user.role === 'admin' ? 'Administrador' : user.role === 'editor' ? 'Editor' : 'Solo lectura'
   const roleBadge = user.role === 'admin' ? 'badge-red' : user.role === 'editor' ? 'badge-blue' : 'badge-gray'
+  const roleLabel = user.role === 'admin' ? 'Administrador' : user.role === 'editor' ? 'Editor' : 'Solo lectura'
 
   return (
     <div className="app-shell">
@@ -99,11 +119,18 @@ export default function Home() {
         </nav>
 
         <div className="topnav-right">
+          {/* Theme switcher */}
+          <div className="theme-switcher">
+            <button className={`theme-btn${theme==='dark'?' active':''}`} onClick={() => applyTheme('dark')} title="Modo oscuro">🌙</button>
+            <button className={`theme-btn${theme==='light'?' active':''}`} onClick={() => applyTheme('light')} title="Modo claro">☀️</button>
+            <button className={`theme-btn${theme==='accessible'?' active':''}`} onClick={() => applyTheme('accessible')} title="Alto contraste">♿</button>
+          </div>
+
           {(isAdmin || user.role==='editor') && (
             <button className="btn btn-primary btn-sm" onClick={() => goTo('facturas')}>+ Nueva factura</button>
           )}
 
-          {/* User avatar menu */}
+          {/* User menu */}
           <div ref={userMenuRef} style={{ position:'relative' }}>
             <button className="user-avatar-btn" onClick={() => setUserMenu(v=>!v)}>
               <div className="user-avatar">{initials}</div>
@@ -113,9 +140,7 @@ export default function Home() {
                 <div className="user-dd-header">
                   <div style={{ fontWeight:500, fontSize:13 }}>{user.nombre}</div>
                   <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:2 }}>{user.email}</div>
-                  <div style={{ marginTop:6 }}>
-                    <span className={`badge ${roleBadge}`}>{roleLabel}</span>
-                  </div>
+                  <div style={{ marginTop:6 }}><span className={`badge ${roleBadge}`}>{roleLabel}</span></div>
                 </div>
                 <div className="user-dd-divider" />
                 <button className="user-dd-item" onClick={() => { setShowPassword(true); setUserMenu(false) }}>
@@ -145,9 +170,7 @@ export default function Home() {
                   🔑 Cambiar contraseña
                 </button>
                 <div className="user-dd-divider" />
-                <button className="mobile-dd-item" onClick={signOut} style={{ color:'var(--danger)' }}>
-                  Cerrar sesión
-                </button>
+                <button className="mobile-dd-item" onClick={signOut} style={{ color:'var(--danger)' }}>Cerrar sesión</button>
               </div>
             )}
           </div>
@@ -164,7 +187,6 @@ export default function Home() {
   )
 }
 
-// Shows red dot on Usuarios nav item when there are pending users
 function PendingBadge() {
   const [count, setCount] = useState(0)
   useEffect(() => {

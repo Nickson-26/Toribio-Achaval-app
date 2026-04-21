@@ -65,7 +65,7 @@ export default function Reservas(_: any) {
   function getTabData(t: Tab) {
     let rows = all
     if (t === 'EMPRENDIMIENTOS') rows = all.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-    else if (t === 'RESIDENCIAL') rows = all.filter(r => isResidencial(r.unidad))
+    else if (t === 'RESIDENCIAL') rows = all.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
     else if (t === 'COMERCIAL')   rows = all.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
 
     if (t !== 'DASHBOARD') {

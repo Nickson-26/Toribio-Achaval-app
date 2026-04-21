@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ars, usd, fdate, today } from '@/lib/utils'
 import { Spinner, Modal, FG, toast } from '@/components/ui'
+import { useHideNumbers } from '@/components/HideNumbers'
 
 type Tab = 'DASHBOARD' | 'EMPRENDIMIENTOS' | 'RESIDENCIAL' | 'COMERCIAL'
 type Operacion = 'all' | 'VENTA' | 'ALQUILER'
@@ -44,6 +45,7 @@ export default function Reservas(_: any) {
   const barRef   = useRef<HTMLCanvasElement>(null)
   const barChart = useRef<any>(null)
 
+  const { hidden } = useHideNumbers()
   const load = async () => {
     setLoading(true)
     const { data, error } = await supabase.from('reservas').select('*').order('fecha', { ascending: false })
@@ -181,12 +183,12 @@ export default function Reservas(_: any) {
             </div>
             <div className="metric-card">
               <div className="metric-label">Monto ARS</div>
-              <div className="metric-value">{ars(totalARS)}</div>
+              <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{ars(totalARS)}</div>
               <div className="metric-sub">reservas en pesos</div>
             </div>
             <div className="metric-card">
               <div className="metric-label">Monto USD</div>
-              <div className="metric-value">{usd(totalUSD)}</div>
+              <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{usd(totalUSD)}</div>
               <div className="metric-sub">reservas en dólares</div>
             </div>
             <div className="metric-card">

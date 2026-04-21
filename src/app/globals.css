@@ -473,3 +473,18 @@ tbody tr:hover td { background: var(--bg-hover); }
 .fact-tab:hover { color: var(--text-primary); }
 .fact-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 [data-theme="accessible"] .fact-tab.active { color: #FFD700; border-bottom-color: #FFD700; }
+
+/* ── Ocultar números ── */
+.num-hidden {
+  filter: blur(6px);
+  user-select: none;
+  pointer-events: none;
+  transition: filter .2s;
+}
+.eye-btn {
+  background: none; border: 1px solid var(--border-strong);
+  color: var(--text-secondary); padding: 5px 9px;
+  border-radius: var(--radius); cursor: pointer; font-size: 14px;
+  transition: background .1s;
+}
+.eye-btn:hover { background: var(--bg-hover); color: var(--text-primary); }

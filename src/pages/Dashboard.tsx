@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { db } from '@/lib/supabase'
 import { ars, usd, fdate, MESES, PERSONAS } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner } from '@/components/ui'
+import { useHideNumbers } from '@/components/HideNumbers'
 
 const YEARS = ['2026', '2025', '2024']
 
@@ -13,6 +14,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   const [fMes,    setFMes]    = useState('all')
   const [fUnidad, setFUnidad] = useState('all')
 
+  const { hidden } = useHideNumbers()
   const barRef   = useRef<HTMLCanvasElement>(null)
   const lineRef  = useRef<HTMLCanvasElement>(null)
   const donutRef = useRef<HTMLCanvasElement>(null)
@@ -202,24 +204,24 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
       <div className="metrics-grid">
         <div className="metric-card accent">
           <div className="metric-label">Facturado Neto {fYear}</div>
-          <div className="metric-value">{ars(totalNeto)}</div>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{ars(totalNeto)}</div>
           <div className="metric-sub">{facts.length} comprobantes · IVA: {ars(totalIVA)}</div>
         </div>
         <div className="metric-card">
           <div className="metric-label">Facturado USD</div>
-          <div className="metric-value">{usd(totalUSD)}</div>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{usd(totalUSD)}</div>
           <div className="metric-sub">{facts.filter((f:any)=>f.monto_usd).length} en dólares</div>
         </div>
         <div className="metric-card">
           <div className="metric-label">Tasa de cobro</div>
-          <div className="metric-value" style={{ color: pctCobrado>=80?'var(--success)':pctCobrado>=50?'var(--warn)':'var(--danger)' }}>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`} style={{ color: pctCobrado>=80?'var(--success)':pctCobrado>=50?'var(--warn)':'var(--danger)' }}>
             {pctCobrado}%
           </div>
           <div className="metric-sub">{cobradas} cobradas / {facts.length} total</div>
         </div>
         <div className="metric-card">
           <div className="metric-label">Pendiente cobro (neto)</div>
-          <div className="metric-value" style={{ color: 'var(--warn)' }}>{ars(montoPend)}</div>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`} style={{ color: 'var(--warn)' }}>{ars(montoPend)}</div>
           <div className="metric-sub">{pendCount} facturas</div>
         </div>
       </div>
@@ -272,7 +274,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${Math.round((v/topClientes[0][1])*100)}%` }} />
                 </div>
-                <span className="progress-value" style={{ minWidth: 85, fontSize: 11 }}>{ars(v)}</span>
+                <span className={`progress-value${hidden ? " num-hidden" : ""}`} style={{ minWidth: 85, fontSize: 11 }}>{ars(v)}</span>
               </div>
             ))}
           </div>
@@ -290,7 +292,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${Math.round((v/totalNeto)*100)}%` }} />
                 </div>
-                <span className="progress-value">{ars(v)}</span>
+                <span className={`progress-value${hidden ? " num-hidden" : ""}`}>{ars(v)}</span>
               </div>
             ))}
           </div>

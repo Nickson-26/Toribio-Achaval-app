@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/components/AuthProvider'
+import { HideNumbersProvider } from '@/components/HideNumbers'
 
 export const metadata: Metadata = {
   title: 'Toribio Achaval — Facturación',
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body>
         <AuthProvider>
-          {children}
+          <HideNumbersProvider>
+            {children}
+          </HideNumbersProvider>
         </AuthProvider>
       </body>
     </html>

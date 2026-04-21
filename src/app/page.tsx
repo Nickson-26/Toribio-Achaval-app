@@ -4,6 +4,7 @@ import { ToastProvider } from '@/components/ui'
 import { useAuth } from '@/components/AuthProvider'
 import LoginPage from '@/components/LoginPage'
 import { CambiarPasswordModal } from '@/components/CambiarPassword'
+import { useHideNumbers } from '@/components/HideNumbers'
 import Dashboard    from '@/pages/Dashboard'
 import Facturas     from '@/pages/Facturas'
 import Usuarios     from '@/pages/Usuarios'
@@ -40,6 +41,7 @@ const TITLES: Record<Page, string> = {
 
 export default function Home() {
   const { user, loading, signOut, isAdmin } = useAuth()
+  const { hidden, toggle: toggleHide } = useHideNumbers()
   const [page,         setPage]         = useState<Page>('dashboard')
   const [modulo,       setModulo]        = useState<Modulo>('facturacion')
   const [pendientes,   setPendientes]   = useState(0)
@@ -151,6 +153,11 @@ export default function Home() {
         {isReservas && <div style={{ flex: 1 }} />}
 
         <div className="topnav-right">
+          {/* Hide numbers */}
+          <button className="eye-btn" onClick={toggleHide} title={hidden ? 'Mostrar números' : 'Ocultar números'}>
+            {hidden ? '🙈' : '👁'}
+          </button>
+
           {/* Theme switcher */}
           <div className="theme-switcher">
             <button className={`theme-btn${theme==='dark'?' active':''}`} onClick={() => applyTheme('dark')} title="Oscuro">🌙</button>

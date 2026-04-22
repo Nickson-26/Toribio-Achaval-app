@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ars, usd, fdate, today } from '@/lib/utils'
 import { Spinner, Modal, FG, toast } from '@/components/ui'
@@ -33,7 +33,12 @@ const UNIDADES_BY_TAB: Record<string, string[]> = {
   COMERCIAL: COMERCIAL_UNIDADES,
 }
 
-const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MESES = [
+  {num:'01',label:'Enero'},{num:'02',label:'Febrero'},{num:'03',label:'Marzo'},
+  {num:'04',label:'Abril'},{num:'05',label:'Mayo'},{num:'06',label:'Junio'},
+  {num:'07',label:'Julio'},{num:'08',label:'Agosto'},{num:'09',label:'Septiembre'},
+  {num:'10',label:'Octubre'},{num:'11',label:'Noviembre'},{num:'12',label:'Diciembre'},
+]
 
 export default function Reservas(_: any) {
   const [all,        setAll]        = useState<Reserva[]>([])
@@ -42,152 +47,98 @@ export default function Reservas(_: any) {
   const [opFilt,     setOpFilt]     = useState<Operacion>('all')
   const [firmoFilt,  setFirmoFilt]  = useState<FirmoFilter>('all')
   const [unidadFilt, setUnidadFilt] = useState('all')
+  const [mesFilt,    setMesFilt]    = useState('all')
+  const [anioFilt,   setAnioFilt]   = useState('2026')
   const [search,     setSearch]     = useState('')
   const [modal,      setModal]      = useState<'new'|'edit'|null>(null)
   const [sel,        setSel]        = useState<Reserva|null>(null)
-  const barRef   = useRef<HTMLCanvasElement>(null)
-  const barChart = useRef<any>(null)
 
   const { hidden } = useHideNumbers()
 
   const load = async () => {
     setLoading(true)
     const { data, error } = await supabase.from('reservas').select('*').order('fecha', { ascending: false })
-    if (error) { console.error(error); toast('Error cargando reservas') }
+    if (error) toast('Error cargando reservas')
     setAll(data || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [])
-
-  // Reset unidad filter when tab changes
   useEffect(() => { setUnidadFilt('all') }, [tab])
 
   async function handleDelete(id: number) {
     if (!confirm('¿Eliminar esta reserva?')) return
     await supabase.from('reservas').delete().eq('id', id)
-    toast('Reserva eliminada')
-    load()
+    toast('Reserva eliminada'); load()
   }
 
   function getBaseRows(t: Tab) {
-    if (t === 'EMPRENDIMIENTOS') return all.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-    if (t === 'RESIDENCIAL')     return all.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
-    if (t === 'COMERCIAL')       return all.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
-    return all
+    let rows = all
+    if (t === 'EMPRENDIMIENTOS') rows = all.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
+    else if (t === 'RESIDENCIAL') rows = all.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
+    else if (t === 'COMERCIAL')   rows = all.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
+    return rows
   }
 
-  function getTabData(t: Tab) {
-    let rows = getBaseRows(t)
-    if (t !== 'DASHBOARD') {
-      if (unidadFilt !== 'all') rows = rows.filter(r => r.unidad === unidadFilt)
-      if (opFilt !== 'all')     rows = rows.filter(r => r.operacion === opFilt)
-      if (firmoFilt !== 'all')  rows = rows.filter(r => r.firmo === firmoFilt)
-      if (search) rows = rows.filter(r =>
-        r.direccion?.toLowerCase().includes(search.toLowerCase()) ||
-        r.broker?.toLowerCase().includes(search.toLowerCase()) ||
-        r.cliente?.toLowerCase().includes(search.toLowerCase())
-      )
-    }
-    return rows.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))
+  // Apply all filters
+  function applyFilters(rows: Reserva[]) {
+    if (anioFilt !== 'all')    rows = rows.filter(r => r.fecha?.startsWith(anioFilt))
+    if (mesFilt !== 'all')     rows = rows.filter(r => r.fecha?.slice(5,7) === mesFilt)
+    if (unidadFilt !== 'all')  rows = rows.filter(r => r.unidad === unidadFilt)
+    if (opFilt !== 'all')      rows = rows.filter(r => r.operacion === opFilt)
+    if (firmoFilt !== 'all')   rows = rows.filter(r => r.firmo === firmoFilt)
+    if (search) rows = rows.filter(r =>
+      r.direccion?.toLowerCase().includes(search.toLowerCase()) ||
+      r.broker?.toLowerCase().includes(search.toLowerCase()) ||
+      r.cliente?.toLowerCase().includes(search.toLowerCase())
+    )
+    return rows.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''))
   }
 
-  const tabData = getTabData(tab)
+  const tabData = applyFilters(getBaseRows(tab))
 
-  // Dashboard metrics
-  const totalARS  = all.reduce((s, r) => s + (r.monto_ars || 0), 0)
-  const totalUSD  = all.reduce((s, r) => s + (r.monto_usd || 0), 0)
-  const ventas    = all.filter(r => r.operacion === 'VENTA').length
-  const alquis    = all.filter(r => r.operacion === 'ALQUILER').length
-  const firmadas  = all.filter(r => r.firmo === 'FIRMADO').length
-  const pendCount = all.filter(r => r.firmo === 'PENDIENTE').length
+  // Dashboard: use only year filter for overview
+  const dashRows = anioFilt !== 'all' ? all.filter(r => r.fecha?.startsWith(anioFilt)) : all
+  const empRows  = dashRows.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
+  const resRows  = dashRows.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
+  const comRows  = dashRows.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
 
-  // By broker
-  const byBroker: Record<string, number> = {}
-  all.forEach(r => { const b = r.broker || 'Sin broker'; byBroker[b] = (byBroker[b] || 0) + 1 })
-  const topBrokers = Object.entries(byBroker).sort((a, b) => b[1] - a[1]).slice(0, 6)
-
-  // Ventas/Alquileres por unidad por mes (para la tabla mensual)
-  function getMonthlyByUnidad(rows: Reserva[]) {
-    // Get unique unidades in these rows
-    const unidades = Array.from(new Set(rows.map(r => r.unidad))).filter(Boolean).sort()
-    // Get months that have data
-    const mesesConDatos = Array.from(new Set(rows.map(r => r.fecha?.slice(0,7)))).filter(Boolean).sort()
-
-    return { unidades, meses: mesesConDatos }
-  }
-
-  // Chart
-  useEffect(() => {
-    if (tab !== 'DASHBOARD' || loading || typeof window === 'undefined') return
-    import('chart.js/auto').then(({ default: Chart }) => {
-      if (!barRef.current) return
-      barChart.current?.destroy()
-      barChart.current = new Chart(barRef.current, {
-        type: 'bar',
-        data: {
-          labels: MESES_CORTOS,
-          datasets: [
-            {
-              label: 'Ventas',
-              data: Array.from({length:12}, (_,i) => all.filter(r => r.operacion==='VENTA' && parseInt(r.fecha?.slice(5,7)||'0')-1===i).length),
-              backgroundColor: 'rgba(200,16,46,0.7)', borderRadius: 3,
-            },
-            {
-              label: 'Alquileres',
-              data: Array.from({length:12}, (_,i) => all.filter(r => r.operacion==='ALQUILER' && parseInt(r.fecha?.slice(5,7)||'0')-1===i).length),
-              backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 3,
-            }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a8a8a8', font: { size: 10 } } },
-            y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a8a8a8', font: { size: 10 } }, beginAtZero: true }
-          },
-          plugins: { legend: { labels: { color: '#a8a8a8', font: { size: 11 }, padding: 12 } } }
-        }
-      })
-    })
-    return () => barChart.current?.destroy()
-  }, [tab, loading, all])
-
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'DASHBOARD',       label: '◈ Dashboard' },
-    { id: 'EMPRENDIMIENTOS', label: 'Emprendimientos' },
-    { id: 'RESIDENCIAL',     label: 'Residencial' },
-    { id: 'COMERCIAL',       label: 'Comercial' },
+  const TABS = [
+    { id: 'DASHBOARD' as Tab,       label: '◈ Dashboard' },
+    { id: 'EMPRENDIMIENTOS' as Tab,  label: 'Emprendimientos' },
+    { id: 'RESIDENCIAL' as Tab,      label: 'Residencial' },
+    { id: 'COMERCIAL' as Tab,        label: 'Comercial' },
   ]
 
-  // Unidades disponibles para el tab actual
   const unidadesDisponibles = tab !== 'DASHBOARD' ? (UNIDADES_BY_TAB[tab] || []) : []
 
   return (
     <>
-      <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Módulo de Reservas</h2>
-          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas · {firmadas} firmadas</p>
+          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas</p>
         </div>
         {tab !== 'DASHBOARD' && (
-          <button className="btn btn-primary" style={{ background: '#1a6bc8', borderColor: '#1a6bc8' }}
-            onClick={() => setModal('new')}>+ Nueva reserva</button>
+          <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
+            + Nueva reserva
+          </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', marginBottom:20 }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '10px 20px', fontSize: 13, fontWeight: tab===t.id ? 600 : 400,
-            cursor: 'pointer', background: 'none', border: 'none',
+            padding:'10px 20px', fontSize:13, fontWeight: tab===t.id ? 600 : 400,
+            cursor:'pointer', background:'none', border:'none',
             color: tab===t.id ? '#6eb3ff' : 'var(--text-secondary)',
             borderBottom: tab===t.id ? '2px solid #1a6bc8' : '2px solid transparent',
-            marginBottom: -1, transition: 'color .1s', whiteSpace: 'nowrap',
+            marginBottom:-1, whiteSpace:'nowrap',
           }}>
             {t.label}
             {t.id !== 'DASHBOARD' && (
-              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-tertiary)' }}>
+              <span style={{ marginLeft:6, fontSize:11, color:'var(--text-tertiary)' }}>
                 ({getBaseRows(t.id).length})
               </span>
             )}
@@ -195,100 +146,80 @@ export default function Reservas(_: any) {
         ))}
       </div>
 
-      {/* DASHBOARD */}
+      {/* ── DASHBOARD ── */}
       {tab === 'DASHBOARD' && (
         loading ? <Spinner /> : <>
-          <div className="metrics-grid">
-            <div className="metric-card" style={{ borderColor: 'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }} />
+          {/* Filtros del dashboard */}
+          <div className="dash-filters" style={{ marginBottom:20 }}>
+            <label>Año</label>
+            <select value={anioFilt} onChange={e => setAnioFilt(e.target.value)}>
+              <option value="all">Todos</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+            </select>
+            <span className="filter-sep"/>
+            <label>Mes</label>
+            <select value={mesFilt} onChange={e => setMesFilt(e.target.value)}>
+              <option value="all">Todos</option>
+              {MESES.map(m => <option key={m.num} value={m.num}>{m.label}</option>)}
+            </select>
+            {(mesFilt !== 'all') && (
+              <button className="btn btn-sm" onClick={() => setMesFilt('all')}>Limpiar</button>
+            )}
+          </div>
+
+          {/* KPIs */}
+          <div className="metrics-grid" style={{ marginBottom:20 }}>
+            <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
               <div className="metric-label">Total Reservas</div>
-              <div className="metric-value">{all.length}</div>
-              <div className="metric-sub">{ventas} ventas · {alquis} alquileres</div>
+              <div className="metric-value">{dashRows.length}</div>
+              <div className="metric-sub">{dashRows.filter(r=>r.operacion==='VENTA').length} ventas · {dashRows.filter(r=>r.operacion==='ALQUILER').length} alquileres</div>
             </div>
             <div className="metric-card">
-              <div className="metric-label">Monto ARS</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`}>{ars(totalARS)}</div>
-              <div className="metric-sub">reservas en pesos</div>
+              <div className="metric-label">Emprendimientos</div>
+              <div className="metric-value">{empRows.length}</div>
+              <div className="metric-sub">{empRows.filter(r=>r.operacion==='VENTA').length}V · {empRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
             </div>
             <div className="metric-card">
-              <div className="metric-label">Monto USD</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`}>{usd(totalUSD)}</div>
-              <div className="metric-sub">reservas en dólares</div>
+              <div className="metric-label">Residencial</div>
+              <div className="metric-value">{resRows.length}</div>
+              <div className="metric-sub">{resRows.filter(r=>r.operacion==='VENTA').length}V · {resRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
             </div>
             <div className="metric-card">
-              <div className="metric-label">Firmadas</div>
-              <div className="metric-value" style={{ color: firmadas > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>{firmadas}</div>
-              <div className="metric-sub">{pendCount} pendientes</div>
+              <div className="metric-label">Comercial</div>
+              <div className="metric-value">{comRows.length}</div>
+              <div className="metric-sub">{comRows.filter(r=>r.operacion==='VENTA').length}V · {comRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
             </div>
           </div>
 
-          <div className="two-col">
-            <div className="card">
-              <div className="card-header"><span className="card-title">Reservas mensuales 2026</span></div>
-              <div style={{ padding: '12px 16px 16px', height: 200 }}>
-                <canvas ref={barRef} />
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-header"><span className="card-title">Top brokers</span></div>
-              <div style={{ padding: '12px 16px' }}>
-                {topBrokers.map(([broker, count]) => (
-                  <div key={broker} className="progress-row" style={{ marginBottom: 8 }}>
-                    <span className="progress-label">{broker}</span>
-                    <div className="progress-track">
-                      <div style={{ height:6, borderRadius:3, background:'#1a6bc8', width:`${Math.round((count/topBrokers[0][1])*100)}%` }} />
-                    </div>
-                    <span style={{ fontSize:11, color:'var(--text-secondary)', minWidth:30, textAlign:'right' }}>{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Resumen por módulo */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:16 }}>
-            {(['EMPRENDIMIENTOS','RESIDENCIAL','COMERCIAL'] as Tab[]).map(t => {
-              const d = getBaseRows(t)
-              const v = d.filter(r=>r.operacion==='VENTA').length
-              const a = d.filter(r=>r.operacion==='ALQUILER').length
-              const usdT = d.reduce((s,r)=>s+(r.monto_usd||0),0)
-              const arsT = d.reduce((s,r)=>s+(r.monto_ars||0),0)
-              return (
-                <div key={t} className="card" style={{ cursor:'pointer' }} onClick={()=>setTab(t)}>
-                  <div className="card-header">
-                    <span className="card-title">{t.charAt(0)+t.slice(1).toLowerCase()}</span>
-                    <span className="card-hint">{d.length} reservas</span>
-                  </div>
-                  <div style={{ padding:'12px 16px' }}>
-                    <div className="sum-row"><span>Ventas</span><span style={{fontWeight:500}}>{v}</span></div>
-                    <div className="sum-row"><span>Alquileres</span><span style={{fontWeight:500}}>{a}</span></div>
-                    {arsT > 0 && <div className="sum-row"><span>ARS</span><span className={hidden?'num-hidden':''}>{ars(arsT)}</span></div>}
-                    {usdT > 0 && <div className="sum-row"><span>USD</span><span className={hidden?'num-hidden':''}>{usd(usdT)}</span></div>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Tabla mensual por unidad — TODAS LAS UNIDADES */}
-          <TablaUnidadMes rows={all} titulo="Ventas y Alquileres por Unidad por Mes" />
+          {/* 3 tablas */}
+          <ResumenTable titulo="Emprendimientos" rows={empRows} unidades={EMPRENDIMIENTOS_UNIDADES} mesFilt={mesFilt} />
+          <ResumenTable titulo="Residencial — Plataformas" rows={resRows} unidades={RESIDENCIAL_UNIDADES} mesFilt={mesFilt} />
+          <ResumenTable titulo="Comercial" rows={comRows} unidades={COMERCIAL_UNIDADES} mesFilt={mesFilt} />
         </>
       )}
 
-      {/* LISTING TABS */}
+      {/* ── LISTADO ── */}
       {tab !== 'DASHBOARD' && (
         <>
           <div className="toolbar">
             <input placeholder="Buscar dirección, broker, cliente…" value={search} onChange={e=>setSearch(e.target.value)} />
-
-            {/* Filtro por unidad — solo si el tab tiene múltiples unidades */}
+            <select value={anioFilt} onChange={e=>setAnioFilt(e.target.value)}>
+              <option value="all">Todos los años</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+            </select>
+            <select value={mesFilt} onChange={e=>setMesFilt(e.target.value)}>
+              <option value="all">Todos los meses</option>
+              {MESES.map(m=><option key={m.num} value={m.num}>{m.label}</option>)}
+            </select>
             {unidadesDisponibles.length > 1 && (
-              <select value={unidadFilt} onChange={e=>setUnidadFilt(e.target.value)} style={{ width: 200 }}>
+              <select value={unidadFilt} onChange={e=>setUnidadFilt(e.target.value)}>
                 <option value="all">Todas las unidades</option>
-                {unidadesDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
+                {unidadesDisponibles.map(u=><option key={u} value={u}>{u}</option>)}
               </select>
             )}
-
             <select value={opFilt} onChange={e=>setOpFilt(e.target.value as Operacion)}>
               <option value="all">Venta + Alquiler</option>
               <option value="VENTA">Solo Ventas</option>
@@ -303,7 +234,7 @@ export default function Reservas(_: any) {
 
           <div className="metrics-grid" style={{ gridTemplateColumns:'repeat(4,minmax(0,1fr))', marginBottom:16 }}>
             <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }} />
+              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
               <div className="metric-label">Total</div>
               <div className="metric-value">{tabData.length}</div>
             </div>
@@ -321,19 +252,13 @@ export default function Reservas(_: any) {
             </div>
           </div>
 
-          {/* Tabla mensual por unidad para este tab */}
-          <TablaUnidadMes
-            rows={getBaseRows(tab)}
-            titulo={`Ventas y Alquileres por Unidad — ${tab.charAt(0)+tab.slice(1).toLowerCase()}`}
-          />
+          {/* Tabla de brokers de esta sección */}
+          <BrokersTable rows={getBaseRows(tab)} titulo={`Brokers — ${tab.charAt(0)+tab.slice(1).toLowerCase()}`} />
 
           {loading ? <Spinner /> : (
             <div className="card">
               <div className="card-header">
-                <span className="card-title">
-                  {tab.charAt(0)+tab.slice(1).toLowerCase()}
-                  {unidadFilt !== 'all' ? ` — ${unidadFilt}` : ''} · {tabData.length} reservas
-                </span>
+                <span className="card-title">{tabData.length} reservas</span>
               </div>
               <div className="table-wrap">
                 <table>
@@ -351,9 +276,9 @@ export default function Reservas(_: any) {
                     ) : tabData.map(r => (
                       <tr key={r.id}>
                         <td>{fdate(r.fecha)}</td>
-                        <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
-                        <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.broker || '—'}</td>
-                        <td style={{ fontSize:11.5 }}>{r.cliente || '—'}</td>
+                        <td style={{ maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
+                        <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.broker||'—'}</td>
+                        <td style={{ fontSize:11.5 }}>{r.cliente||'—'}</td>
                         <td><span className={`badge ${r.operacion==='VENTA'?'badge-red':'badge-blue'}`}>{r.operacion}</span></td>
                         <td style={{ fontSize:11, color:'var(--text-tertiary)' }}>{r.unidad}</td>
                         <td className="text-right text-mono">{ars(r.monto_ars)}</td>
@@ -376,98 +301,146 @@ export default function Reservas(_: any) {
         </>
       )}
 
-      {modal==='new' && (
-        <ReservaModal tab={tab as any} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load()}} />
-      )}
-      {modal==='edit' && sel && (
-        <ReservaModal tab={tab as any} reserva={sel} onClose={()=>{setModal(null);setSel(null)}} onSaved={()=>{setModal(null);setSel(null);load()}} />
-      )}
+      {modal==='new' && <ReservaModal tab={tab as any} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load()}} />}
+      {modal==='edit' && sel && <ReservaModal tab={tab as any} reserva={sel} onClose={()=>{setModal(null);setSel(null)}} onSaved={()=>{setModal(null);setSel(null);load()}} />}
     </>
   )
 }
 
-// ── Tabla mensual por unidad ──────────────────────────────────
-function TablaUnidadMes({ rows, titulo }: { rows: Reserva[]; titulo: string }) {
-  const unidades = Array.from(new Set(rows.map(r => r.unidad))).filter(Boolean).sort()
-  const meses    = Array.from(new Set(rows.map(r => r.fecha?.slice(0,7)))).filter(Boolean).sort()
+// ── Tabla resumen por unidad ──────────────────────────────────
+function ResumenTable({ titulo, rows, unidades, mesFilt }: {
+  titulo: string; rows: Reserva[]; unidades: string[]; mesFilt: string
+}) {
+  if (!rows.length) return null
 
-  if (!unidades.length || !meses.length) return null
+  // Get months that have data
+  const mesesConDatos = Array.from(new Set(rows.map(r => r.fecha?.slice(0,7)))).filter(Boolean).sort()
+  const mesesFiltrados = mesFilt !== 'all'
+    ? mesesConDatos.filter(m => m?.slice(5,7) === mesFilt)
+    : mesesConDatos
 
-  // Count ventas and alquileres per unidad per mes
-  function getCount(unidad: string, mes: string, op: string) {
-    return rows.filter(r => r.unidad === unidad && r.fecha?.slice(0,7) === mes && r.operacion === op).length
+  function count(unidad: string, mes: string, op: string) {
+    return rows.filter(r => r.unidad===unidad && r.fecha?.slice(0,7)===mes && r.operacion===op).length
   }
-  function getTotal(unidad: string, op: string) {
-    return rows.filter(r => r.unidad === unidad && r.operacion === op).length
+  function countAll(unidad: string, op: string) {
+    return rows.filter(r => r.unidad===unidad && r.operacion===op).length
   }
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header"><span className="card-title">{titulo}</span></div>
+    <div className="card" style={{ marginBottom:20 }}>
+      <div className="card-header">
+        <span className="card-title">{titulo}</span>
+        <span className="card-hint">
+          {rows.filter(r=>r.operacion==='VENTA').length} ventas · {rows.filter(r=>r.operacion==='ALQUILER').length} alquileres
+        </span>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th style={{ minWidth: 160 }}>Unidad</th>
-              {meses.map(m => (
-                <th key={m} className="text-right" colSpan={2} style={{ borderLeft: '1px solid var(--border)' }}>
-                  {m.slice(5,7)}/{m.slice(2,4)}
+              <th style={{ minWidth:160 }}>Unidad</th>
+              {mesesFiltrados.map(m => (
+                <th key={m} className="text-right" colSpan={2}
+                  style={{ borderLeft:'1px solid var(--border)', fontSize:10 }}>
+                  {m?.slice(5,7)}/{m?.slice(2,4)}
                 </th>
               ))}
-              <th className="text-right" style={{ borderLeft: '1px solid var(--border)' }} colSpan={2}>Total</th>
+              <th className="text-right" colSpan={2} style={{ borderLeft:'1px solid var(--border)', background:'var(--bg-tertiary)', fontSize:10 }}>
+                TOTAL
+              </th>
             </tr>
             <tr>
-              <th style={{ fontSize: 9, color: 'var(--text-tertiary)' }}></th>
-              {meses.map(m => (
-                <>
-                  <th key={`${m}-v`} className="text-right" style={{ fontSize: 9, color: 'var(--danger)', borderLeft: '1px solid var(--border)' }}>V</th>
-                  <th key={`${m}-a`} className="text-right" style={{ fontSize: 9, color: 'var(--info)' }}>A</th>
-                </>
-              ))}
-              <th className="text-right" style={{ fontSize: 9, color: 'var(--danger)', borderLeft: '1px solid var(--border)' }}>V</th>
-              <th className="text-right" style={{ fontSize: 9, color: 'var(--info)' }}>A</th>
+              <th style={{ fontSize:9 }}></th>
+              {mesesFiltrados.map(m => (<>
+                <th key={`${m}v`} style={{ fontSize:9, color:'var(--danger)', borderLeft:'1px solid var(--border)', textAlign:'right' }}>V</th>
+                <th key={`${m}a`} style={{ fontSize:9, color:'var(--info)', textAlign:'right' }}>A</th>
+              </>))}
+              <th style={{ fontSize:9, color:'var(--danger)', borderLeft:'1px solid var(--border)', textAlign:'right', background:'var(--bg-tertiary)' }}>V</th>
+              <th style={{ fontSize:9, color:'var(--info)', textAlign:'right', background:'var(--bg-tertiary)' }}>A</th>
             </tr>
           </thead>
           <tbody>
-            {unidades.map(u => (
-              <tr key={u}>
-                <td style={{ fontWeight: 500, fontSize: 12 }}>{u}</td>
-                {meses.map(m => {
-                  const v = getCount(u, m, 'VENTA')
-                  const a = getCount(u, m, 'ALQUILER')
-                  return (
-                    <>
-                      <td key={`${u}-${m}-v`} className="text-right" style={{ borderLeft: '1px solid var(--border)', color: v > 0 ? 'var(--danger)' : 'var(--text-tertiary)', fontWeight: v > 0 ? 600 : 400 }}>{v || '—'}</td>
-                      <td key={`${u}-${m}-a`} className="text-right" style={{ color: a > 0 ? 'var(--info)' : 'var(--text-tertiary)', fontWeight: a > 0 ? 600 : 400 }}>{a || '—'}</td>
-                    </>
-                  )
-                })}
-                <td className="text-right" style={{ borderLeft: '1px solid var(--border)', color: 'var(--danger)', fontWeight: 600 }}>{getTotal(u,'VENTA') || '—'}</td>
-                <td className="text-right" style={{ color: 'var(--info)', fontWeight: 600 }}>{getTotal(u,'ALQUILER') || '—'}</td>
-              </tr>
-            ))}
-            {/* Totals row */}
-            <tr style={{ background: 'var(--bg-secondary)' }}>
-              <td style={{ fontWeight: 700, fontSize: 12 }}>TOTAL</td>
-              {meses.map(m => {
-                const v = rows.filter(r => r.fecha?.slice(0,7)===m && r.operacion==='VENTA').length
-                const a = rows.filter(r => r.fecha?.slice(0,7)===m && r.operacion==='ALQUILER').length
-                return (
-                  <>
-                    <td key={`tot-${m}-v`} className="text-right" style={{ borderLeft: '1px solid var(--border)', fontWeight: 700, color: 'var(--danger)' }}>{v || '—'}</td>
-                    <td key={`tot-${m}-a`} className="text-right" style={{ fontWeight: 700, color: 'var(--info)' }}>{a || '—'}</td>
-                  </>
-                )
+            {unidades.map(u => {
+              const totalV = countAll(u,'VENTA')
+              const totalA = countAll(u,'ALQUILER')
+              if (totalV + totalA === 0) return null
+              return (
+                <tr key={u}>
+                  <td style={{ fontWeight:500, fontSize:12 }}>{u}</td>
+                  {mesesFiltrados.map(m => {
+                    const v = count(u, m!, 'VENTA')
+                    const a = count(u, m!, 'ALQUILER')
+                    return (<>
+                      <td key={`${u}${m}v`} className="text-right" style={{ borderLeft:'1px solid var(--border)', color: v>0?'var(--danger)':'var(--text-tertiary)', fontWeight: v>0?600:400 }}>{v||'—'}</td>
+                      <td key={`${u}${m}a`} className="text-right" style={{ color: a>0?'var(--info)':'var(--text-tertiary)', fontWeight: a>0?600:400 }}>{a||'—'}</td>
+                    </>)
+                  })}
+                  <td className="text-right" style={{ borderLeft:'1px solid var(--border)', color:'var(--danger)', fontWeight:700, background:'var(--bg-secondary)' }}>{totalV||'—'}</td>
+                  <td className="text-right" style={{ color:'var(--info)', fontWeight:700, background:'var(--bg-secondary)' }}>{totalA||'—'}</td>
+                </tr>
+              )
+            })}
+            <tr style={{ background:'var(--bg-secondary)' }}>
+              <td style={{ fontWeight:700, fontSize:12 }}>TOTAL</td>
+              {mesesFiltrados.map(m => {
+                const v = rows.filter(r=>r.fecha?.slice(0,7)===m&&r.operacion==='VENTA').length
+                const a = rows.filter(r=>r.fecha?.slice(0,7)===m&&r.operacion==='ALQUILER').length
+                return (<>
+                  <td key={`tot${m}v`} className="text-right" style={{ borderLeft:'1px solid var(--border)', fontWeight:700, color:'var(--danger)' }}>{v||'—'}</td>
+                  <td key={`tot${m}a`} className="text-right" style={{ fontWeight:700, color:'var(--info)' }}>{a||'—'}</td>
+                </>)
               })}
-              <td className="text-right" style={{ borderLeft: '1px solid var(--border)', fontWeight: 700, color: 'var(--danger)' }}>{rows.filter(r=>r.operacion==='VENTA').length}</td>
-              <td className="text-right" style={{ fontWeight: 700, color: 'var(--info)' }}>{rows.filter(r=>r.operacion==='ALQUILER').length}</td>
+              <td className="text-right" style={{ borderLeft:'1px solid var(--border)', fontWeight:700, color:'var(--danger)' }}>{rows.filter(r=>r.operacion==='VENTA').length}</td>
+              <td className="text-right" style={{ fontWeight:700, color:'var(--info)' }}>{rows.filter(r=>r.operacion==='ALQUILER').length}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--text-tertiary)' }}>
-        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>V</span> = Ventas &nbsp;·&nbsp;
-        <span style={{ color: 'var(--info)', fontWeight: 600 }}>A</span> = Alquileres
+      <div style={{ padding:'6px 16px', fontSize:11, color:'var(--text-tertiary)' }}>
+        <span style={{ color:'var(--danger)', fontWeight:600 }}>V</span> = Ventas &nbsp;·&nbsp;
+        <span style={{ color:'var(--info)', fontWeight:600 }}>A</span> = Alquileres
+      </div>
+    </div>
+  )
+}
+
+// ── Tabla de brokers por unidad ───────────────────────────────
+function BrokersTable({ rows, titulo }: { rows: Reserva[]; titulo: string }) {
+  const byUnidad: Record<string, Record<string, { v:number; a:number }>> = {}
+
+  rows.forEach(r => {
+    const broker = r.broker || 'Sin asignar'
+    const unidad = r.unidad
+    if (!byUnidad[unidad]) byUnidad[unidad] = {}
+    if (!byUnidad[unidad][broker]) byUnidad[unidad][broker] = { v:0, a:0 }
+    if (r.operacion==='VENTA') byUnidad[unidad][broker].v++
+    else byUnidad[unidad][broker].a++
+  })
+
+  const unidades = Object.keys(byUnidad).sort()
+  if (!unidades.length) return null
+
+  return (
+    <div className="card" style={{ marginBottom:16 }}>
+      <div className="card-header"><span className="card-title">{titulo}</span></div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:0 }}>
+        {unidades.map(u => (
+          <div key={u} style={{ borderRight:'1px solid var(--border)', padding:'12px 16px' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-tertiary)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:10 }}>{u}</div>
+            {Object.entries(byUnidad[u])
+              .sort((a,b) => (b[1].v+b[1].a) - (a[1].v+a[1].a))
+              .map(([broker, counts]) => (
+                <div key={broker} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid var(--border)', fontSize:12 }}>
+                  <span style={{ color:'var(--text-secondary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:160 }}>{broker}</span>
+                  <span style={{ display:'flex', gap:8, flexShrink:0 }}>
+                    {counts.v > 0 && <span style={{ color:'var(--danger)', fontWeight:600, fontSize:11 }}>{counts.v}V</span>}
+                    {counts.a > 0 && <span style={{ color:'var(--info)', fontWeight:600, fontSize:11 }}>{counts.a}A</span>}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -476,7 +449,7 @@ function TablaUnidadMes({ rows, titulo }: { rows: Reserva[]; titulo: string }) {
 // ── Modal ─────────────────────────────────────────────────────
 function ReservaModal({ tab, reserva, onClose, onSaved }: {
   tab: 'EMPRENDIMIENTOS'|'RESIDENCIAL'|'COMERCIAL'
-  reserva?: Reserva; onClose: ()=>void; onSaved: ()=>void
+  reserva?: Reserva; onClose:()=>void; onSaved:()=>void
 }) {
   const isEdit = !!reserva
   const [saving,  setSaving]  = useState(false)
@@ -499,10 +472,10 @@ function ReservaModal({ tab, reserva, onClose, onSaved }: {
     try {
       const payload = {
         fecha, direccion: dir.trim(),
-        broker: broker.trim() || null, cliente: cliente.trim() || null,
-        operacion: op, unidad: unidad || unidades[0],
-        monto_ars: arsV ? parseFloat(arsV) : null,
-        monto_usd: usdV ? parseFloat(usdV) : null,
+        broker: broker.trim()||null, cliente: cliente.trim()||null,
+        operacion: op, unidad: unidad||unidades[0],
+        monto_ars: arsV?parseFloat(arsV):null,
+        monto_usd: usdV?parseFloat(usdV):null,
         modo_pago: pago, firmo,
       }
       if (isEdit && reserva) {
@@ -514,7 +487,7 @@ function ReservaModal({ tab, reserva, onClose, onSaved }: {
       }
       onSaved()
     } catch (e: any) {
-      toast('Error: ' + (e.message || ''))
+      toast('Error: '+(e.message||''))
     } finally { setSaving(false) }
   }
 
@@ -525,23 +498,21 @@ function ReservaModal({ tab, reserva, onClose, onSaved }: {
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={save} disabled={saving}>
-          {saving ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear reserva'}
+          {saving?'Guardando…':isEdit?'Guardar cambios':'Crear reserva'}
         </button>
       </>}
     >
       <div className="form-grid">
-        <FG label="Fecha *"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} /></FG>
+        <FG label="Fecha *"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
         <FG label="Operación *">
           <select value={op} onChange={e=>setOp(e.target.value)}>
             <option value="VENTA">Venta</option>
             <option value="ALQUILER">Alquiler</option>
           </select>
         </FG>
-        <FG label="Dirección *" full>
-          <input placeholder="Ej: Av. Santa Fe 1234 3° A" value={dir} onChange={e=>setDir(e.target.value)} />
-        </FG>
-        <FG label="Broker"><input placeholder="Nombre del broker" value={broker} onChange={e=>setBroker(e.target.value)} /></FG>
-        <FG label="Cliente"><input placeholder="Nombre del cliente" value={cliente} onChange={e=>setCliente(e.target.value)} /></FG>
+        <FG label="Dirección *" full><input placeholder="Ej: Av. Santa Fe 1234 3° A" value={dir} onChange={e=>setDir(e.target.value)}/></FG>
+        <FG label="Broker"><input placeholder="Nombre del broker" value={broker} onChange={e=>setBroker(e.target.value)}/></FG>
+        <FG label="Cliente"><input placeholder="Nombre del cliente" value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
         <FG label="Unidad">
           <select value={unidad} onChange={e=>setUnidad(e.target.value)}>
             {unidades.map(u=><option key={u} value={u}>{u}</option>)}
@@ -552,8 +523,8 @@ function ReservaModal({ tab, reserva, onClose, onSaved }: {
             {['EFECTIVO','TRANSFERENCIA','CHEQUE','OTRO'].map(p=><option key={p}>{p}</option>)}
           </select>
         </FG>
-        <FG label="Monto ARS"><input type="number" min="0" placeholder="0" value={arsV} onChange={e=>setArs(e.target.value)} /></FG>
-        <FG label="Monto USD"><input type="number" min="0" placeholder="0" value={usdV} onChange={e=>setUsd(e.target.value)} /></FG>
+        <FG label="Monto ARS"><input type="number" min="0" placeholder="0" value={arsV} onChange={e=>setArs(e.target.value)}/></FG>
+        <FG label="Monto USD"><input type="number" min="0" placeholder="0" value={usdV} onChange={e=>setUsd(e.target.value)}/></FG>
         <FG label="Estado firma">
           <select value={firmo} onChange={e=>setFirmo(e.target.value)}>
             <option value="PENDIENTE">Pendiente</option>

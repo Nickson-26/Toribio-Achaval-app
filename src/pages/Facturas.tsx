@@ -1,11 +1,11 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { db, Comprobante } from '@/lib/supabase'
+import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, toast } from '@/components/ui'
 import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal } from '@/components/ComprobanteForms'
 
-type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | null
+type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'eliminar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -48,6 +48,14 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     if (!confirm(`¿Confirmar anulación de ${id}?`)) return
     await db.deleteComprobante(id)
     toast(`Comprobante ${id} anulado`)
+    closeModal(); load()
+  }
+
+  async function handleEliminar(id: string) {
+    if (!confirm(`¿Eliminar PERMANENTEMENTE ${id}? Esta acción no se puede deshacer.`)) return
+    const { error } = await supabase.from('comprobantes').delete().eq('id', id)
+    if (error) { toast('Error al eliminar: ' + error.message); return }
+    toast(`${id} eliminada`)
     closeModal(); load()
   }
 
@@ -160,6 +168,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                         {f.estado === 'pendiente' && (
                           <button className="btn btn-sm btn-primary" onClick={() => { setSelected(f); setModal('cobrar') }}>Cobrar</button>
                         )}
+                        <button className="btn btn-sm btn-danger" onClick={() => { setSelected(f); setModal('eliminar') }}>Eliminar</button>
                       </div>
                     </td>
                   </tr>
@@ -223,6 +232,32 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           onClose={closeModal}
           onSaved={() => { closeModal(); load() }}
         />
+      )}
+
+      {modal === 'eliminar' && selected && (
+        <Modal
+          title={`Eliminar factura — ${selected.id}`}
+          onClose={closeModal}
+          footer={<>
+            <button className="btn" onClick={closeModal}>Cancelar</button>
+            <button className="btn btn-danger" onClick={() => handleEliminar(selected!.id)}>
+              Eliminar definitivamente
+            </button>
+          </>}
+        >
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+            <p style={{ fontSize: 14, color: 'var(--text-primary)', marginBottom: 8, fontWeight: 500 }}>
+              ¿Eliminar <strong>{selected.id}</strong>?
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              {selected.cliente} — {selected.fecha}
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 12 }}>
+              Esta acción es permanente y no se puede deshacer.
+            </p>
+          </div>
+        </Modal>
       )}
 
       {modal === 'cobrar' && selected && (

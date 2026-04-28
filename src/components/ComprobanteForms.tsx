@@ -304,7 +304,7 @@ export function MarcarCobradaModal({
       await db.updateComprobante(comp.id, { estado: 'cobrada', recibo_id: rId, fecha_cobro: fecha })
       await db.createRecibo({
         id: rId, fecha, cliente: comp.cliente,
-        nro_fact: comp.id.split('-').pop() ?? comp.id,
+        nro_fact: comp.id,  // ID completo ej: FC-A-4086 o FC-B-4070
         persona: comp.persona,
         monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
         forma_pago: pago, retencion: null,

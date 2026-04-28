@@ -97,11 +97,18 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
   const [saving,setSaving]=useState(false)
   const [fecha,setFecha]=useState(today())
   const [cliente,setCliente]=useState('')
+  const [tipoFact,setTipoFact]=useState('FACT A')
   const [nroFact,setNroFact]=useState('')
   const [persona,setPersona]=useState(PERSONAS[0])
   const [pago,setPago]=useState('transferencia')
   const [arsV,setArs]=useState('')
   const [usdV,setUsd]=useState('')
+
+  const tipoMap: Record<string,string> = {
+    'FACT A':'FC-A','FACT B':'FC-B','FACT DE CREDITO':'FC-FC',
+    'FACT E':'FC-E','NC A':'NC-A','NC B':'NC-B'
+  }
+  const fullFactId = nroFact.trim() ? `${tipoMap[tipoFact]}-${nroFact.trim()}` : null
 
   async function save() {
     if (!cliente.trim()) return toast('El cliente es obligatorio')
@@ -109,7 +116,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
     try {
       const { data: last } = await supabase.from('recibos').select('id').order('id',{ascending:false}).limit(1)
       const nextId = last&&last[0] ? last[0].id+1 : 19200
-      await db.createRecibo({ id:nextId, fecha, cliente:cliente.trim(), nro_fact:nroFact||null, persona, forma_pago:pago, monto_ars:arsV?parseFloat(arsV):null, monto_usd:usdV?parseFloat(usdV):null, retencion:null, nro_echeq:null })
+      await db.createRecibo({ id:nextId, fecha, cliente:cliente.trim(), nro_fact:fullFactId, persona, forma_pago:pago, monto_ars:arsV?parseFloat(arsV):null, monto_usd:usdV?parseFloat(usdV):null, retencion:null, nro_echeq:null })
       toast(`✓ Recibo ${nextId} guardado`)
       onSaved()
     } catch(e:any) { toast('Error: '+(e.message||'')) } finally { setSaving(false) }
@@ -127,7 +134,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
         </FG>
         <FG label="N° Factura">
           <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4086"/>
-          {nroFact && <span className="calc-hint">ID completo: FC-{tipoFact.split(' ')[1]}-{nroFact}</span>}
+          {nroFact && <span className="calc-hint">ID: {tipoMap[tipoFact]}-{nroFact}</span>}
         </FG>
         <FG label="Persona / Unidad"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>

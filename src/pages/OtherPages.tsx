@@ -120,7 +120,15 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
       <div className="form-grid">
         <FG label="Fecha *"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
         <FG label="Cliente *" full><input value={cliente} onChange={e=>setCliente(e.target.value)} placeholder="Razón social"/></FG>
-        <FG label="N° Factura"><input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4070"/></FG>
+        <FG label="Tipo de factura">
+          <select value={tipoFact} onChange={e=>setTipoFact(e.target.value)}>
+            {['FACT A','FACT B','FACT DE CREDITO','FACT E','NC A','NC B'].map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </FG>
+        <FG label="N° Factura">
+          <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4086"/>
+          {nroFact && <span className="calc-hint">ID completo: FC-{tipoFact.split(' ')[1]}-{nroFact}</span>}
+        </FG>
         <FG label="Persona / Unidad"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>
         <div/>

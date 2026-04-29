@@ -185,7 +185,7 @@ function EditarReciboModal({recibo,onClose,onSaved}:{recibo:Recibo;onClose:()=>v
   const [pago,setPago]=useState(recibo.forma_pago||'transferencia')
   const [arsV,setArs]=useState(String(recibo.monto_ars||''))
   const [usdV,setUsd]=useState(String(recibo.monto_usd||''))
-  const fullFactId = nroFact.trim() ? \`\${tipoMap[tipoFact]}-\${nroFact.trim()}\` : null
+  const fullFactId = nroFact.trim() ? `${tipoMap[tipoFact]}-${nroFact.trim()}` : null
 
   return (
     <Modal title={`Editar Recibo ${recibo.id}`} onClose={onClose}

@@ -7,10 +7,8 @@ import { supabase } from '@/lib/supabase'
 
 const IVA_RATE = 0.21
 
-// ── Nueva Factura ─────────────────────────────────────────────────────────────
-export function NuevoComprobanteModal({
-  onClose, onSaved, clientes
-}: {
+// ── Nueva Factura ──────────────────────────────────────────────────────────────
+export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
   onClose: () => void
   onSaved: (c: Comprobante) => void
   clientes: string[]
@@ -21,38 +19,43 @@ export function NuevoComprobanteModal({
   const [cliente,  setCliente]  = useState('')
   const [persona,  setPersona]  = useState(PERSONAS[0])
   const [concepto, setConcepto] = useState('')
-  // Money fields
-  const [netoStr,  setNeto]     = useState('')
-  const [ivaStr,   setIvaStr]   = useState('')
-  const [totalStr, setTotal]    = useState('')
-  const [usdStr,   setUsd]      = useState('')
+  const [netoARS,  setNetoARS]  = useState('')
+  const [ivaARS,   setIvaARS]   = useState('')
+  const [totalARS, setTotalARS] = useState('')
+  const [netoUSD,  setNetoUSD]  = useState('')
+  const [ivaUSD,   setIvaUSD]   = useState('')
+  const [totalUSD, setTotalUSD] = useState('')
   const [tcStr,    setTc]       = useState('')
   const [errors,   setErrors]   = useState<Record<string, boolean>>({})
 
-  const isB      = tipo === 'FACT B'
-  const isUSD    = !!usdStr && !totalStr && !netoStr
-  const needsTC  = !!usdStr
+  const isB    = tipo === 'FACT B'
+  const hasUSD = !!netoUSD || !!totalUSD
 
-  // Auto-calculate when neto changes (FACT A / C / E)
+  // Auto-calc ARS IVA from neto ARS
   useEffect(() => {
-    if (isB) return
-    const n = parseFloat(netoStr)
+    if (isB || !netoARS) { setIvaARS(''); setTotalARS(''); return }
+    const n = parseFloat(netoARS)
     if (!isNaN(n) && n > 0) {
       const iva   = Math.round(n * IVA_RATE * 100) / 100
-      const total = Math.round((n + iva) * 100) / 100
-      setIvaStr(String(iva))
-      setTotal(String(total))
-    } else if (!netoStr) {
-      setIvaStr('')
-      setTotal('')
+      setIvaARS(String(iva))
+      setTotalARS(String(Math.round((n + iva) * 100) / 100))
     }
-  }, [netoStr, isB])
+  }, [netoARS, isB])
 
-  // Auto-calc neto from total (FACT B — no IVA)
+  // Auto-calc USD IVA from neto USD
   useEffect(() => {
-    if (!isB) return
-    setIvaStr('')
-    setNeto('')
+    if (isB || !netoUSD) { setIvaUSD(''); setTotalUSD(''); return }
+    const n = parseFloat(netoUSD)
+    if (!isNaN(n) && n > 0) {
+      const iva   = Math.round(n * IVA_RATE * 10000) / 10000
+      setIvaUSD(String(iva))
+      setTotalUSD(String(Math.round((n + iva) * 10000) / 10000))
+    }
+  }, [netoUSD, isB])
+
+  // When tipo changes to B, clear IVA fields
+  useEffect(() => {
+    if (isB) { setIvaARS(''); setIvaUSD(''); setNetoARS(''); setNetoUSD('') }
   }, [isB])
 
   async function handleSave() {
@@ -69,19 +72,32 @@ export function NuevoComprobanteModal({
       const nextNum = last && last[0] ? (last[0].numero ?? 4000) + 1 : 4001
       const id = buildComprobanteId(tipo, nextNum)
 
-      const monto_ars  = isB
-        ? (totalStr ? parseFloat(totalStr) : null)
-        : (totalStr ? parseFloat(totalStr) : null)
-      const monto_usd  = usdStr  ? parseFloat(usdStr)  : null
-      const tipo_cambio = tcStr  ? parseFloat(tcStr)   : null
-      const neto_ars   = !isB && netoStr ? parseFloat(netoStr) : null
-      const iva_val    = !isB && ivaStr  ? parseFloat(ivaStr)  : null
+      const tc = tcStr ? parseFloat(tcStr) : null
+
+      // If USD, convert to ARS using TC for storage
+      const monto_usd   = hasUSD && !isB ? (totalUSD ? parseFloat(totalUSD) : null) : null
+      const neto_usd    = hasUSD && !isB ? (netoUSD  ? parseFloat(netoUSD)  : null) : null
+      const monto_ars   = isB
+        ? (totalARS ? parseFloat(totalARS) : null)
+        : hasUSD && tc
+          ? (monto_usd ? Math.round(monto_usd * tc * 100) / 100 : null)
+          : (totalARS ? parseFloat(totalARS) : null)
+      const neto_ars    = !isB
+        ? hasUSD && tc && neto_usd
+          ? Math.round(neto_usd * tc * 100) / 100
+          : (netoARS ? parseFloat(netoARS) : null)
+        : null
+      const iva_ars     = !isB
+        ? hasUSD && tc && ivaUSD
+          ? Math.round(parseFloat(ivaUSD) * tc * 100) / 100
+          : (ivaARS ? parseFloat(ivaARS) : null)
+        : null
 
       const payload: Omit<Comprobante, 'created_at'> = {
         id, tipo, numero: nextNum, fecha,
         cliente: cliente.trim(), persona, concepto: concepto.trim(),
-        monto_ars, monto_usd, tipo_cambio,
-        neto_ars, neto_usd: null, iva: iva_val,
+        monto_ars, monto_usd, tipo_cambio: tc,
+        neto_ars, neto_usd, iva: iva_ars,
         arba_ars: null, arba_usd: null,
         estado: tipo.startsWith('FACT') ? 'pendiente' : 'emitida',
         recibo_id: null, fecha_cobro: null,
@@ -95,9 +111,7 @@ export function NuevoComprobanteModal({
   }
 
   return (
-    <Modal
-      title="Nueva Factura / Comprobante"
-      onClose={onClose}
+    <Modal title="Nueva Factura / Comprobante" onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -115,13 +129,9 @@ export function NuevoComprobanteModal({
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
         </FG>
         <FG label="Cliente *" full>
-          <input
-            className={errors.cliente ? 'error' : ''}
-            value={cliente}
+          <input className={errors.cliente ? 'error' : ''} value={cliente}
             onChange={e => { setCliente(e.target.value); setErrors(p => ({...p, cliente: false})) }}
-            placeholder="Razón social"
-            list="cl-list"
-          />
+            placeholder="Razón social" list="cl-list" />
           <datalist id="cl-list">{clientes.map(c => <option key={c} value={c} />)}</datalist>
         </FG>
         <FG label="Persona / Unidad *">
@@ -130,64 +140,70 @@ export function NuevoComprobanteModal({
           </select>
         </FG>
         <FG label="Tipo de cambio (si es en USD)">
-          <input type="number" min="0" step="0.01" placeholder="Ej: 1470" value={tcStr} onChange={e => setTc(e.target.value)} />
+          <input type="number" min="0" step="0.01" placeholder="Ej: 1470" value={tcStr}
+            onChange={e => setTc(e.target.value)} />
         </FG>
 
         <hr className="form-divider" />
 
-        {/* USD fields */}
-        <FG label="Monto USD (si aplica)">
-          <input type="number" min="0" step="0.01" placeholder="0" value={usdStr} onChange={e => setUsd(e.target.value)} />
-        </FG>
-
-        <div /> {/* spacer */}
-
-        {/* ARS fields — different for B vs A */}
         {isB ? (
+          /* FACT B — solo total, sin IVA */
           <>
-            <FG label="Total ARS *">
-              <input type="number" min="0" step="0.01" placeholder="0" value={totalStr} onChange={e => setTotal(e.target.value)} />
+            <FG label="Total ARS">
+              <input type="number" min="0" step="0.01" placeholder="0" value={totalARS}
+                onChange={e => setTotalARS(e.target.value)} />
             </FG>
-            <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0 0', gridColumn: '2' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Factura B — no lleva IVA</span>
+            <FG label="Total USD">
+              <input type="number" min="0" step="0.0001" placeholder="0" value={totalUSD}
+                onChange={e => setTotalUSD(e.target.value)} />
+            </FG>
+            <div className="form-group full">
+              <span className="calc-hint" style={{ color: 'var(--info)' }}>
+                Factura B — no lleva IVA
+              </span>
             </div>
           </>
         ) : (
+          /* FACT A / FCE / E — neto + IVA calculado */
           <>
-            <FG label="Neto ARS *">
-              <input type="number" min="0" step="0.01" placeholder="Ingresá el neto" value={netoStr} onChange={e => setNeto(e.target.value)} />
-              <span className="calc-hint">El IVA y el total se calculan solos</span>
+            <FG label="Neto ARS">
+              <input type="number" min="0" step="0.01" placeholder="Ingresá el neto en ARS" value={netoARS}
+                onChange={e => setNetoARS(e.target.value)} />
+              <span className="calc-hint">IVA y total se calculan solos</span>
             </FG>
-            <FG label="IVA 21% (calculado)">
-              <input type="number" readOnly value={ivaStr} placeholder="—" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }} />
+            <FG label="Neto USD">
+              <input type="number" min="0" step="0.0001" placeholder="Ingresá el neto en USD" value={netoUSD}
+                onChange={e => setNetoUSD(e.target.value)} />
+              <span className="calc-hint">IVA USD se calcula solo</span>
             </FG>
-            <FG label="Total con IVA (calculado)" full>
-              <input type="number" readOnly value={totalStr} placeholder="—" style={{ background: 'var(--bg-secondary)', fontWeight: 500 }} />
+            <FG label="IVA ARS (calculado)">
+              <input readOnly value={ivaARS} placeholder="—" />
+            </FG>
+            <FG label="IVA USD (calculado)">
+              <input readOnly value={ivaUSD} placeholder="—" />
+            </FG>
+            <FG label="Total ARS (calculado)">
+              <input readOnly value={totalARS} placeholder="—" style={{ fontWeight: 500 }} />
+            </FG>
+            <FG label="Total USD (calculado)">
+              <input readOnly value={totalUSD} placeholder="—" style={{ fontWeight: 500 }} />
             </FG>
           </>
         )}
 
         <FG label="Concepto *" full>
-          <textarea
-            className={errors.concepto ? 'error' : ''}
-            rows={3}
-            placeholder="Descripción detallada del servicio…"
-            value={concepto}
-            onChange={e => { setConcepto(e.target.value); setErrors(p => ({...p, concepto: false})) }}
-          />
+          <textarea className={errors.concepto ? 'error' : ''} rows={3}
+            placeholder="Descripción detallada del servicio…" value={concepto}
+            onChange={e => { setConcepto(e.target.value); setErrors(p => ({...p, concepto: false})) }} />
         </FG>
       </div>
     </Modal>
   )
 }
 
-// ── Editar ────────────────────────────────────────────────────────────────────
-export function EditarComprobanteModal({
-  comp, onClose, onSaved
-}: {
-  comp: Comprobante
-  onClose: () => void
-  onSaved: (c: Comprobante) => void
+// ── Editar ─────────────────────────────────────────────────────────────────────
+export function EditarComprobanteModal({ comp, onClose, onSaved }: {
+  comp: Comprobante; onClose: () => void; onSaved: (c: Comprobante) => void
 }) {
   const [saving,     setSaving]     = useState(false)
   const [fecha,      setFecha]      = useState(comp.fecha || '')
@@ -199,19 +215,20 @@ export function EditarComprobanteModal({
   const [usdStr,     setUsd]        = useState(String(comp.monto_usd || ''))
   const [netoStr,    setNeto]       = useState(String(comp.neto_ars || ''))
   const [ivaStr,     setIva]        = useState(String(comp.iva || ''))
+  const [netoUSD,    setNetoUSD]    = useState(String(comp.neto_usd || ''))
   const [reciboId,   setReciboId]   = useState(String(comp.recibo_id || ''))
   const [fechaCobro, setFechaCobro] = useState(comp.fecha_cobro || '')
   const [concepto,   setConcepto]   = useState(comp.concepto || '')
 
-  // Auto-calc IVA on neto change
+  const isB = comp.tipo === 'FACT B'
+
   useEffect(() => {
-    if (comp.tipo === 'FACT B') return
+    if (isB) return
     const n = parseFloat(netoStr)
     if (!isNaN(n) && n > 0) {
       const iva   = Math.round(n * IVA_RATE * 100) / 100
-      const total = Math.round((n + iva) * 100) / 100
       setIva(String(iva))
-      setArs(String(total))
+      setArs(String(Math.round((n + iva) * 100) / 100))
     }
   }, [netoStr])
 
@@ -224,6 +241,7 @@ export function EditarComprobanteModal({
         monto_ars:   arsStr    ? parseFloat(arsStr)    : null,
         monto_usd:   usdStr    ? parseFloat(usdStr)    : null,
         neto_ars:    netoStr   ? parseFloat(netoStr)   : null,
+        neto_usd:    netoUSD   ? parseFloat(netoUSD)   : null,
         iva:         ivaStr    ? parseFloat(ivaStr)    : null,
         recibo_id:   reciboId  ? parseInt(reciboId)    : null,
         fecha_cobro: fechaCobro || null,
@@ -236,12 +254,8 @@ export function EditarComprobanteModal({
     } finally { setSaving(false) }
   }
 
-  const isB = comp.tipo === 'FACT B'
-
   return (
-    <Modal
-      title={`Editar — ${comp.id}`}
-      onClose={onClose}
+    <Modal title={`Editar — ${comp.id}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -272,8 +286,9 @@ export function EditarComprobanteModal({
               <input type="number" value={netoStr} onChange={e => setNeto(e.target.value)} placeholder="—" />
               <span className="calc-hint">IVA y total se recalculan solos</span>
             </FG>
-            <FG label="IVA (calculado)"><input type="number" readOnly value={ivaStr} /></FG>
-            <FG label="Total ARS (calculado)"><input type="number" readOnly value={arsStr} /></FG>
+            <FG label="Neto USD"><input type="number" value={netoUSD} onChange={e => setNetoUSD(e.target.value)} placeholder="—" /></FG>
+            <FG label="IVA ARS (calculado)"><input readOnly value={ivaStr} /></FG>
+            <FG label="Total ARS (calculado)"><input readOnly value={arsStr} /></FG>
           </>
         )}
         <FG label="N° Recibo"><input type="number" value={reciboId} onChange={e => setReciboId(e.target.value)} placeholder="—" /></FG>
@@ -284,10 +299,8 @@ export function EditarComprobanteModal({
   )
 }
 
-// ── Marcar cobrada ────────────────────────────────────────────────────────────
-export function MarcarCobradaModal({
-  comp, nextReciboId, onClose, onSaved
-}: {
+// ── Marcar cobrada ─────────────────────────────────────────────────────────────
+export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   comp: Comprobante; nextReciboId: number
   onClose: () => void; onSaved: () => void
 }) {
@@ -304,7 +317,7 @@ export function MarcarCobradaModal({
       await db.updateComprobante(comp.id, { estado: 'cobrada', recibo_id: rId, fecha_cobro: fecha })
       await db.createRecibo({
         id: rId, fecha, cliente: comp.cliente,
-        nro_fact: comp.id,  // ID completo ej: FC-A-4086 o FC-B-4070
+        nro_fact: comp.id,
         persona: comp.persona,
         monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
         forma_pago: pago, retencion: null,
@@ -318,9 +331,7 @@ export function MarcarCobradaModal({
   }
 
   return (
-    <Modal
-      title={`Registrar cobro — ${comp.id}`}
-      onClose={onClose}
+    <Modal title={`Registrar cobro — ${comp.id}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>

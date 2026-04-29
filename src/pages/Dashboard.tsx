@@ -33,12 +33,20 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   }, [])
 
   const toNeto = (f: any) => {
-    // Use neto_ars if available, otherwise derive from monto
+    // Priority 1: stored neto_ars
     if (f.neto_ars) return f.neto_ars
-    if (f.neto_usd && f.tipo_cambio) return f.neto_usd * f.tipo_cambio
-    // Fallback: monto sin IVA (divide by 1.21)
-    if (f.monto_ars) return Math.round(f.monto_ars / 1.21)
-    if (f.monto_usd && f.tipo_cambio) return Math.round((f.monto_usd * f.tipo_cambio) / 1.21)
+    // Priority 2: neto_usd * tipo_cambio (USD invoices with TC)
+    if (f.neto_usd && f.tipo_cambio) return Math.round(f.neto_usd * f.tipo_cambio * 100) / 100
+    // Priority 3: monto_usd * tipo_cambio / 1.21 (USD without neto stored)
+    if (f.monto_usd && f.tipo_cambio) return Math.round((f.monto_usd * f.tipo_cambio / 1.21) * 100) / 100
+    // Priority 4: monto_ars / 1.21 (ARS without neto stored)
+    if (f.monto_ars) return Math.round((f.monto_ars / 1.21) * 100) / 100
+    return 0
+  }
+
+  const toBruto = (f: any) => {
+    if (f.monto_ars) return f.monto_ars
+    if (f.monto_usd && f.tipo_cambio) return Math.round(f.monto_usd * f.tipo_cambio * 100) / 100
     return 0
   }
 

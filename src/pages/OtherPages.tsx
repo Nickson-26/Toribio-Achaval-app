@@ -117,7 +117,18 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
       const { data: last } = await supabase.from('recibos').select('id').order('id',{ascending:false}).limit(1)
       const nextId = last&&last[0] ? last[0].id+1 : 19200
       await db.createRecibo({ id:nextId, fecha, cliente:cliente.trim(), nro_fact:fullFactId, persona, forma_pago:pago, monto_ars:arsV?parseFloat(arsV):null, monto_usd:usdV?parseFloat(usdV):null, retencion:null, nro_echeq:null })
-      toast(`✓ Recibo ${nextId} guardado`)
+      // Auto-mark factura as cobrada if fullFactId matches a comprobante
+      if (fullFactId) {
+        const { data: comp } = await supabase.from('comprobantes').select('id,estado').eq('id', fullFactId).single()
+        if (comp && comp.estado === 'pendiente') {
+          await supabase.from('comprobantes').update({ estado: 'cobrada', recibo_id: nextId, fecha_cobro: fecha }).eq('id', fullFactId)
+          toast(`✓ Recibo ${nextId} guardado — ${fullFactId} marcada como cobrada`)
+        } else {
+          toast(`✓ Recibo ${nextId} guardado`)
+        }
+      } else {
+        toast(`✓ Recibo ${nextId} guardado`)
+      }
       onSaved()
     } catch(e:any) { toast('Error: '+(e.message||'')) } finally { setSaving(false) }
   }
@@ -126,6 +137,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
     <Modal title="Nuevo Recibo" onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'Guardando…':'Guardar'}</button></>}>
       <div className="form-grid">
         <FG label="Fecha *"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
+        <FG label="Persona / Unidad"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <FG label="Cliente *" full><input value={cliente} onChange={e=>setCliente(e.target.value)} placeholder="Razón social"/></FG>
         <FG label="Tipo de factura">
           <select value={tipoFact} onChange={e=>setTipoFact(e.target.value)}>
@@ -136,9 +148,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
           <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4086"/>
           {nroFact && <span className="calc-hint">ID: {tipoMap[tipoFact]}-{nroFact}</span>}
         </FG>
-        <FG label="Persona / Unidad"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>
-        <div/>
         <FG label="Cobrado ARS"><input type="number" min="0" step="0.01" placeholder="0" value={arsV} onChange={e=>setArs(e.target.value)}/></FG>
         <FG label="Cobrado USD"><input type="number" min="0" step="0.01" placeholder="0" value={usdV} onChange={e=>setUsd(e.target.value)}/></FG>
       </div>
@@ -147,24 +157,53 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
 }
 
 function EditarReciboModal({recibo,onClose,onSaved}:{recibo:Recibo;onClose:()=>void;onSaved:(p:Partial<Recibo>)=>void}) {
+  const tipoMap: Record<string,string> = {
+    'FACT A':'FC-A','FACT B':'FC-B','FACT DE CREDITO':'FC-FC',
+    'FACT E':'FC-E','NC A':'NC-A','NC B':'NC-B'
+  }
+  const reverseMap: Record<string,string> = {
+    'FC-A':'FACT A','FC-B':'FACT B','FC-FC':'FACT DE CREDITO',
+    'FC-E':'FACT E','NC-A':'NC A','NC-B':'NC B'
+  }
+  // Parse existing nro_fact: "FC-A-4086" -> tipo="FACT A", num="4086"
+  function parseFact(nf: string): {tipo: string; num: string} {
+    if (!nf) return { tipo: 'FACT A', num: '' }
+    const parts = nf.split('-')
+    if (parts.length >= 3) {
+      const prefix = parts.slice(0, parts.length-1).join('-')
+      const num = parts[parts.length-1]
+      return { tipo: reverseMap[prefix] || 'FACT A', num }
+    }
+    return { tipo: 'FACT A', num: nf }
+  }
+  const parsed = parseFact(recibo.nro_fact||'')
   const [fecha,setFecha]=useState(recibo.fecha||'')
   const [cliente,setCliente]=useState(recibo.cliente||'')
-  const [nroFact,setNroFact]=useState(recibo.nro_fact||'')
+  const [tipoFact,setTipoFact]=useState(parsed.tipo)
+  const [nroFact,setNroFact]=useState(parsed.num)
   const [persona,setPersona]=useState(recibo.persona||PERSONAS[0])
   const [pago,setPago]=useState(recibo.forma_pago||'transferencia')
   const [arsV,setArs]=useState(String(recibo.monto_ars||''))
   const [usdV,setUsd]=useState(String(recibo.monto_usd||''))
+  const fullFactId = nroFact.trim() ? \`\${tipoMap[tipoFact]}-\${nroFact.trim()}\` : null
 
   return (
     <Modal title={`Editar Recibo ${recibo.id}`} onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={()=>onSaved({fecha,cliente:cliente.trim(),nro_fact:nroFact||null,persona,forma_pago:pago,monto_ars:arsV?parseFloat(arsV):null,monto_usd:usdV?parseFloat(usdV):null})}>Guardar</button></>}>
+      footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={()=>onSaved({fecha,cliente:cliente.trim(),nro_fact:fullFactId,persona,forma_pago:pago,monto_ars:arsV?parseFloat(arsV):null,monto_usd:usdV?parseFloat(usdV):null})}>Guardar</button></>}>
       <div className="form-grid">
         <FG label="Fecha"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
-        <FG label="Cliente"><input value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
-        <FG label="N° Factura"><input value={nroFact} onChange={e=>setNroFact(e.target.value)}/></FG>
         <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
+        <FG label="Cliente" full><input value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
+        <FG label="Tipo de factura">
+          <select value={tipoFact} onChange={e=>setTipoFact(e.target.value)}>
+            {['FACT A','FACT B','FACT DE CREDITO','FACT E','NC A','NC B'].map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </FG>
+        <FG label="N° Factura">
+          <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4086"/>
+          {nroFact && <span className="calc-hint">ID: {tipoMap[tipoFact]}-{nroFact}</span>}
+        </FG>
         <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>
-        <div/>
         <FG label="ARS"><input type="number" value={arsV} onChange={e=>setArs(e.target.value)}/></FG>
         <FG label="USD"><input type="number" value={usdV} onChange={e=>setUsd(e.target.value)}/></FG>
       </div>

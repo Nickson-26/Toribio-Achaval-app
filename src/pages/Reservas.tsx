@@ -252,9 +252,6 @@ export default function Reservas(_: any) {
             </div>
           </div>
 
-          {/* Tabla de brokers de esta sección */}
-          <BrokersTable rows={getBaseRows(tab)} titulo={`Brokers — ${tab.charAt(0)+tab.slice(1).toLowerCase()}`} />
-
           {loading ? <Spinner /> : (
             <div className="card">
               <div className="card-header">
@@ -404,47 +401,6 @@ function ResumenTable({ titulo, rows, unidades, mesFilt }: {
   )
 }
 
-// ── Tabla de brokers por unidad ───────────────────────────────
-function BrokersTable({ rows, titulo }: { rows: Reserva[]; titulo: string }) {
-  const byUnidad: Record<string, Record<string, { v:number; a:number }>> = {}
-
-  rows.forEach(r => {
-    const broker = r.broker || 'Sin asignar'
-    const unidad = r.unidad
-    if (!byUnidad[unidad]) byUnidad[unidad] = {}
-    if (!byUnidad[unidad][broker]) byUnidad[unidad][broker] = { v:0, a:0 }
-    if (r.operacion==='VENTA') byUnidad[unidad][broker].v++
-    else byUnidad[unidad][broker].a++
-  })
-
-  const unidades = Object.keys(byUnidad).sort()
-  if (!unidades.length) return null
-
-  return (
-    <div className="card" style={{ marginBottom:16 }}>
-      <div className="card-header"><span className="card-title">{titulo}</span></div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:0 }}>
-        {unidades.map(u => (
-          <div key={u} style={{ borderRight:'1px solid var(--border)', padding:'12px 16px' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-tertiary)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:10 }}>{u}</div>
-            {Object.entries(byUnidad[u])
-              .sort((a,b) => (b[1].v+b[1].a) - (a[1].v+a[1].a))
-              .map(([broker, counts]) => (
-                <div key={broker} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid var(--border)', fontSize:12 }}>
-                  <span style={{ color:'var(--text-secondary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:160 }}>{broker}</span>
-                  <span style={{ display:'flex', gap:8, flexShrink:0 }}>
-                    {counts.v > 0 && <span style={{ color:'var(--danger)', fontWeight:600, fontSize:11 }}>{counts.v}V</span>}
-                    {counts.a > 0 && <span style={{ color:'var(--info)', fontWeight:600, fontSize:11 }}>{counts.a}A</span>}
-                  </span>
-                </div>
-              ))
-            }
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // ── Modal ─────────────────────────────────────────────────────
 function ReservaModal({ tab, reserva, onClose, onSaved }: {

@@ -15,6 +15,48 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'FACT E',          label: 'Fact. E' },
 ]
 
+function exportPendientesExcel(pendientes: Comprobante[]) {
+  if (pendientes.length === 0) { toast('No hay facturas pendientes para exportar'); return }
+
+  // Build CSV data
+  const rows = [
+    ['N° Factura', 'Tipo', 'Fecha', 'Cliente', 'Persona / Unidad', 'Neto ARS', 'IVA', 'Total ARS', 'Total USD', 'Tipo de Cambio', 'Concepto'],
+    ...pendientes.map(f => [
+      f.id,
+      f.tipo,
+      f.fecha || '',
+      f.cliente,
+      f.persona,
+      f.neto_ars ?? '',
+      f.iva ?? '',
+      f.monto_ars ?? '',
+      f.monto_usd ?? '',
+      f.tipo_cambio ?? '',
+      f.concepto || '',
+    ])
+  ]
+
+  // Convert to CSV with BOM for Excel UTF-8 compatibility
+  const csv = '\uFEFF' + rows.map(row =>
+    row.map(cell => {
+      const val = String(cell ?? '')
+      return val.includes(',') || val.includes('"') || val.includes('\n')
+        ? `"${val.replace(/"/g, '""')}"`
+        : val
+    }).join(',')
+  ).join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  const date = new Date().toISOString().slice(0, 10)
+  a.href     = url
+  a.download = `facturas-pendientes-${date}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast(`✓ ${pendientes.length} facturas pendientes exportadas`)
+}
+
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
   const [data,     setData]     = useState<Comprobante[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -59,13 +101,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     closeModal(); load()
   }
 
-  // Filter by current tab and sort by numero DESC
-  const tabData = data
-    .filter(f => f.tipo === tab)
-    .sort((a, b) => (b.numero || 0) - (a.numero || 0))
+  const tabData    = data.filter(f => f.tipo === tab).sort((a, b) => (b.numero || 0) - (a.numero || 0))
+  const allPending = data.filter(f => f.estado === 'pendiente').sort((a, b) => (b.numero || 0) - (a.numero || 0))
+  const tabPending = tabData.filter(f => f.estado === 'pendiente')
 
-  const totalARS = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
-  const totalUSD = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
+  const totalARS  = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
+  const totalUSD  = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
   const pendCount = tabData.filter(f => f.estado === 'pendiente').length
 
   return (
@@ -86,6 +127,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           ['ID','Tipo','Fecha','Cliente','Persona','Monto ARS','Monto USD','Neto','IVA','Estado'],
           ...tabData.map(f => [f.id,f.tipo,f.fecha,f.cliente,f.persona,f.monto_ars,f.monto_usd,f.neto_ars,f.iva,f.estado])
         ], `${tab.replace(/ /g,'-')}.csv`)}>↓ CSV</button>
+
+        {/* Exportar pendientes — todas las tabs */}
+        <button
+          className="btn"
+          style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}
+          onClick={() => exportPendientesExcel(allPending)}
+          title={`Exportar todas las facturas pendientes (${allPending.length})`}
+        >
+          ↓ Pendientes ({allPending.length})
+        </button>
+
         <button className="btn btn-primary" onClick={() => setModal('new')}>+ Nueva factura</button>
       </div>
 
@@ -122,7 +174,18 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
         <div className="metric-card">
           <div className="metric-label">Pendientes de cobro</div>
           <div className="metric-value" style={{ color: pendCount > 0 ? 'var(--warn)' : 'var(--success)' }}>{pendCount}</div>
-          <div className="metric-sub">de {tabData.length} facturas</div>
+          <div className="metric-sub">
+            de {tabData.length} facturas
+            {tabPending.length > 0 && (
+              <span
+                style={{ marginLeft: 8, cursor: 'pointer', textDecoration: 'underline', color: 'var(--warn)' }}
+                onClick={() => exportPendientesExcel(tabPending)}
+                title="Exportar solo pendientes de este tab"
+              >
+                ↓ exportar
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -130,6 +193,15 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       <div className="card">
         <div className="card-header">
           <span className="card-title">{TABS.find(t=>t.id===tab)?.label} — ordenadas por número</span>
+          {tabPending.length > 0 && (
+            <button
+              className="btn btn-sm"
+              style={{ borderColor: 'var(--warn)', color: 'var(--warn)', fontSize: 11 }}
+              onClick={() => exportPendientesExcel(tabPending)}
+            >
+              ↓ Exportar {tabPending.length} pendientes
+            </button>
+          )}
         </div>
         {loading ? <Spinner /> : (
           <div className="table-wrap">
@@ -179,7 +251,6 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
         )}
       </div>
 
-      {/* Detail modal */}
       {modal === 'detail' && selected && (
         <Modal
           title={`${selected.tipo} — N° ${selected.numero}`}
@@ -219,21 +290,11 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       )}
 
       {modal === 'new' && (
-        <NuevoComprobanteModal
-          onClose={closeModal}
-          onSaved={() => { closeModal(); load() }}
-          clientes={clientes}
-        />
+        <NuevoComprobanteModal onClose={closeModal} onSaved={() => { closeModal(); load() }} clientes={clientes} />
       )}
-
       {modal === 'edit' && selected && (
-        <EditarComprobanteModal
-          comp={selected}
-          onClose={closeModal}
-          onSaved={() => { closeModal(); load() }}
-        />
+        <EditarComprobanteModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />
       )}
-
       {modal === 'eliminar' && selected && (
         <Modal
           title={`Eliminar factura — ${selected.id}`}
@@ -259,14 +320,8 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         </Modal>
       )}
-
       {modal === 'cobrar' && selected && (
-        <MarcarCobradaModal
-          comp={selected}
-          nextReciboId={19200}
-          onClose={closeModal}
-          onSaved={() => { closeModal(); load() }}
-        />
+        <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />
       )}
     </>
   )

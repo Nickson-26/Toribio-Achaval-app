@@ -15,46 +15,67 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'FACT E',          label: 'Fact. E' },
 ]
 
-function exportPendientesExcel(pendientes: Comprobante[]) {
+async function exportPendientesExcel(pendientes: Comprobante[]) {
   if (pendientes.length === 0) { toast('No hay facturas pendientes para exportar'); return }
 
-  // Build CSV data
-  const rows = [
-    ['N° Factura', 'Tipo', 'Fecha', 'Cliente', 'Persona / Unidad', 'Neto ARS', 'IVA', 'Total ARS', 'Total USD', 'Tipo de Cambio', 'Concepto'],
-    ...pendientes.map(f => [
-      f.id,
-      f.tipo,
-      f.fecha || '',
-      f.cliente,
-      f.persona,
-      f.neto_ars ?? '',
-      f.iva ?? '',
-      f.monto_ars ?? '',
-      f.monto_usd ?? '',
-      f.tipo_cambio ?? '',
-      f.concepto || '',
+  try {
+    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs' as any)
+
+    const rows = pendientes.map(f => ({
+      'N° Factura':      f.id,
+      'Tipo':            f.tipo,
+      'Fecha':           f.fecha || '',
+      'Cliente':         f.cliente,
+      'Unidad':          f.persona,
+      'Neto ARS':        f.neto_ars ?? '',
+      'IVA':             f.iva ?? '',
+      'Total ARS':       f.monto_ars ?? '',
+      'Total USD':       f.monto_usd ?? '',
+      'Tipo de Cambio':  f.tipo_cambio ?? '',
+      'Concepto':        f.concepto || '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 16 }, // N° Factura
+      { wch: 18 }, // Tipo
+      { wch: 12 }, // Fecha
+      { wch: 35 }, // Cliente
+      { wch: 18 }, // Unidad
+      { wch: 16 }, // Neto ARS
+      { wch: 14 }, // IVA
+      { wch: 16 }, // Total ARS
+      { wch: 12 }, // Total USD
+      { wch: 14 }, // Tipo de Cambio
+      { wch: 50 }, // Concepto
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Pendientes')
+
+    const date = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `facturas-pendientes-${date}.xlsx`)
+    toast(`✓ ${pendientes.length} facturas exportadas a Excel`)
+  } catch {
+    // Fallback: TSV (tab-separated) opens cleanly in Excel
+    const headers = ['N° Factura','Tipo','Fecha','Cliente','Unidad','Neto ARS','IVA','Total ARS','Total USD','Tipo de Cambio','Concepto']
+    const rows = pendientes.map(f => [
+      f.id, f.tipo, f.fecha||'', f.cliente, f.persona,
+      f.neto_ars??'', f.iva??'', f.monto_ars??'', f.monto_usd??'', f.tipo_cambio??'',
+      (f.concepto||'').replace(/\t/g,' ').replace(/\n/g,' ')
     ])
-  ]
-
-  // Convert to CSV with BOM for Excel UTF-8 compatibility
-  const csv = '\uFEFF' + rows.map(row =>
-    row.map(cell => {
-      const val = String(cell ?? '')
-      return val.includes(',') || val.includes('"') || val.includes('\n')
-        ? `"${val.replace(/"/g, '""')}"`
-        : val
-    }).join(',')
-  ).join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  const date = new Date().toISOString().slice(0, 10)
-  a.href     = url
-  a.download = `facturas-pendientes-${date}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-  toast(`✓ ${pendientes.length} facturas pendientes exportadas`)
+    const tsv = '\uFEFF' + [headers, ...rows].map(r => r.join('\t')).join('\n')
+    const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = `facturas-pendientes-${new Date().toISOString().slice(0,10)}.xls`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast(`✓ ${pendientes.length} facturas exportadas`)
+  }
 }
 
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
@@ -128,38 +149,29 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           ...tabData.map(f => [f.id,f.tipo,f.fecha,f.cliente,f.persona,f.monto_ars,f.monto_usd,f.neto_ars,f.iva,f.estado])
         ], `${tab.replace(/ /g,'-')}.csv`)}>↓ CSV</button>
 
-        {/* Exportar pendientes — todas las tabs */}
         <button
           className="btn"
-          style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}
+          style={{ borderColor: 'var(--warn)', color: 'var(--warn)', fontWeight: 600 }}
           onClick={() => exportPendientesExcel(allPending)}
           title={`Exportar todas las facturas pendientes (${allPending.length})`}
         >
-          ↓ Pendientes ({allPending.length})
+          ↓ Excel pendientes ({allPending.length})
         </button>
 
         <button className="btn btn-primary" onClick={() => setModal('new')}>+ Nueva factura</button>
       </div>
 
-      {/* Tabs */}
       <div className="fact-tabs">
         {TABS.map(t => (
-          <button
-            key={t.id}
-            className={`fact-tab${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
+          <button key={t.id} className={`fact-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
             {t.id === tab && tabData.length > 0 && (
-              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                ({tabData.length})
-              </span>
+              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-tertiary)' }}>({tabData.length})</span>
             )}
           </button>
         ))}
       </div>
 
-      {/* Summary metrics */}
       <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', marginBottom: 16 }}>
         <div className="metric-card accent">
           <div className="metric-label">Total {TABS.find(t=>t.id===tab)?.label}</div>
@@ -174,32 +186,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
         <div className="metric-card">
           <div className="metric-label">Pendientes de cobro</div>
           <div className="metric-value" style={{ color: pendCount > 0 ? 'var(--warn)' : 'var(--success)' }}>{pendCount}</div>
-          <div className="metric-sub">
-            de {tabData.length} facturas
-            {tabPending.length > 0 && (
-              <span
-                style={{ marginLeft: 8, cursor: 'pointer', textDecoration: 'underline', color: 'var(--warn)' }}
-                onClick={() => exportPendientesExcel(tabPending)}
-                title="Exportar solo pendientes de este tab"
-              >
-                ↓ exportar
-              </span>
-            )}
-          </div>
+          <div className="metric-sub">de {tabData.length} facturas</div>
         </div>
       </div>
 
-      {/* Table */}
       <div className="card">
         <div className="card-header">
           <span className="card-title">{TABS.find(t=>t.id===tab)?.label} — ordenadas por número</span>
           {tabPending.length > 0 && (
-            <button
-              className="btn btn-sm"
-              style={{ borderColor: 'var(--warn)', color: 'var(--warn)', fontSize: 11 }}
-              onClick={() => exportPendientesExcel(tabPending)}
-            >
-              ↓ Exportar {tabPending.length} pendientes
+            <button className="btn btn-sm" style={{ borderColor:'var(--warn)', color:'var(--warn)', fontSize:11 }}
+              onClick={() => exportPendientesExcel(tabPending)}>
+              ↓ {tabPending.length} pendientes de este tab
             </button>
           )}
         </div>
@@ -208,16 +205,11 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <table>
               <thead>
                 <tr>
-                  <th>N°</th>
-                  <th>Fecha</th>
-                  <th>Cliente</th>
-                  <th>Persona</th>
+                  <th>N°</th><th>Fecha</th><th>Cliente</th><th>Persona</th>
                   {tab !== 'FACT B' && <th className="text-right">Neto</th>}
                   {tab !== 'FACT B' && <th className="text-right">IVA</th>}
-                  <th className="text-right">Total ARS</th>
-                  <th className="text-right">USD</th>
-                  <th>Estado</th>
-                  <th></th>
+                  <th className="text-right">Total ARS</th><th className="text-right">USD</th>
+                  <th>Estado</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -252,9 +244,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       </div>
 
       {modal === 'detail' && selected && (
-        <Modal
-          title={`${selected.tipo} — N° ${selected.numero}`}
-          onClose={closeModal}
+        <Modal title={`${selected.tipo} — N° ${selected.numero}`} onClose={closeModal}
           footer={<>
             <button className="btn btn-danger btn-sm" onClick={() => handleAnular(selected.id)}>Anular</button>
             <button className="btn" onClick={() => { setModal('edit') }}>Editar</button>
@@ -262,8 +252,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
               <button className="btn btn-primary" onClick={() => setModal('cobrar')}>Marcar cobrada</button>
             )}
             <button className="btn" onClick={closeModal}>Cerrar</button>
-          </>}
-        >
+          </>}>
           <div className="detail-grid">
             <div className="detail-item"><div className="detail-label">N° Factura</div><div className="detail-value" style={{ fontWeight: 600 }}>{selected.numero}</div></div>
             <div className="detail-item"><div className="detail-label">Fecha</div><div className="detail-value">{fdate(selected.fecha)}</div></div>
@@ -288,35 +277,19 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         </Modal>
       )}
-
-      {modal === 'new' && (
-        <NuevoComprobanteModal onClose={closeModal} onSaved={() => { closeModal(); load() }} clientes={clientes} />
-      )}
-      {modal === 'edit' && selected && (
-        <EditarComprobanteModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />
-      )}
+      {modal === 'new' && <NuevoComprobanteModal onClose={closeModal} onSaved={() => { closeModal(); load() }} clientes={clientes} />}
+      {modal === 'edit' && selected && <EditarComprobanteModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
       {modal === 'eliminar' && selected && (
-        <Modal
-          title={`Eliminar factura — ${selected.id}`}
-          onClose={closeModal}
+        <Modal title={`Eliminar — ${selected.id}`} onClose={closeModal}
           footer={<>
             <button className="btn" onClick={closeModal}>Cancelar</button>
-            <button className="btn btn-danger" onClick={() => handleEliminar(selected!.id)}>
-              Eliminar definitivamente
-            </button>
-          </>}
-        >
-          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <button className="btn btn-danger" onClick={() => handleEliminar(selected!.id)}>Eliminar definitivamente</button>
+          </>}>
+          <div style={{ padding: '24px', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
-            <p style={{ fontSize: 14, color: 'var(--text-primary)', marginBottom: 8, fontWeight: 500 }}>
-              ¿Eliminar <strong>{selected.id}</strong>?
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
-              {selected.cliente} — {selected.fecha}
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 12 }}>
-              Esta acción es permanente y no se puede deshacer.
-            </p>
+            <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>¿Eliminar <strong>{selected.id}</strong>?</p>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>{selected.cliente} — {selected.fecha}</p>
+            <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 12 }}>Esta acción es permanente y no se puede deshacer.</p>
           </div>
         </Modal>
       )}

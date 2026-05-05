@@ -2,10 +2,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV } from '@/lib/utils'
-import { TipoBadge, EstadoBadge, Spinner, Modal, toast } from '@/components/ui'
+import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal } from '@/components/ComprobanteForms'
 
-type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'eliminar' | null
+type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'eliminar' | 'exportar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -15,21 +15,28 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'FACT E',          label: 'Fact. E' },
 ]
 
-function exportToExcel(pendientes: Comprobante[]) {
-  if (!pendientes.length) { toast('No hay facturas pendientes'); return }
+const MESES = [
+  { num: '01', label: 'Enero' },   { num: '02', label: 'Febrero' },
+  { num: '03', label: 'Marzo' },   { num: '04', label: 'Abril' },
+  { num: '05', label: 'Mayo' },    { num: '06', label: 'Junio' },
+  { num: '07', label: 'Julio' },   { num: '08', label: 'Agosto' },
+  { num: '09', label: 'Septiembre' }, { num: '10', label: 'Octubre' },
+  { num: '11', label: 'Noviembre' },  { num: '12', label: 'Diciembre' },
+]
+
+function exportToExcel(pendientes: Comprobante[], label: string) {
+  if (!pendientes.length) { toast('No hay facturas pendientes en ese período'); return }
+
+  const esc = (v: any) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,' ')
 
   const headers = ['N° Factura','Tipo','Fecha','Cliente','Unidad','Neto ARS','IVA','Total ARS','Total USD','Tipo de Cambio','Concepto']
-
   const rows = pendientes.map(f => [
-    f.id, f.tipo, f.fecha || '',
-    f.cliente, f.persona,
+    f.id, f.tipo, f.fecha || '', f.cliente, f.persona,
     f.neto_ars ?? '', f.iva ?? '',
     f.monto_ars ?? '', f.monto_usd ?? '',
     f.tipo_cambio ?? '',
     (f.concepto || '').replace(/\n/g, ' '),
   ])
-
-  const esc = (v: any) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
@@ -42,7 +49,7 @@ function exportToExcel(pendientes: Comprobante[]) {
   </Style>
   <Style ss:ID="n"><NumberFormat ss:Format="#,##0.00"/></Style>
  </Styles>
- <Worksheet ss:Name="Facturas Pendientes">
+ <Worksheet ss:Name="Pendientes">
   <Table>
    <Column ss:Width="140"/><Column ss:Width="130"/><Column ss:Width="90"/>
    <Column ss:Width="220"/><Column ss:Width="140"/>
@@ -51,14 +58,12 @@ function exportToExcel(pendientes: Comprobante[]) {
    <Row ss:Height="20">
     ${headers.map(h => `<Cell ss:StyleID="h"><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('')}
    </Row>
-   ${rows.map(row => `<Row>
-    ${row.map((v, i) => {
-      const isNum = i >= 5 && i <= 9 && v !== ''
-      const type  = isNum ? 'Number' : 'String'
-      const style = isNum ? ' ss:StyleID="n"' : ''
-      return `<Cell${style}><Data ss:Type="${type}">${esc(v)}</Data></Cell>`
-    }).join('')}
-   </Row>`).join('\n   ')}
+   ${rows.map(row => `<Row>${row.map((v, i) => {
+     const isNum = i >= 5 && i <= 9 && v !== ''
+     return isNum
+       ? `<Cell ss:StyleID="n"><Data ss:Type="Number">${v}</Data></Cell>`
+       : `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`
+   }).join('')}</Row>`).join('\n   ')}
   </Table>
  </Worksheet>
 </Workbook>`
@@ -67,12 +72,132 @@ function exportToExcel(pendientes: Comprobante[]) {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `facturas-pendientes-${new Date().toISOString().slice(0,10)}.xls`
+  a.download = `pendientes-${label}.xls`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast(`✓ ${pendientes.length} facturas exportadas a Excel`)
+  toast(`✓ ${pendientes.length} facturas exportadas`)
+}
+
+// ── Modal de exportación con selector de período ──────────────
+function ExportarModal({ pendientes, onClose }: { pendientes: Comprobante[]; onClose: () => void }) {
+  const currentMonth = new Date().toISOString().slice(5, 7)
+  const [desde, setDesde] = useState(currentMonth)
+  const [hasta, setHasta] = useState('12')
+  const [anio,  setAnio]  = useState('2026')
+
+  const filtrados = pendientes.filter(f => {
+    if (!f.fecha) return false
+    const [y, m] = f.fecha.split('-')
+    if (y !== anio) return false
+    return m >= desde && m <= hasta
+  })
+
+  const totalARS = filtrados.reduce((s, f) => s + (f.monto_ars || 0), 0)
+  const totalUSD = filtrados.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
+
+  const mesDesdeLabel = MESES.find(m => m.num === desde)?.label || desde
+  const mesHastaLabel = MESES.find(m => m.num === hasta)?.label || hasta
+
+  function handleExport() {
+    const label = `${mesDesdeLabel}-${mesHastaLabel}-${anio}`
+    exportToExcel(filtrados, label)
+    onClose()
+  }
+
+  return (
+    <Modal
+      title="Exportar facturas pendientes a Excel"
+      onClose={onClose}
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" onClick={handleExport} disabled={filtrados.length === 0}>
+          ↓ Exportar {filtrados.length} facturas
+        </button>
+      </>}
+    >
+      <div className="form-grid">
+        <FG label="Año">
+          <select value={anio} onChange={e => setAnio(e.target.value)}>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2027">2027</option>
+          </select>
+        </FG>
+        <div />
+        <FG label="Desde (mes)">
+          <select value={desde} onChange={e => setDesde(e.target.value)}>
+            {MESES.map(m => <option key={m.num} value={m.num}>{m.label}</option>)}
+          </select>
+        </FG>
+        <FG label="Hasta (mes)">
+          <select value={hasta} onChange={e => setHasta(e.target.value)}>
+            {MESES.map(m => <option key={m.num} value={m.num}>{m.label}</option>)}
+          </select>
+        </FG>
+      </div>
+
+      {/* Preview */}
+      <div style={{ margin: '0 22px 20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius)', padding: '14px 16px', border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+          Vista previa — {mesDesdeLabel} a {mesHastaLabel} {anio}
+        </div>
+        {filtrados.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px 0' }}>
+            Sin facturas pendientes en ese período
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--warn)' }}>{filtrados.length}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>facturas</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{ars(totalARS)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>total ARS</div>
+              </div>
+              {totalUSD > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--info)' }}>{usd(totalUSD)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>total USD</div>
+                </div>
+              )}
+            </div>
+            {/* Mini table preview */}
+            <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '4px 6px', textAlign: 'left', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', fontSize: 10 }}>N°</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'left', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', fontSize: 10 }}>Fecha</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'left', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', fontSize: 10 }}>Cliente</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', fontSize: 10 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtrados.slice(0, 8).map(f => (
+                    <tr key={f.id}>
+                      <td style={{ padding: '3px 6px', color: 'var(--warn)', fontWeight: 600 }}>{f.id}</td>
+                      <td style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>{fdate(f.fecha)}</td>
+                      <td style={{ padding: '3px 6px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.cliente}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {f.monto_ars ? ars(f.monto_ars) : usd(f.monto_usd)}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtrados.length > 8 && (
+                    <tr><td colSpan={4} style={{ padding: '4px 6px', color: 'var(--text-tertiary)', textAlign: 'center', fontSize: 11 }}>... y {filtrados.length - 8} más</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
 }
 
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
@@ -143,7 +268,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           ...tabData.map(f => [f.id,f.tipo,f.fecha,f.cliente,f.persona,f.monto_ars,f.monto_usd,f.neto_ars,f.iva,f.estado])
         ], `${tab.replace(/ /g,'-')}.csv`)}>↓ CSV</button>
         <button className="btn" style={{ borderColor:'var(--warn)', color:'var(--warn)', fontWeight:600 }}
-          onClick={() => exportToExcel(allPending)}>
+          onClick={() => setModal('exportar')}>
           ↓ Excel pendientes ({allPending.length})
         </button>
         <button className="btn btn-primary" onClick={() => setModal('new')}>+ Nueva factura</button>
@@ -181,8 +306,8 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           <span className="card-title">{TABS.find(t=>t.id===tab)?.label} — ordenadas por número</span>
           {tabPending.length > 0 && (
             <button className="btn btn-sm" style={{ borderColor:'var(--warn)', color:'var(--warn)', fontSize:11 }}
-              onClick={() => exportToExcel(tabPending)}>
-              ↓ {tabPending.length} pendientes de este tab
+              onClick={() => setModal('exportar')}>
+              ↓ Exportar {tabPending.length} pendientes
             </button>
           )}
         </div>
@@ -228,6 +353,10 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         )}
       </div>
+
+      {modal === 'exportar' && (
+        <ExportarModal pendientes={allPending} onClose={closeModal} />
+      )}
 
       {modal === 'detail' && selected && (
         <Modal title={`${selected.tipo} — N° ${selected.numero}`} onClose={closeModal}

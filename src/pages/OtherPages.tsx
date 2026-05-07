@@ -459,7 +459,7 @@ export function Resumen(_: any) {
   const byPers:Record<string,{ars:number;usd:number;count:number}>= {}
   facts.forEach(f=>{ if(!byPers[f.persona])byPers[f.persona]={ars:0,usd:0,count:0}; byPers[f.persona].ars+=montoARS(f); byPers[f.persona].usd+=f.monto_usd||0; byPers[f.persona].count++ })
 
-  const totalARSNativo = facts.reduce((s,f)=>s+(f.monto_ars||0),0)
+  const totalARSNativo = facts.filter(f=>!f.monto_usd).reduce((s,f)=>s+(f.monto_ars||0),0)
   const totalUSDNativo = facts.reduce((s,f)=>s+(f.monto_usd||0),0)
   const totalARS=Object.values(byTipo).reduce((s,v)=>s+v.ars,0)
   const totalNC=ncs.reduce((s,f)=>s+montoARS(f),0)

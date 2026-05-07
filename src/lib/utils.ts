@@ -30,9 +30,10 @@ export function today(): string {
 }
 
 export function montoARS(f: { monto_ars?: number|null; monto_usd?: number|null; tipo_cambio?: number|null }): number {
-  if (f.monto_ars) return f.monto_ars
-  if (f.monto_usd && f.tipo_cambio) return f.monto_usd * f.tipo_cambio
-  return 0
+  // Factura en USD → siempre se convierte usando el TC de la factura
+  if (f.monto_usd) return f.tipo_cambio ? f.monto_usd * f.tipo_cambio : 0
+  // Factura nativa en ARS
+  return f.monto_ars || 0
 }
 
 export function tipoColor(t: string): string {

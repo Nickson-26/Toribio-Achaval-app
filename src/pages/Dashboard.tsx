@@ -33,21 +33,23 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   }, [])
 
   const toNeto = (f: any) => {
-    // Priority 1: stored neto_ars
+    // Si la factura es en USD → siempre se convierte usando el TC
+    if (f.monto_usd) {
+      if (!f.tipo_cambio) return 0
+      if (f.neto_usd) return Math.round(f.neto_usd * f.tipo_cambio * 100) / 100
+      return Math.round((f.monto_usd * f.tipo_cambio / 1.21) * 100) / 100
+    }
+    // Factura nativa en ARS
     if (f.neto_ars) return f.neto_ars
-    // Priority 2: neto_usd * tipo_cambio (USD invoices with TC)
-    if (f.neto_usd && f.tipo_cambio) return Math.round(f.neto_usd * f.tipo_cambio * 100) / 100
-    // Priority 3: monto_usd * tipo_cambio / 1.21 (USD without neto stored)
-    if (f.monto_usd && f.tipo_cambio) return Math.round((f.monto_usd * f.tipo_cambio / 1.21) * 100) / 100
-    // Priority 4: monto_ars / 1.21 (ARS without neto stored)
     if (f.monto_ars) return Math.round((f.monto_ars / 1.21) * 100) / 100
     return 0
   }
 
   const toBruto = (f: any) => {
-    if (f.monto_ars) return f.monto_ars
-    if (f.monto_usd && f.tipo_cambio) return Math.round(f.monto_usd * f.tipo_cambio * 100) / 100
-    return 0
+    // USD → conversión con TC siempre
+    if (f.monto_usd) return f.tipo_cambio ? Math.round(f.monto_usd * f.tipo_cambio * 100) / 100 : 0
+    // ARS nativa
+    return f.monto_ars || 0
   }
 
   const facts = all.filter((c: any) => {
@@ -59,7 +61,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   })
 
   const totalNeto  = facts.reduce((s: number, f: any) => s + toNeto(f), 0)
-  const totalBruto = facts.reduce((s: number, f: any) => s + (f.monto_ars || (f.monto_usd && f.tipo_cambio ? f.monto_usd * f.tipo_cambio : 0)), 0)
+  const totalBruto = facts.reduce((s: number, f: any) => s + toBruto(f), 0)
   const totalIVA   = totalBruto - totalNeto
   const totalUSD   = facts.filter((f: any) => f.monto_usd).reduce((s: number, f: any) => s + (f.monto_usd || 0), 0)
   const cobradas   = facts.filter((f: any) => f.estado === 'cobrada').length
@@ -209,11 +211,16 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
       </div>
 
       {/* KPIs */}
-      <div className="metrics-grid">
+      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))' }}>
         <div className="metric-card accent">
+          <div className="metric-label">Total General {fYear}</div>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{ars(totalBruto)}</div>
+          <div className="metric-sub">ARS + USD convertidos · {facts.length} facturas</div>
+        </div>
+        <div className="metric-card">
           <div className="metric-label">Facturado Neto {fYear}</div>
           <div className={`metric-value${hidden ? " num-hidden" : ""}`}>{ars(totalNeto)}</div>
-          <div className="metric-sub">{facts.length} comprobantes · IVA: {ars(totalIVA)}</div>
+          <div className="metric-sub">IVA: {ars(totalIVA)}</div>
         </div>
         <div className="metric-card">
           <div className="metric-label">Facturado USD</div>

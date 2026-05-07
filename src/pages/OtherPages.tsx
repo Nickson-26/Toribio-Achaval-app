@@ -451,19 +451,27 @@ export function Resumen(_: any) {
   const ncs=comps.filter(c=>c.tipo.startsWith('NC'))
 
   const byTipo:Record<string,{ars:number;usd:number;count:number}>= {}
-  facts.forEach(f=>{ if(!byTipo[f.tipo])byTipo[f.tipo]={ars:0,usd:0,count:0}; byTipo[f.tipo].ars+=f.monto_ars||0; byTipo[f.tipo].usd+=f.monto_usd||0; byTipo[f.tipo].count++ })
+  facts.forEach(f=>{ if(!byTipo[f.tipo])byTipo[f.tipo]={ars:0,usd:0,count:0}; byTipo[f.tipo].ars+=montoARS(f); byTipo[f.tipo].usd+=f.monto_usd||0; byTipo[f.tipo].count++ })
 
   const byMes:Record<string,{ars:number;usd:number}>= {}
-  facts.forEach(f=>{ const k=f.fecha?.slice(0,7)||'N/A'; if(!byMes[k])byMes[k]={ars:0,usd:0}; byMes[k].ars+=f.monto_ars||0; byMes[k].usd+=f.monto_usd||0 })
+  facts.forEach(f=>{ const k=f.fecha?.slice(0,7)||'N/A'; if(!byMes[k])byMes[k]={ars:0,usd:0}; byMes[k].ars+=montoARS(f); byMes[k].usd+=f.monto_usd||0 })
 
   const byPers:Record<string,{ars:number;usd:number;count:number}>= {}
   facts.forEach(f=>{ if(!byPers[f.persona])byPers[f.persona]={ars:0,usd:0,count:0}; byPers[f.persona].ars+=montoARS(f); byPers[f.persona].usd+=f.monto_usd||0; byPers[f.persona].count++ })
 
+  const totalARSNativo = facts.reduce((s,f)=>s+(f.monto_ars||0),0)
+  const totalUSDNativo = facts.reduce((s,f)=>s+(f.monto_usd||0),0)
   const totalARS=Object.values(byTipo).reduce((s,v)=>s+v.ars,0)
-  const totalNC=ncs.reduce((s,f)=>s+(f.monto_ars||0),0)
+  const totalNC=ncs.reduce((s,f)=>s+montoARS(f),0)
+  const totalNeto = totalARS - totalNC
 
   return (
     <>
+      <div className="metrics-grid" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}>
+        <div className="metric-card"><div className="metric-label">Facturado ARS</div><div className="metric-value">{ars(totalARSNativo)}</div></div>
+        <div className="metric-card"><div className="metric-label">Facturado USD</div><div className="metric-value">{usd(totalUSDNativo)}</div></div>
+        <div className="metric-card"><div className="metric-label">Total TOTAL (ARS)</div><div className="metric-value">{ars(totalARS)}</div><div className="metric-label" style={{marginTop:4,fontSize:11}}>Neto: {ars(totalNeto)}</div></div>
+      </div>
       <div className="two-col">
         <div className="card">
           <div className="card-header"><span className="card-title">Por tipo de comprobante</span></div>
@@ -478,9 +486,9 @@ export function Resumen(_: any) {
                 </span>
               </div>
             ))}
-            <div className="sum-row" style={{marginTop:8}}><span style={{fontWeight:600}}>Total Facturado ARS</span><span className="text-mono" style={{fontWeight:600}}>{ars(totalARS)}</span></div>
+            <div className="sum-row" style={{marginTop:8}}><span style={{fontWeight:600}}>Total Facturado (ARS, USD convertidos)</span><span className="text-mono" style={{fontWeight:600}}>{ars(totalARS)}</span></div>
             <div className="sum-row"><span className="text-danger">— Notas de Crédito</span><span className="text-mono text-danger">-{ars(totalNC)}</span></div>
-            <div className="sum-row" style={{fontSize:15}}><span style={{fontWeight:600}}>Neto Facturado</span><span className="text-mono text-success" style={{fontWeight:600}}>{ars(totalARS-totalNC)}</span></div>
+            <div className="sum-row" style={{fontSize:15}}><span style={{fontWeight:600}}>Neto Facturado</span><span className="text-mono text-success" style={{fontWeight:600}}>{ars(totalNeto)}</span></div>
           </div>
         </div>
         <div className="card">

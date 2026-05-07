@@ -268,6 +268,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const [search,   setSearch]   = useState('')
   const [fPers,    setFPers]    = useState('all')
   const [fEst,     setFEst]     = useState('all')
+  const [fMoneda,  setFMoneda]  = useState<'all'|'ars'|'usd'>('all')
   const [clientes, setClientes] = useState<string[]>([])
   const [tab,      setTab]      = useState<Tab>('FACT A')
 
@@ -302,7 +303,14 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     closeModal(); load()
   }
 
-  const tabData    = data.filter(f => f.tipo === tab).sort((a, b) => (b.numero || 0) - (a.numero || 0))
+  const tabData    = data
+    .filter(f => f.tipo === tab)
+    .filter(f => {
+      if (fMoneda === 'ars') return !!f.monto_ars && !f.monto_usd
+      if (fMoneda === 'usd') return !!f.monto_usd
+      return true
+    })
+    .sort((a, b) => (b.numero || 0) - (a.numero || 0))
   const allPending = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
   const tabPending = tabData.filter(f => f.estado === 'pendiente')
   const totalARS   = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
@@ -322,6 +330,11 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           <option value="pendiente">Pendiente</option>
           <option value="cobrada">Cobrada</option>
           <option value="anulada">Anulada</option>
+        </select>
+        <select value={fMoneda} onChange={e => setFMoneda(e.target.value as 'all'|'ars'|'usd')} style={{ width: 130 }}>
+          <option value="all">Todas las monedas</option>
+          <option value="ars">Sólo ARS</option>
+          <option value="usd">Sólo USD</option>
         </select>
         <button className="btn" onClick={() => downloadCSV([
           ['ID','Tipo','Fecha','Cliente','Persona','Monto ARS','Monto USD','Neto','IVA','Estado'],

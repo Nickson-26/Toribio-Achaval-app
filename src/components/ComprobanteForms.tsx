@@ -199,11 +199,15 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
   const [netoStr,    setNeto]       = useState(String(comp.neto_ars || ''))
   const [ivaStr,     setIva]        = useState(String(comp.iva || ''))
   const [netoUSD,    setNetoUSD]    = useState(String(comp.neto_usd || ''))
+  const [ivaUSD,     setIvaUSD]     = useState('')
+  const [totalUSD,   setTotalUSD]   = useState(String(comp.monto_usd || ''))
   const [reciboId,   setReciboId]   = useState(String(comp.recibo_id || ''))
   const [fechaCobro, setFechaCobro] = useState(comp.fecha_cobro || '')
   const [concepto,   setConcepto]   = useState(comp.concepto || '')
   const isB = comp.tipo === 'FACT B'
+  const isUSD = !!usdStr || !!netoUSD || !!totalUSD
 
+  // Recalcula IVA y Total ARS a partir del Neto ARS (sólo para facturas no-B)
   useEffect(() => {
     if (isB) return
     const n = parseFloat(netoStr)
@@ -211,8 +215,22 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
       const iva = Math.round(n * IVA_RATE * 100) / 100
       setIva(String(iva))
       setArs(String(Math.round((n + iva) * 100) / 100))
+    } else if (netoStr === '') {
+      // si limpio el neto, no toco el total ARS (puede haberse cargado manual)
     }
-  }, [netoStr])
+  }, [netoStr, isB])
+
+  // Recalcula IVA y Total USD a partir del Neto USD (sólo para facturas no-B)
+  useEffect(() => {
+    if (isB) return
+    const n = parseFloat(netoUSD)
+    if (!isNaN(n) && n > 0) {
+      const iva = Math.round(n * IVA_RATE * 10000) / 10000
+      setIvaUSD(String(iva))
+      setTotalUSD(String(Math.round((n + iva) * 10000) / 10000))
+      setUsd(String(Math.round((n + iva) * 10000) / 10000))
+    }
+  }, [netoUSD, isB])
 
   async function handleSave() {
     setSaving(true)
@@ -221,7 +239,7 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
         fecha, estado, cliente: cliente.trim(), persona,
         tipo_cambio: tcStr     ? parseFloat(tcStr)     : null,
         monto_ars:   arsStr    ? parseFloat(arsStr)    : null,
-        monto_usd:   usdStr    ? parseFloat(usdStr)    : null,
+        monto_usd:   (totalUSD || usdStr) ? parseFloat(totalUSD || usdStr) : null,
         neto_ars:    netoStr   ? parseFloat(netoStr)   : null,
         neto_usd:    netoUSD   ? parseFloat(netoUSD)   : null,
         iva:         ivaStr    ? parseFloat(ivaStr)    : null,
@@ -237,7 +255,7 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
   }
 
   return (
-    <Modal title={`Editar — ${comp.id}`} onClose={onClose}
+    <Modal title={`Editar ${comp.tipo} — ${comp.id}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -245,36 +263,72 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
         </button>
       </>}>
       <div className="form-grid">
+        {/* ───── Datos generales ───── */}
+        <div className="form-section">Datos generales <span className="form-section-pill">{comp.tipo}</span></div>
         <FG label="Fecha"><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></FG>
         <FG label="Estado">
           <select value={estado} onChange={e => setEstado(e.target.value as any)}>
             {['pendiente','cobrada','anulada','emitida'].map(s => <option key={s}>{s}</option>)}
           </select>
         </FG>
-        <FG label="Cliente" full><input value={cliente} onChange={e => setCliente(e.target.value)} /></FG>
+        <FG label="Cliente" full><input value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Razón social" /></FG>
         <FG label="Persona / Unidad">
           <select value={persona} onChange={e => setPersona(e.target.value)}>
             {PERSONAS.map(p => <option key={p}>{p}</option>)}
           </select>
         </FG>
-        <FG label="Tipo de cambio"><input type="number" value={tcStr} onChange={e => setTc(e.target.value)} placeholder="—" /></FG>
-        <FG label="Monto USD"><input type="number" value={usdStr} onChange={e => setUsd(e.target.value)} placeholder="—" /></FG>
+        <FG label="Tipo de cambio">
+          <input type="number" min="0" step="0.01" value={tcStr} onChange={e => setTc(e.target.value)} placeholder="Sólo si la factura es en USD" />
+          {isUSD && !tcStr && <span className="calc-hint" style={{color:'var(--warn)'}}>⚠ Falta TC para convertir a ARS</span>}
+        </FG>
+
+        {/* ───── Montos ARS ───── */}
+        <div className="form-section">Montos en pesos {isB && <span className="form-section-pill">Fact B — sin IVA</span>}</div>
         {isB ? (
-          <FG label="Total ARS"><input type="number" value={arsStr} onChange={e => setArs(e.target.value)} /></FG>
+          <FG label="Total ARS" full>
+            <input type="number" min="0" step="0.01" value={arsStr} onChange={e => setArs(e.target.value)} placeholder="0" />
+          </FG>
         ) : (
           <>
             <FG label="Neto ARS">
-              <input type="number" value={netoStr} onChange={e => setNeto(e.target.value)} placeholder="—" />
-              <span className="calc-hint">IVA y total se recalculan solos</span>
+              <input type="number" min="0" step="0.01" value={netoStr} onChange={e => setNeto(e.target.value)} placeholder="—" />
+              <span className="calc-hint">IVA y Total se recalculan al cambiar este campo</span>
             </FG>
-            <FG label="Neto USD"><input type="number" value={netoUSD} onChange={e => setNetoUSD(e.target.value)} placeholder="—" /></FG>
-            <FG label="IVA ARS (calculado)"><input readOnly value={ivaStr} /></FG>
-            <FG label="Total ARS (calculado)"><input readOnly value={arsStr} /></FG>
+            <FG label="Total ARS">
+              <input type="number" min="0" step="0.01" value={arsStr} onChange={e => setArs(e.target.value)} placeholder="—" style={{fontWeight:500}} />
+              <span className="calc-hint">Editable si querés ajustar manualmente</span>
+            </FG>
+            <FG label="IVA ARS (calculado)"><input readOnly value={ivaStr} placeholder="—" /></FG>
           </>
         )}
+
+        {/* ───── Montos USD (opcional) ───── */}
+        <div className="form-section">Montos en dólares <span className="form-section-pill" style={{background:'var(--info-bg)',color:'var(--info)'}}>opcional</span></div>
+        {isB ? (
+          <FG label="Total USD" full>
+            <input type="number" min="0" step="0.0001" value={totalUSD} onChange={e => { setTotalUSD(e.target.value); setUsd(e.target.value) }} placeholder="0" />
+          </FG>
+        ) : (
+          <>
+            <FG label="Neto USD">
+              <input type="number" min="0" step="0.0001" value={netoUSD} onChange={e => setNetoUSD(e.target.value)} placeholder="—" />
+              <span className="calc-hint">IVA y Total USD se recalculan</span>
+            </FG>
+            <FG label="Total USD">
+              <input type="number" min="0" step="0.0001" value={totalUSD} onChange={e => { setTotalUSD(e.target.value); setUsd(e.target.value) }} placeholder="—" style={{fontWeight:500}} />
+            </FG>
+            <FG label="IVA USD (calculado)"><input readOnly value={ivaUSD} placeholder="—" /></FG>
+          </>
+        )}
+
+        {/* ───── Cobro ───── */}
+        <div className="form-section">Datos de cobro</div>
         <FG label="N° Recibo"><input type="number" value={reciboId} onChange={e => setReciboId(e.target.value)} placeholder="—" /></FG>
-        <FG label="Fecha cobro"><input type="date" value={fechaCobro} onChange={e => setFechaCobro(e.target.value)} /></FG>
-        <FG label="Concepto" full><textarea rows={3} value={concepto} onChange={e => setConcepto(e.target.value)} /></FG>
+        <FG label="Fecha de cobro"><input type="date" value={fechaCobro} onChange={e => setFechaCobro(e.target.value)} /></FG>
+
+        {/* ───── Concepto ───── */}
+        <div className="form-section">Concepto</div>
+        <FG label="Detalle del servicio" full><textarea rows={3} value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Descripción detallada…" /></FG>
       </div>
     </Modal>
   )

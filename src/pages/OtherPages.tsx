@@ -147,6 +147,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
 }
 
 function EditarReciboModal({recibo,onClose,onSaved}:{recibo:Recibo;onClose:()=>void;onSaved:(p:Partial<Recibo>)=>void}) {
+  const [saving,setSaving]=useState(false)
   const [fecha,setFecha]=useState(recibo.fecha||'')
   const [cliente,setCliente]=useState(recibo.cliente||'')
   const [nroFact,setNroFact]=useState(recibo.nro_fact||'')
@@ -154,19 +155,63 @@ function EditarReciboModal({recibo,onClose,onSaved}:{recibo:Recibo;onClose:()=>v
   const [pago,setPago]=useState(recibo.forma_pago||'transferencia')
   const [arsV,setArs]=useState(String(recibo.monto_ars||''))
   const [usdV,setUsd]=useState(String(recibo.monto_usd||''))
+  const [echeq,setEcheq]=useState(recibo.nro_echeq || '')
+
+  function handleSave() {
+    if (!cliente.trim()) { toast('El cliente es obligatorio'); return }
+    setSaving(true)
+    try {
+      onSaved({
+        fecha,
+        cliente: cliente.trim(),
+        nro_fact: nroFact.trim() || null,
+        persona,
+        forma_pago: pago,
+        monto_ars: arsV ? parseFloat(arsV) : null,
+        monto_usd: usdV ? parseFloat(usdV) : null,
+        nro_echeq: echeq.trim() || null,
+      })
+    } finally { setSaving(false) }
+  }
 
   return (
     <Modal title={`Editar Recibo ${recibo.id}`} onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={()=>onSaved({fecha,cliente:cliente.trim(),nro_fact:nroFact||null,persona,forma_pago:pago,monto_ars:arsV?parseFloat(arsV):null,monto_usd:usdV?parseFloat(usdV):null})}>Guardar</button></>}>
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving?'Guardando…':'Guardar cambios'}</button>
+      </>}>
       <div className="form-grid">
+        {/* Datos generales */}
+        <div className="form-section">Datos generales</div>
         <FG label="Fecha"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
-        <FG label="Cliente"><input value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
-        <FG label="N° Factura"><input value={nroFact} onChange={e=>setNroFact(e.target.value)}/></FG>
-        <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
-        <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>
-        <div/>
-        <FG label="ARS"><input type="number" value={arsV} onChange={e=>setArs(e.target.value)}/></FG>
-        <FG label="USD"><input type="number" value={usdV} onChange={e=>setUsd(e.target.value)}/></FG>
+        <FG label="N° Factura asociada">
+          <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: FC-A-4086"/>
+        </FG>
+        <FG label="Cliente *" full><input value={cliente} onChange={e=>setCliente(e.target.value)} placeholder="Razón social"/></FG>
+        <FG label="Persona / Unidad">
+          <select value={persona} onChange={e=>setPersona(e.target.value)}>
+            {PERSONAS.map(p=><option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        <FG label="Forma de pago">
+          <select value={pago} onChange={e=>setPago(e.target.value)}>
+            {['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        {(pago==='cheque' || pago==='e-cheq') && (
+          <FG label="N° E-Cheq / Cheque" full>
+            <input value={echeq} onChange={e=>setEcheq(e.target.value)} placeholder="—"/>
+          </FG>
+        )}
+
+        {/* Montos cobrados */}
+        <div className="form-section">Montos cobrados</div>
+        <FG label="Cobrado ARS">
+          <input type="number" min="0" step="0.01" value={arsV} onChange={e=>setArs(e.target.value)} placeholder="0"/>
+        </FG>
+        <FG label="Cobrado USD">
+          <input type="number" min="0" step="0.01" value={usdV} onChange={e=>setUsd(e.target.value)} placeholder="0"/>
+        </FG>
       </div>
     </Modal>
   )

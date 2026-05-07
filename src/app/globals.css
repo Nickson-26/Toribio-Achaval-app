@@ -707,23 +707,64 @@ tbody tr:hover td { background: var(--bg-hover); }
 .mobile-dd-item.active { color: var(--accent-text); background: var(--accent-bg); }
 
 /* ══════════════════════════════════════════════
+   FORM SECTIONS (modales)
+══════════════════════════════════════════════ */
+.form-section {
+  grid-column: 1/-1;
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-top: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.form-section:first-child { margin-top: 0; }
+.form-section .form-section-pill {
+  background: var(--accent-bg); color: var(--accent-text);
+  padding: 1px 8px; border-radius: 8px; font-size: 9.5px; letter-spacing: 0.04em;
+}
+
+/* ══════════════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════════════ */
+/* Modo ventana grande (1200–1100px) — laptop angosta o ventana media */
+@media (max-width: 1200px) {
+  .metrics-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; gap: 12px; }
+  .main-content { padding: 20px; }
+}
+@media (max-width: 1024px) {
+  .metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  .topnav-center { gap: 0; }
+  .topnav-item { padding: 6px 8px; font-size: 12.5px; }
+}
 @media (max-width: 900px) {
   .topnav-center { display: none; }
   .mobile-menu-btn { display: flex; align-items: center; }
-  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .two-col, .three-col { grid-template-columns: 1fr; }
   .main-content { padding: 14px; }
+  .toolbar input { width: 180px; }
+  .toolbar select { width: 150px; }
+  .card-header { padding: 12px 14px; }
+}
+@media (max-width: 720px) {
+  .metrics-grid { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .metric-card { padding: 14px 14px; }
+  .metric-value { font-size: 20px; }
+  .toolbar { gap: 6px; }
+  .toolbar input,
+  .toolbar select { width: auto; flex: 1 1 140px; min-width: 0; }
+  .toolbar .btn { flex-shrink: 0; }
 }
 @media (max-width: 640px) {
   .topnav { padding: 0 14px; gap: 6px; }
   .brand-name { display: none; }
-  .metrics-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metrics-grid { grid-template-columns: 1fr !important; gap: 10px; }
   .metric-value { font-size: 18px; }
   .form-grid { grid-template-columns: 1fr; padding: 14px 16px; }
   .form-group.full { grid-column: 1; }
   .modal { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   .overlay { align-items: flex-end; padding: 0; }
-  .toolbar input { width: 160px; }
+  .table-wrap { font-size: 11.5px; }
+  th, td { padding: 8px 10px; }
 }

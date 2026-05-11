@@ -33,22 +33,18 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   }, [])
 
   const toNeto = (f: any) => {
-    // Si la factura es en USD → siempre se convierte usando el TC
     if (f.monto_usd) {
       if (!f.tipo_cambio) return 0
       if (f.neto_usd) return Math.round(f.neto_usd * f.tipo_cambio * 100) / 100
       return Math.round((f.monto_usd * f.tipo_cambio / 1.21) * 100) / 100
     }
-    // Factura nativa en ARS
     if (f.neto_ars) return f.neto_ars
     if (f.monto_ars) return Math.round((f.monto_ars / 1.21) * 100) / 100
     return 0
   }
 
   const toBruto = (f: any) => {
-    // USD → conversión con TC siempre
     if (f.monto_usd) return f.tipo_cambio ? Math.round(f.monto_usd * f.tipo_cambio * 100) / 100 : 0
-    // ARS nativa
     return f.monto_ars || 0
   }
 
@@ -69,7 +65,6 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   const montoPend  = facts.filter((f: any) => f.estado === 'pendiente').reduce((s: number, f: any) => s + toNeto(f), 0)
   const pctCobrado = facts.length ? Math.round((cobradas / facts.length) * 100) : 0
 
-  // Monthly neto
   const byMes = new Array(12).fill(0)
   all.filter((c: any) => c.tipo?.startsWith('FACT') && c.estado !== 'anulada' && c.fecha?.startsWith(fYear) && (fUnidad === 'all' || c.persona === fUnidad))
     .forEach((f: any) => {
@@ -81,6 +76,15 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
 
   const byUnidad: Record<string, number> = {}
   facts.forEach((f: any) => { byUnidad[f.persona] = (byUnidad[f.persona]||0)+toNeto(f) })
+
+  const consultoriaAll  = facts.filter((f: any) => f.persona === 'CONSULTORIA')
+  const consCobradas    = consultoriaAll
+    .filter((f: any) => f.estado === 'cobrada')
+    .sort((a: any, b: any) => (b.fecha_cobro || b.fecha || '').localeCompare(a.fecha_cobro || a.fecha || ''))
+  const consPendientes  = consultoriaAll.filter((f: any) => f.estado === 'pendiente')
+  const consCobradasARS = consCobradas.reduce((s: number, f: any) => s + (f.monto_ars || 0), 0)
+  const consCobradasUSD = consCobradas.filter((f: any) => f.monto_usd).reduce((s: number, f: any) => s + (f.monto_usd || 0), 0)
+  const consNetoCobrado = consCobradas.reduce((s: number, f: any) => s + toNeto(f), 0)
 
   const byTipo: Record<string, number> = {}
   facts.forEach((f: any) => { byTipo[f.tipo] = (byTipo[f.tipo]||0)+toNeto(f) })
@@ -101,67 +105,26 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         barChart.current?.destroy()
         barChart.current = new Chart(barRef.current, {
           type: 'bar',
-          data: {
-            labels: MESES,
-            datasets: [{
-              data: byMes.map(v => Math.round(v/1000000)),
-              backgroundColor: byMes.map((_,i) => fMes !== 'all' && String(i+1).padStart(2,'0') === fMes ? ACCENT : 'rgba(200,16,46,0.4)'),
-              borderColor: ACCENT, borderWidth: 1, borderRadius: 4,
-            }]
-          },
-          options: {
-            ...defaults,
-            scales: {
-              x: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 } } },
-              y: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 }, callback: (v: any) => `$${v}M` } }
-            },
-            plugins: { ...defaults.plugins, tooltip: { callbacks: { label: (ctx: any) => ` Neto: $${ctx.raw}M` } } }
-          }
+          data: { labels: MESES, datasets: [{ data: byMes.map(v => Math.round(v/1000000)), backgroundColor: byMes.map((_,i) => fMes !== 'all' && String(i+1).padStart(2,'0') === fMes ? ACCENT : 'rgba(200,16,46,0.4)'), borderColor: ACCENT, borderWidth: 1, borderRadius: 4 }] },
+          options: { ...defaults, scales: { x: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 }, callback: (v: any) => `$${v}M` } } }, plugins: { ...defaults.plugins, tooltip: { callbacks: { label: (ctx: any) => ` Neto: $${ctx.raw}M` } } } }
         })
       }
-
       if (lineRef.current) {
         lineChart.current?.destroy()
         lineChart.current = new Chart(lineRef.current, {
           type: 'line',
-          data: {
-            labels: MESES,
-            datasets: [{
-              data: cumulative.map(v => Math.round(v/1000000)),
-              borderColor: ACCENT, backgroundColor: 'rgba(200,16,46,0.08)',
-              borderWidth: 2, fill: true, tension: 0.4,
-              pointBackgroundColor: ACCENT, pointRadius: 3,
-            }]
-          },
-          options: {
-            ...defaults,
-            scales: {
-              x: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 } } },
-              y: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 }, callback: (v: any) => `$${v}M` } }
-            }
-          }
+          data: { labels: MESES, datasets: [{ data: cumulative.map(v => Math.round(v/1000000)), borderColor: ACCENT, backgroundColor: 'rgba(200,16,46,0.08)', borderWidth: 2, fill: true, tension: 0.4, pointBackgroundColor: ACCENT, pointRadius: 3 }] },
+          options: { ...defaults, scales: { x: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 } } }, y: { grid: { color: GRID }, ticks: { color: TEXT, font: { size: 10 }, callback: (v: any) => `$${v}M` } } } }
         })
       }
-
       if (donutRef.current) {
         donutChart.current?.destroy()
         donutChart.current = new Chart(donutRef.current, {
           type: 'doughnut',
-          data: {
-            labels: ['Cobradas', 'Pendientes'],
-            datasets: [{
-              data: [cobradas, pendCount],
-              backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(200,16,46,0.7)'],
-              borderColor: ['#22c55e', ACCENT], borderWidth: 1,
-            }]
-          },
-          options: {
-            ...defaults, cutout: '72%',
-            plugins: { legend: { display: true, position: 'bottom' as const, labels: { color: TEXT, font: { size: 11 }, padding: 12, boxWidth: 10 } } }
-          }
+          data: { labels: ['Cobradas', 'Pendientes'], datasets: [{ data: [cobradas, pendCount], backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(200,16,46,0.7)'], borderColor: ['#22c55e', ACCENT], borderWidth: 1 }] },
+          options: { ...defaults, cutout: '72%', plugins: { legend: { display: true, position: 'bottom' as const, labels: { color: TEXT, font: { size: 11 }, padding: 12, boxWidth: 10 } } } }
         })
       }
-
       if (typeRef.current) {
         typeChart.current?.destroy()
         const tipoLabels = Object.keys(byTipo)
@@ -169,14 +132,8 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         const colors = ['rgba(200,16,46,0.8)','rgba(96,165,250,0.8)','rgba(245,158,11,0.8)','rgba(139,92,246,0.8)','rgba(20,184,166,0.8)']
         typeChart.current = new Chart(typeRef.current, {
           type: 'doughnut',
-          data: {
-            labels: tipoLabels,
-            datasets: [{ data: tipoVals, backgroundColor: colors.slice(0, tipoLabels.length), borderWidth: 1 }]
-          },
-          options: {
-            ...defaults, cutout: '68%',
-            plugins: { legend: { display: true, position: 'bottom' as const, labels: { color: TEXT, font: { size: 10 }, padding: 8, boxWidth: 10 } } }
-          }
+          data: { labels: tipoLabels, datasets: [{ data: tipoVals, backgroundColor: colors.slice(0, tipoLabels.length), borderWidth: 1 }] },
+          options: { ...defaults, cutout: '68%', plugins: { legend: { display: true, position: 'bottom' as const, labels: { color: TEXT, font: { size: 10 }, padding: 8, boxWidth: 10 } } } }
         })
       }
     })
@@ -187,7 +144,6 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
 
   return (
     <>
-      {/* Filter bar */}
       <div className="dash-filters">
         <label>Filtros</label>
         <span className="filter-sep" />
@@ -210,7 +166,6 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         )}
       </div>
 
-      {/* KPIs */}
       <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))' }}>
         <div className="metric-card accent">
           <div className="metric-label">Total General {fYear}</div>
@@ -229,9 +184,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         </div>
         <div className="metric-card">
           <div className="metric-label">Tasa de cobro</div>
-          <div className={`metric-value${hidden ? " num-hidden" : ""}`} style={{ color: pctCobrado>=80?'var(--success)':pctCobrado>=50?'var(--warn)':'var(--danger)' }}>
-            {pctCobrado}%
-          </div>
+          <div className={`metric-value${hidden ? " num-hidden" : ""}`} style={{ color: pctCobrado>=80?'var(--success)':pctCobrado>=50?'var(--warn)':'var(--danger)' }}>{pctCobrado}%</div>
           <div className="metric-sub">{cobradas} cobradas / {facts.length} total</div>
         </div>
         <div className="metric-card">
@@ -241,41 +194,80 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         </div>
       </div>
 
-      {/* Main charts */}
-      <div className="two-col">
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Facturación neta mensual</span>
-            <span className="card-hint">{fYear} — ARS</span>
-          </div>
-          <div style={{ padding: '12px 16px 16px', height: 220 }}>
-            <canvas ref={barRef} />
-          </div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <span className="card-title">Consultoría — Facturas cobradas</span>
+          <span className="card-hint">{consCobradas.length} cobradas · {consPendientes.length} pendientes · {fYear}</span>
         </div>
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Acumulado neto anual</span>
-            <span className="card-hint">{fYear}</span>
+        <div style={{ padding: '12px 16px 16px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:12, marginBottom:14 }}>
+            <div className="metric-card">
+              <div className="metric-label">Cobradas</div>
+              <div className={`metric-value${hidden ? ' num-hidden' : ''}`} style={{ color:'var(--success)' }}>{consCobradas.length}</div>
+              <div className="metric-sub">de {consultoriaAll.length} facturas</div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-label">Total cobrado (neto)</div>
+              <div className={`metric-value${hidden ? ' num-hidden' : ''}`}>{ars(consNetoCobrado)}</div>
+              <div className="metric-sub">Bruto: {ars(consCobradasARS)}</div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-label">Cobrado en USD</div>
+              <div className={`metric-value${hidden ? ' num-hidden' : ''}`}>{usd(consCobradasUSD)}</div>
+              <div className="metric-sub">{consCobradas.filter((f:any)=>f.monto_usd).length} en dólares</div>
+            </div>
           </div>
-          <div style={{ padding: '12px 16px 16px', height: 220 }}>
-            <canvas ref={lineRef} />
-          </div>
+          {consCobradas.length === 0 ? (
+            <div style={{ color:'var(--text-tertiary)', fontSize:13, textAlign:'center', padding:20 }}>Sin facturas de Consultoría cobradas en {fYear}.</div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>N°</th><th>Tipo</th><th>Cliente</th><th>Fecha cobro</th>
+                    <th className="text-right">ARS</th><th className="text-right">USD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {consCobradas.slice(0, 15).map((f: any) => (
+                    <tr key={f.id}>
+                      <td style={{ fontWeight:600 }}>{f.numero || '—'}</td>
+                      <td><TipoBadge tipo={f.tipo} /></td>
+                      <td style={{ maxWidth:220, overflow:'hidden', textOverflow:'ellipsis' }}>{f.cliente}</td>
+                      <td>{fdate(f.fecha_cobro || f.fecha)}</td>
+                      <td className={`text-right text-mono${hidden ? ' num-hidden' : ''}`}>{ars(f.monto_ars)}</td>
+                      <td className={`text-right text-mono${hidden ? ' num-hidden' : ''}`}>{usd(f.monto_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {consCobradas.length > 15 && (
+                <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-tertiary)', textAlign:'center' }}>Mostrando 15 más recientes de {consCobradas.length}</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Secondary charts + ranking */}
+      <div className="two-col">
+        <div className="card">
+          <div className="card-header"><span className="card-title">Facturación neta mensual</span><span className="card-hint">{fYear} — ARS</span></div>
+          <div style={{ padding: '12px 16px 16px', height: 220 }}><canvas ref={barRef} /></div>
+        </div>
+        <div className="card">
+          <div className="card-header"><span className="card-title">Acumulado neto anual</span><span className="card-hint">{fYear}</span></div>
+          <div style={{ padding: '12px 16px 16px', height: 220 }}><canvas ref={lineRef} /></div>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.6fr', gap: 16, marginBottom: 16 }}>
         <div className="card">
           <div className="card-header"><span className="card-title">Estado de cobro</span></div>
-          <div style={{ padding: '12px 16px 16px', height: 210 }}>
-            <canvas ref={donutRef} />
-          </div>
+          <div style={{ padding: '12px 16px 16px', height: 210 }}><canvas ref={donutRef} /></div>
         </div>
         <div className="card">
           <div className="card-header"><span className="card-title">Por tipo de factura</span></div>
-          <div style={{ padding: '12px 16px 16px', height: 210 }}>
-            <canvas ref={typeRef} />
-          </div>
+          <div style={{ padding: '12px 16px 16px', height: 210 }}><canvas ref={typeRef} /></div>
         </div>
         <div className="card">
           <div className="card-header"><span className="card-title">Top clientes — neto</span></div>
@@ -296,7 +288,6 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
         </div>
       </div>
 
-      {/* By unidad */}
       <div className="card">
         <div className="card-header"><span className="card-title">Facturación neta por unidad de negocio</span></div>
         <div style={{ padding: '14px 16px' }}>

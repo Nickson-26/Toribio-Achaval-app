@@ -127,7 +127,7 @@ export const db = {
   async getDashboardStats() {
     const { data: comps, error } = await supabase
       .from('comprobantes')
-      .select('tipo,persona,fecha,monto_ars,monto_usd,tipo_cambio,neto_ars,estado')
+      .select('id,numero,tipo,persona,cliente,fecha,fecha_cobro,monto_ars,monto_usd,tipo_cambio,neto_ars,estado')
       .neq('estado', 'anulada')
     if (error) throw new Error(`Error al cargar dashboard: ${error.message}`)
     return { comprobantes: comps || [] }

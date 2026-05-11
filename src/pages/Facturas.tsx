@@ -416,6 +416,13 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                         {f.estado === 'pendiente' && (
                           <button className="btn btn-sm btn-primary" onClick={() => { setSelected(f); setModal('cobrar') }}>Cobrar</button>
                         )}
+                        {f.estado !== 'anulada' && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ borderColor:'var(--warn)', color:'var(--warn)' }}
+                            onClick={() => handleAnular(f.id)}
+                          >Anular</button>
+                        )}
                         <button className="btn btn-sm btn-danger" onClick={() => { setSelected(f); setModal('eliminar') }}>Eliminar</button>
                       </div>
                     </td>

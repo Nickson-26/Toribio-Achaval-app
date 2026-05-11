@@ -121,7 +121,28 @@ export const db = {
     const { data, error } = await supabase
       .from('recibos').insert(payload).select().single()
     if (error) throw new Error(`Error al crear recibo: ${error.message}`)
-    return data as Recibo
+    const recibo = data as Recibo
+
+    // Auto-cobrar la factura asociada (si el recibo tiene nro_fact).
+    // nro_fact es el id del comprobante (ej. "FC-A-4086").
+    if (recibo.nro_fact) {
+      const { error: updErr } = await supabase
+        .from('comprobantes')
+        .update({
+          estado: 'cobrada' as ComprobanteEstado,
+          recibo_id: recibo.id,
+          fecha_cobro: recibo.fecha,
+        })
+        .eq('id', recibo.nro_fact)
+      if (updErr) {
+        // No revertimos el recibo: avisamos al caller para que muestre warning.
+        console.warn(`Recibo ${recibo.id} creado, pero no se pudo marcar la factura ${recibo.nro_fact} como cobrada:`, updErr.message)
+        throw new Error(
+          `Recibo ${recibo.id} guardado, pero no se pudo actualizar la factura ${recibo.nro_fact}: ${updErr.message}`
+        )
+      }
+    }
+    return recibo
   },
 
   async getDashboardStats() {

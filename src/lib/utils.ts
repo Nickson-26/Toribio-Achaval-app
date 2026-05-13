@@ -61,14 +61,16 @@ export function estadoColor(e: string): string {
   return 'badge-gray'
 }
 
-export function buildComprobanteId(tipo: string, numero: number): string {
+export function buildComprobanteId(tipo: string, numero: number, pv: string = PUNTO_VENTA_DEFAULT): string {
   const prefix =
     tipo === 'FACT A' ? 'FC-A' :
     tipo === 'FACT B' ? 'FC-B' :
     tipo === 'FACT DE CREDITO' ? 'FC-FC' :
     tipo === 'FACT E' ? 'FC-E' :
     tipo.replace(/\s/g, '-')
-  return `${prefix}-${numero}`
+  // PV 0002 mantiene el formato histórico para preservar los IDs viejos
+  if (pv === PUNTO_VENTA_DEFAULT) return `${prefix}-${numero}`
+  return `${prefix}-${pv}-${numero}`
 }
 
 export function downloadCSV(rows: (string | number | null)[][], filename: string) {

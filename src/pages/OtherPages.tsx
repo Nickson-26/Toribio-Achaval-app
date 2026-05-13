@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { db, Recibo, Comprobante } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
-import { ars, usd, fdate, montoARS, PERSONAS, today, downloadCSV, MESES, TODOS_TIPOS, PUNTOS_VENTA } from '@/lib/utils'
+import { ars, usd, fdate, montoARS, PERSONAS, today, downloadCSV, MESES, TODOS_TIPOS, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT } from '@/lib/utils'
 import { TipoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 
 // ══════════════════════════════════════════════════════════════
@@ -98,6 +98,7 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
   const [fecha,setFecha]=useState(today())
   const [cliente,setCliente]=useState('')
   const [tipoFact,setTipoFact]=useState('FACT A')
+  const [pvFact,setPvFact]=useState<string>(PUNTO_VENTA_DEFAULT)
   const [nroFact,setNroFact]=useState('')
   const [persona,setPersona]=useState(PERSONAS[0])
   const [pago,setPago]=useState('transferencia')
@@ -108,7 +109,12 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
     'FACT A':'FC-A','FACT B':'FC-B','FACT DE CREDITO':'FC-FC',
     'FACT E':'FC-E','NC A':'NC-A','NC B':'NC-B'
   }
-  const fullFactId = nroFact.trim() ? `${tipoMap[tipoFact]}-${nroFact.trim()}` : null
+  // Mismo formato que buildComprobanteId: PV 0002 mantiene el ID histórico
+  const fullFactId = nroFact.trim()
+    ? (pvFact === PUNTO_VENTA_DEFAULT
+        ? `${tipoMap[tipoFact]}-${nroFact.trim()}`
+        : `${tipoMap[tipoFact]}-${pvFact}-${nroFact.trim()}`)
+    : null
 
   async function save() {
     if (!cliente.trim()) return toast('El cliente es obligatorio')
@@ -132,9 +138,14 @@ function NuevoReciboModal({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void})
             {['FACT A','FACT B','FACT DE CREDITO','FACT E','NC A','NC B'].map(t=><option key={t} value={t}>{t}</option>)}
           </select>
         </FG>
+        <FG label="Punto de Venta">
+          <select value={pvFact} onChange={e=>setPvFact(e.target.value)}>
+            {PUNTOS_VENTA.map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+        </FG>
         <FG label="N° Factura">
           <input value={nroFact} onChange={e=>setNroFact(e.target.value)} placeholder="Ej: 4086"/>
-          {nroFact && <span className="calc-hint">ID: {tipoMap[tipoFact]}-{nroFact}</span>}
+          {nroFact && <span className="calc-hint">ID: {fullFactId}</span>}
         </FG>
         <FG label="Persona / Unidad"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <FG label="Forma de pago"><select value={pago} onChange={e=>setPago(e.target.value)}>{['transferencia','cheque','e-cheq','efectivo'].map(p=><option key={p}>{p}</option>)}</select></FG>

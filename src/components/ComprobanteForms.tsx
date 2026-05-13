@@ -74,11 +74,19 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
 
     setSaving(true)
     try {
+      // Numeración independiente por (tipo, punto_venta).
+      // PV 0002 sigue la serie histórica; PV nuevos arrancan desde 1.
       const { data: last } = await supabase
-        .from('comprobantes').select('numero').eq('tipo', tipo)
-        .order('numero', { ascending: false }).limit(1)
-      const nextNum = last && last[0] ? (last[0].numero ?? 4000) + 1 : 4001
-      const id = buildComprobanteId(tipo, nextNum)
+        .from('comprobantes')
+        .select('numero')
+        .eq('tipo', tipo)
+        .eq('punto_venta', pv)
+        .order('numero', { ascending: false })
+        .limit(1)
+      const nextNum = last && last[0]
+        ? (last[0].numero ?? 0) + 1
+        : (pv === '0002' ? 4001 : 1)
+      const id = buildComprobanteId(tipo, nextNum, pv)
       const tc = tcStr ? parseFloat(tcStr) : null
       const monto_usd = hasUSD && !isB ? (totalUSD ? parseFloat(totalUSD) : null) : null
       const neto_usd  = hasUSD && !isB ? (netoUSD  ? parseFloat(netoUSD)  : null) : null

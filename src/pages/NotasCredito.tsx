@@ -182,11 +182,15 @@ function NuevaNCModal({ tipo, onClose, onSaved, clientes }: {
     if (!cliente.trim()) { toast('El cliente es obligatorio'); return }
     setSaving(true)
     try {
+      // Numeración independiente por (tipo, punto_venta)
       const { data: last } = await supabase.from('comprobantes')
-        .select('numero').eq('tipo', tipo)
+        .select('numero').eq('tipo', tipo).eq('punto_venta', pv)
         .order('numero', { ascending: false }).limit(1)
-      const nextNum = last && last[0] ? (last[0].numero ?? 400) + 1 : 401
-      const id = `${tipo.replace(/ /g, '-')}-${nextNum}`
+      const nextNum = last && last[0]
+        ? (last[0].numero ?? 0) + 1
+        : (pv === '0002' ? 401 : 1)
+      const tipoPrefix = tipo.replace(/ /g, '-')
+      const id = pv === '0002' ? `${tipoPrefix}-${nextNum}` : `${tipoPrefix}-${pv}-${nextNum}`
       await supabase.from('comprobantes').insert({
         id, tipo, numero: nextNum, fecha,
         cliente: cliente.trim(), persona,

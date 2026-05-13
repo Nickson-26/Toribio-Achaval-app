@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { db, Recibo, Comprobante } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
-import { ars, usd, fdate, montoARS, PERSONAS, today, downloadCSV, MESES, TODOS_TIPOS } from '@/lib/utils'
+import { ars, usd, fdate, montoARS, PERSONAS, today, downloadCSV, MESES, TODOS_TIPOS, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 
 // ══════════════════════════════════════════════════════════════
@@ -425,11 +425,14 @@ function EditarNCModal({comp,onClose,onSaved}:{comp:Comprobante;onClose:()=>void
 export function NotasDebito(_: any) {
   const [data,setData]=useState<Comprobante[]>([])
   const [loading,setLoading]=useState(true)
+  const [fPV,setFPV]=useState<'all'|string>('all')
   const [modal,setModal]=useState<'edit'|null>(null)
   const [sel,setSel]=useState<Comprobante|null>(null)
 
   const load=()=>{ setLoading(true); db.getComprobantes().then(rows=>{setData(rows.filter(r=>r.tipo.startsWith('ND')));setLoading(false)}) }
   useEffect(()=>{load()},[])
+
+  const rows = data.filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
 
   async function handleDelete(id:string) {
     if(!confirm(`¿Eliminar ${id}?`)) return
@@ -444,17 +447,24 @@ export function NotasDebito(_: any) {
 
   return (
     <div className="card">
-      <div className="card-header"><span className="card-title">Notas de Débito ({data.length})</span></div>
-      {loading?<Spinner/>:data.length===0?(
+      <div className="card-header">
+        <span className="card-title">Notas de Débito ({rows.length})</span>
+        <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width: 130 }}>
+          <option value="all">Todos los PV</option>
+          {PUNTOS_VENTA.map(p => <option key={p} value={p}>PV {p}</option>)}
+        </select>
+      </div>
+      {loading?<Spinner/>:rows.length===0?(
         <div className="empty-row">Sin notas de débito registradas</div>
       ):(
         <div className="table-wrap">
           <table>
-            <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Persona</th><th className="text-right">ARS</th><th className="text-right">USD</th><th>Concepto</th><th></th></tr></thead>
+            <thead><tr><th>N°</th><th>PV</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Persona</th><th className="text-right">ARS</th><th className="text-right">USD</th><th>Concepto</th><th></th></tr></thead>
             <tbody>
-              {data.map(f=>(
+              {rows.map(f=>(
                 <tr key={f.id}>
                   <td style={{fontWeight:500}}>{f.id}</td>
+                  <td style={{fontFamily:'var(--font-mono)',fontSize:11,color:'var(--text-tertiary)'}}>{f.punto_venta || '0002'}</td>
                   <td>{fdate(f.fecha)}</td><td>{f.cliente}</td>
                   <td><TipoBadge tipo={f.tipo}/></td>
                   <td className="text-dim">{f.persona}</td>

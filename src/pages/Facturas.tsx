@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { db, Comprobante, supabase } from '@/lib/supabase'
-import { ars, usd, fdate, PERSONAS, downloadCSV } from '@/lib/utils'
+import { ars, usd, fdate, PERSONAS, downloadCSV, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal } from '@/components/ComprobanteForms'
 
@@ -269,6 +269,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const [fPers,    setFPers]    = useState('all')
   const [fEst,     setFEst]     = useState('all')
   const [fMoneda,  setFMoneda]  = useState<'all'|'ars'|'usd'>('all')
+  const [fPV,      setFPV]      = useState<'all'|string>('all')
   const [clientes, setClientes] = useState<string[]>([])
   const [tab,      setTab]      = useState<Tab>('FACT A')
 
@@ -310,6 +311,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       if (fMoneda === 'usd') return !!f.monto_usd
       return true
     })
+    .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
     .sort((a, b) => (b.numero || 0) - (a.numero || 0))
   const allPending = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
   const tabPending = tabData.filter(f => f.estado === 'pendiente')
@@ -330,6 +332,10 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           <option value="pendiente">Pendiente</option>
           <option value="cobrada">Cobrada</option>
           <option value="anulada">Anulada</option>
+        </select>
+        <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width: 130 }}>
+          <option value="all">Todos los PV</option>
+          {PUNTOS_VENTA.map(p => <option key={p} value={p}>PV {p}</option>)}
         </select>
         <select value={fMoneda} onChange={e => setFMoneda(e.target.value as 'all'|'ars'|'usd')} style={{ width: 130 }}>
           <option value="all">Todas las monedas</option>
@@ -389,7 +395,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <table>
               <thead>
                 <tr>
-                  <th>N°</th><th>Fecha</th><th>Cliente</th><th>Persona</th>
+                  <th>N°</th><th>PV</th><th>Fecha</th><th>Cliente</th><th>Persona</th>
                   {tab !== 'FACT B' && <th className="text-right">Neto</th>}
                   {tab !== 'FACT B' && <th className="text-right">IVA</th>}
                   <th className="text-right">Total ARS</th><th className="text-right">USD</th>
@@ -402,6 +408,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                 ) : tabData.map(f => (
                   <tr key={f.id} className="tr-clickable" onClick={() => openDetail(f)}>
                     <td className="text-link" style={{ fontWeight:600 }}>{f.numero}</td>
+                    <td style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-tertiary)' }}>{f.punto_venta || '0002'}</td>
                     <td>{fdate(f.fecha)}</td>
                     <td style={{ maxWidth:180, overflow:'hidden', textOverflow:'ellipsis' }}>{f.cliente}</td>
                     <td className="text-dim" style={{ fontSize:11.5 }}>{f.persona}</td>

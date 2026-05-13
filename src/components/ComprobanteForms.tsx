@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { db, Comprobante } from '@/lib/supabase'
 import { Modal, FG, toast } from '@/components/ui'
-import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId } from '@/lib/utils'
+import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 const IVA_RATE = 0.21
@@ -28,6 +28,7 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
   const [fecha,    setFecha]    = useState(today())
   const [cliente,  setCliente]  = useState('')
   const [persona,  setPersona]  = useState(PERSONAS[0])
+  const [pv,       setPv]       = useState<string>(PUNTO_VENTA_DEFAULT)
   const [concepto, setConcepto] = useState('')
   const [netoARS,  setNetoARS]  = useState('')
   const [ivaARS,   setIvaARS]   = useState('')
@@ -100,6 +101,7 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
         arba_ars: null, arba_usd: null,
         estado: tipo.startsWith('FACT') ? 'pendiente' : 'emitida',
         recibo_id: null, fecha_cobro: null,
+        punto_venta: pv,
       }
       const saved = await db.createComprobante(payload)
       onSaved(saved)
@@ -135,6 +137,11 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
         <FG label="Persona / Unidad *">
           <select value={persona} onChange={e => setPersona(e.target.value)}>
             {PERSONAS.map(p => <option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        <FG label="Punto de Venta *">
+          <select value={pv} onChange={e => setPv(e.target.value)}>
+            {PUNTOS_VENTA.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </FG>
         <FG label="Tipo de cambio (si es en USD)">
@@ -193,6 +200,7 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
   const [estado,     setEstado]     = useState(comp.estado)
   const [cliente,    setCliente]    = useState(comp.cliente || '')
   const [persona,    setPersona]    = useState(comp.persona || '')
+  const [pv,         setPv]         = useState<string>(comp.punto_venta || PUNTO_VENTA_DEFAULT)
   const [tcStr,      setTc]         = useState(String(comp.tipo_cambio || ''))
   const [arsStr,     setArs]        = useState(String(comp.monto_ars || ''))
   const [usdStr,     setUsd]        = useState(String(comp.monto_usd || ''))
@@ -237,6 +245,7 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
     try {
       const saved = await db.updateComprobante(comp.id, {
         fecha, estado, cliente: cliente.trim(), persona,
+        punto_venta: pv,
         tipo_cambio: tcStr     ? parseFloat(tcStr)     : null,
         monto_ars:   arsStr    ? parseFloat(arsStr)    : null,
         monto_usd:   (totalUSD || usdStr) ? parseFloat(totalUSD || usdStr) : null,
@@ -275,6 +284,11 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
         <FG label="Persona / Unidad">
           <select value={persona} onChange={e => setPersona(e.target.value)}>
             {PERSONAS.map(p => <option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        <FG label="Punto de Venta">
+          <select value={pv} onChange={e => setPv(e.target.value)}>
+            {PUNTOS_VENTA.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </FG>
         <FG label="Tipo de cambio">

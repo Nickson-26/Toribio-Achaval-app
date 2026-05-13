@@ -10,6 +10,11 @@ export const TIPOS_NC   = ['NC A', 'NC B', 'NC FACT DE CREDITO']
 export const TIPOS_ND   = ['ND A', 'ND B', 'ND FACT DE CREDITO']
 export const TODOS_TIPOS = [...TIPOS_FACT, ...TIPOS_NC, ...TIPOS_ND]
 
+// Puntos de venta AFIP — definir acá nuevos PV si la empresa los habilita
+export const PUNTOS_VENTA = ['0002', '0004'] as const
+export type PuntoVenta = typeof PUNTOS_VENTA[number]
+export const PUNTO_VENTA_DEFAULT: PuntoVenta = '0002'
+
 export const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 export function ars(n: number | null | undefined): string {

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { db, Comprobante } from '@/lib/supabase'
-import { ars, usd, fdate, PERSONAS, today } from '@/lib/utils'
+import { ars, usd, fdate, PERSONAS, today, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT } from '@/lib/utils'
 import { TipoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 
 type Tab = 'NC A' | 'NC B'
@@ -11,6 +11,7 @@ export default function NotasCredito(_: any) {
   const [data,    setData]    = useState<Comprobante[]>([])
   const [loading, setLoading] = useState(true)
   const [tab,     setTab]     = useState<Tab>('NC A')
+  const [fPV,     setFPV]     = useState<'all'|string>('all')
   const [modal,   setModal]   = useState<'new'|'edit'|null>(null)
   const [sel,     setSel]     = useState<Comprobante|null>(null)
 
@@ -38,6 +39,7 @@ export default function NotasCredito(_: any) {
 
   const tabData = data
     .filter(f => f.tipo === tab)
+    .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
     .sort((a, b) => (b.numero || 0) - (a.numero || 0))
 
   const total = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
@@ -64,6 +66,10 @@ export default function NotasCredito(_: any) {
       </div>
 
       <div className="toolbar">
+        <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width: 130 }}>
+          <option value="all">Todos los PV</option>
+          {PUNTOS_VENTA.map(p => <option key={p} value={p}>PV {p}</option>)}
+        </select>
         <button className="btn btn-primary" onClick={() => setModal('new')}>+ Nueva NC {tab.split(' ')[1]}</button>
       </div>
 
@@ -92,7 +98,7 @@ export default function NotasCredito(_: any) {
             <table>
               <thead>
                 <tr>
-                  <th>N°</th><th>Fecha</th><th>Cliente</th><th>Persona</th>
+                  <th>N°</th><th>PV</th><th>Fecha</th><th>Cliente</th><th>Persona</th>
                   {tab === 'NC A' && <th className="text-right">Neto</th>}
                   {tab === 'NC A' && <th className="text-right">IVA</th>}
                   <th className="text-right">Total ARS</th>
@@ -106,6 +112,7 @@ export default function NotasCredito(_: any) {
                 ) : tabData.map(f => (
                   <tr key={f.id}>
                     <td style={{ fontWeight: 600, color: 'var(--danger)' }}>{f.numero}</td>
+                    <td style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-tertiary)' }}>{f.punto_venta || '0002'}</td>
                     <td>{fdate(f.fecha)}</td>
                     <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.cliente}</td>
                     <td className="text-dim" style={{ fontSize: 11.5 }}>{f.persona}</td>
@@ -154,6 +161,7 @@ function NuevaNCModal({ tipo, onClose, onSaved, clientes }: {
   const [fecha,    setFecha]    = useState(today())
   const [cliente,  setCliente]  = useState('')
   const [persona,  setPersona]  = useState(PERSONAS[0])
+  const [pv,       setPv]       = useState<string>(PUNTO_VENTA_DEFAULT)
   const [neto,     setNeto]     = useState('')
   const [iva,      setIva]      = useState('')
   const [arsV,     setArs]      = useState('')
@@ -182,6 +190,7 @@ function NuevaNCModal({ tipo, onClose, onSaved, clientes }: {
       await supabase.from('comprobantes').insert({
         id, tipo, numero: nextNum, fecha,
         cliente: cliente.trim(), persona,
+        punto_venta: pv,
         concepto: concepto.trim(),
         monto_ars: arsV ? parseFloat(arsV) : (usdV ? null : null),
         monto_usd: usdV ? parseFloat(usdV) : null,
@@ -215,7 +224,11 @@ function NuevaNCModal({ tipo, onClose, onSaved, clientes }: {
             {PERSONAS.map(p => <option key={p}>{p}</option>)}
           </select>
         </FG>
-        <div />
+        <FG label="Punto de Venta">
+          <select value={pv} onChange={e => setPv(e.target.value)}>
+            {PUNTOS_VENTA.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </FG>
         {tipo === 'NC A' ? (
           <>
             <FG label="Neto ARS">
@@ -245,6 +258,7 @@ function EditarNCModal({ comp, onClose, onSaved }: {
   const [fecha,    setFecha]    = useState(comp.fecha || '')
   const [cliente,  setCliente]  = useState(comp.cliente || '')
   const [persona,  setPersona]  = useState(comp.persona || PERSONAS[0])
+  const [pv,       setPv]       = useState<string>(comp.punto_venta || PUNTO_VENTA_DEFAULT)
   const [neto,     setNeto]     = useState(String(comp.neto_ars || ''))
   const [iva,      setIva]      = useState(String(comp.iva || ''))
   const [arsV,     setArs]      = useState(String(comp.monto_ars || ''))
@@ -267,6 +281,7 @@ function EditarNCModal({ comp, onClose, onSaved }: {
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={() => onSaved({
           fecha, cliente: cliente.trim(), persona, concepto: concepto.trim(),
+          punto_venta: pv,
           neto_ars: neto ? parseFloat(neto) : null,
           iva:      iva  ? parseFloat(iva)  : null,
           monto_ars: arsV ? parseFloat(arsV) : null,
@@ -281,7 +296,11 @@ function EditarNCModal({ comp, onClose, onSaved }: {
             {PERSONAS.map(p => <option key={p}>{p}</option>)}
           </select>
         </FG>
-        <div />
+        <FG label="Punto de Venta">
+          <select value={pv} onChange={e => setPv(e.target.value)}>
+            {PUNTOS_VENTA.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </FG>
         {comp.tipo === 'NC A' ? (
           <>
             <FG label="Neto"><input type="number" value={neto} onChange={e => setNeto(e.target.value)} /></FG>

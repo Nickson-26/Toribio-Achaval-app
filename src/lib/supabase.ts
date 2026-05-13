@@ -40,6 +40,7 @@ export type Comprobante = {
   estado: ComprobanteEstado
   recibo_id: number | null
   fecha_cobro: string | null
+  punto_venta: string  // '0002' | '0004' — default '0002'
   created_at: string
 }
 
@@ -148,7 +149,7 @@ export const db = {
   async getDashboardStats() {
     const { data: comps, error } = await supabase
       .from('comprobantes')
-      .select('id,numero,tipo,persona,cliente,fecha,fecha_cobro,monto_ars,monto_usd,tipo_cambio,neto_ars,estado')
+      .select('id,numero,tipo,persona,cliente,fecha,fecha_cobro,monto_ars,monto_usd,tipo_cambio,neto_ars,estado,punto_venta')
       .neq('estado', 'anulada')
     if (error) throw new Error(`Error al cargar dashboard: ${error.message}`)
     return { comprobantes: comps || [] }

@@ -261,17 +261,18 @@ function ExportarModal({ pendientes, onClose }: { pendientes: Comprobante[]; onC
 }
 
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
-  const [data,     setData]     = useState<Comprobante[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [modal,    setModal]    = useState<ModalType>(null)
-  const [selected, setSelected] = useState<Comprobante | null>(null)
-  const [search,   setSearch]   = useState('')
-  const [fPers,    setFPers]    = useState('all')
-  const [fEst,     setFEst]     = useState('all')
-  const [fMoneda,  setFMoneda]  = useState<'all'|'ars'|'usd'>('all')
-  const [fPV,      setFPV]      = useState<'all'|string>('all')
-  const [clientes, setClientes] = useState<string[]>([])
-  const [tab,      setTab]      = useState<Tab>('FACT A')
+  const [data,        setData]        = useState<Comprobante[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [modal,       setModal]       = useState<ModalType>(null)
+  const [selected,    setSelected]    = useState<Comprobante | null>(null)
+  const [search,      setSearch]      = useState('')
+  const [fPers,       setFPers]       = useState('all')
+  const [fEst,        setFEst]        = useState('all')
+  const [fMoneda,     setFMoneda]     = useState<'all'|'ars'|'usd'>('all')
+  const [fPV,         setFPV]         = useState<'all'|string>('all')
+  const [clientes,    setClientes]    = useState<string[]>([])
+  const [tab,         setTab]         = useState<Tab>('FACT A')
+  const [pdfUploading,setPdfUploading]= useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -294,6 +295,33 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     await db.deleteComprobante(id)
     toast(`Comprobante ${id} anulado`)
     closeModal(); load()
+  }
+
+  async function handlePDFUpload(comp: Comprobante, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPdfUploading(true)
+    try {
+      const path = await db.uploadComprobantePDF(comp.id, file)
+      toast('✓ PDF adjuntado correctamente')
+      setSelected(prev => prev ? { ...prev, pdf_url: path } : null)
+      load()
+    } catch (err: any) {
+      toast('Error al subir PDF: ' + err.message)
+    } finally {
+      setPdfUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleViewPDF(comp: Comprobante) {
+    if (!comp.pdf_url) return
+    try {
+      const url = await db.getPDFSignedUrl(comp.pdf_url)
+      window.open(url, '_blank')
+    } catch (err: any) {
+      toast('Error al abrir PDF: ' + err.message)
+    }
   }
 
   async function handleEliminar(id: string) {
@@ -467,6 +495,28 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             {selected.tipo_cambio && <div className="amount-row"><span>Tipo de cambio</span><span className="text-mono">${selected.tipo_cambio}</span></div>}
             {selected.recibo_id && <div className="amount-row"><span>N° Recibo</span><span>{selected.recibo_id}</span></div>}
             {selected.fecha_cobro && <div className="amount-row"><span>Fecha de cobro</span><span>{fdate(selected.fecha_cobro)}</span></div>}
+          </div>
+          {/* ── Sección PDF ── */}
+          <div style={{padding:'8px 22px 18px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',borderTop:'1px solid var(--border)',marginTop:8}}>
+            <span style={{fontSize:11,color:'var(--text-tertiary)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',minWidth:30}}>PDF</span>
+            {selected.pdf_url ? (
+              <>
+                <button className="btn btn-sm" onClick={()=>handleViewPDF(selected)}>📄 Ver PDF adjunto</button>
+                <label className="btn btn-sm" style={{cursor:pdfUploading?'wait':'pointer',opacity:pdfUploading?.7:1}}>
+                  🔄 Reemplazar
+                  <input type="file" accept=".pdf" style={{display:'none'}} disabled={pdfUploading} onChange={e=>handlePDFUpload(selected,e)}/>
+                </label>
+              </>
+            ) : (
+              <label className="btn btn-sm" style={{cursor:pdfUploading?'wait':'pointer',opacity:pdfUploading?.7:1}}>
+                {pdfUploading ? '⏳ Subiendo…' : '📎 Adjuntar PDF'}
+                <input type="file" accept=".pdf" style={{display:'none'}} disabled={pdfUploading} onChange={e=>handlePDFUpload(selected,e)}/>
+              </label>
+            )}
+            {pdfUploading && <span style={{fontSize:12,color:'var(--text-secondary)'}}>Subiendo PDF…</span>}
+            {!selected.pdf_url && !pdfUploading && (
+              <span style={{fontSize:11,color:'var(--text-tertiary)'}}>Adjuntá el comprobante AFIP en PDF</span>
+            )}
           </div>
         </Modal>
       )}

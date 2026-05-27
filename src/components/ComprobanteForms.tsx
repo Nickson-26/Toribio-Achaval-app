@@ -23,21 +23,22 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
   onSaved: (c: Comprobante) => void
   clientes: string[]
 }) {
-  const [saving,   setSaving]   = useState(false)
-  const [tipo,     setTipo]     = useState('FACT A')
-  const [fecha,    setFecha]    = useState(today())
-  const [cliente,  setCliente]  = useState('')
-  const [persona,  setPersona]  = useState(PERSONAS[0])
-  const [pv,       setPv]       = useState<string>(PUNTO_VENTA_DEFAULT)
-  const [concepto, setConcepto] = useState('')
-  const [netoARS,  setNetoARS]  = useState('')
-  const [ivaARS,   setIvaARS]   = useState('')
-  const [totalARS, setTotalARS] = useState('')
-  const [netoUSD,  setNetoUSD]  = useState('')
-  const [ivaUSD,   setIvaUSD]   = useState('')
-  const [totalUSD, setTotalUSD] = useState('')
-  const [tcStr,    setTc]       = useState('')
-  const [errors,   setErrors]   = useState<Record<string, boolean>>({})
+  const [saving,     setSaving]     = useState(false)
+  const [extracting, setExtracting] = useState(false)
+  const [tipo,       setTipo]       = useState('FACT A')
+  const [fecha,      setFecha]      = useState(today())
+  const [cliente,    setCliente]    = useState('')
+  const [persona,    setPersona]    = useState(PERSONAS[0])
+  const [pv,         setPv]         = useState<string>(PUNTO_VENTA_DEFAULT)
+  const [concepto,   setConcepto]   = useState('')
+  const [netoARS,    setNetoARS]    = useState('')
+  const [ivaARS,     setIvaARS]     = useState('')
+  const [totalARS,   setTotalARS]   = useState('')
+  const [netoUSD,    setNetoUSD]    = useState('')
+  const [ivaUSD,     setIvaUSD]     = useState('')
+  const [totalUSD,   setTotalUSD]   = useState('')
+  const [tcStr,      setTc]         = useState('')
+  const [errors,     setErrors]     = useState<Record<string, boolean>>({})
 
   const isB    = tipo === 'FACT B'
   const hasUSD = !!netoUSD || !!totalUSD
@@ -65,6 +66,52 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
   useEffect(() => {
     if (isB) { setIvaARS(''); setIvaUSD(''); setNetoARS(''); setNetoUSD('') }
   }, [isB])
+
+  async function handlePDFImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setExtracting(true)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/extract-invoice', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pdfBase64: base64 }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({error:'Error desconocido'}))
+        toast('Error al extraer datos: ' + (err.error || res.statusText))
+        return
+      }
+      const data = await res.json()
+      // Pre-completar campos del formulario
+      if (data.tipo && TODOS_TIPOS.includes(data.tipo)) setTipo(data.tipo)
+      if (data.fecha)       setFecha(data.fecha)
+      if (data.cliente)     setCliente(data.cliente)
+      if (data.concepto)    setConcepto(data.concepto)
+      if (data.punto_venta && PUNTOS_VENTA.includes(data.punto_venta)) setPv(data.punto_venta)
+      if (data.tipo_cambio) setTc(String(data.tipo_cambio))
+      const esB = (data.tipo || tipo) === 'FACT B'
+      if (esB) {
+        if (data.total_ars) setTotalARS(String(data.total_ars))
+        if (data.total_usd) setTotalUSD(String(data.total_usd))
+      } else {
+        if (data.neto_ars)  setNetoARS(String(data.neto_ars))   // useEffect auto-calcula IVA y total
+        if (data.neto_usd)  setNetoUSD(String(data.neto_usd))
+      }
+      toast('✓ Datos extraídos — revisá y confirmá antes de guardar')
+    } catch (err: any) {
+      toast('Error: ' + (err.message || 'no se pudo procesar el PDF'))
+    } finally {
+      setExtracting(false)
+      e.target.value = ''
+    }
+  }
 
   async function handleSave() {
     const errs: Record<string, boolean> = {}
@@ -127,6 +174,16 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
           {saving ? 'Guardando…' : 'Guardar'}
         </button>
       </>}>
+      {/* ── Importar desde PDF ── */}
+      <div style={{padding:'14px 22px 0',display:'flex',alignItems:'center',gap:10,borderBottom:'1px solid var(--border)',paddingBottom:14}}>
+        <label style={{cursor:extracting?'wait':'pointer',display:'inline-flex',alignItems:'center',gap:6,padding:'6px 12px',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',fontSize:13,fontWeight:500,color:extracting?'var(--text-tertiary)':'var(--text-primary)',transition:'all .15s'}}>
+          {extracting ? '⏳ Procesando PDF…' : '📎 Importar datos desde PDF'}
+          <input type="file" accept=".pdf" style={{display:'none'}} disabled={extracting} onChange={handlePDFImport}/>
+        </label>
+        <span style={{fontSize:11,color:'var(--text-tertiary)'}}>
+          {extracting ? 'Claude está leyendo el PDF…' : 'Subí una factura AFIP/ARCA y el formulario se completa solo'}
+        </span>
+      </div>
       <div className="form-grid">
         <FG label="Tipo *">
           <select value={tipo} onChange={e => setTipo(e.target.value)}>

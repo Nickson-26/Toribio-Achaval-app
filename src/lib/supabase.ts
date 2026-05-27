@@ -41,6 +41,7 @@ export type Comprobante = {
   recibo_id: number | null
   fecha_cobro: string | null
   punto_venta: string  // '0002' | '0004' — default '0002'
+  pdf_url?: string | null  // path en Supabase Storage (bucket comprobantes-pdfs)
   created_at: string
 }
 
@@ -56,6 +57,8 @@ export type Recibo = {
   retencion: number | null
   nro_echeq: string | null
   created_at: string
+  // join from recibo_comprobantes (populated when queried with select join)
+  recibo_comprobantes?: { comprobante_id: string }[]
 }
 
 // ── API helpers ───────────────────────────────────────────────
@@ -111,7 +114,7 @@ export const db = {
   },
 
   async getRecibos(search?: string) {
-    let q = supabase.from('recibos').select('*').order('id', { ascending: false })
+    let q = supabase.from('recibos').select('*, recibo_comprobantes(comprobante_id)').order('id', { ascending: false })
     if (search) q = q.or(`cliente.ilike.%${search}%,nro_fact.ilike.%${search}%`)
     const { data, error } = await q
     if (error) throw new Error(`Error al cargar recibos: ${error.message}`)
@@ -153,5 +156,72 @@ export const db = {
       .neq('estado', 'anulada')
     if (error) throw new Error(`Error al cargar dashboard: ${error.message}`)
     return { comprobantes: comps || [] }
+  },
+
+  // ── Recibo vinculado a múltiples facturas ──────────────────────
+  async createReciboConFacturas(
+    payload: Omit<Recibo, 'created_at' | 'recibo_comprobantes'>,
+    comprobanteIds: string[]
+  ): Promise<Recibo> {
+    // 1. Insertar recibo (sin auto-cobrar — lo hacemos debajo para todos)
+    const { data, error } = await supabase
+      .from('recibos')
+      .insert(payload)
+      .select()
+      .single()
+    if (error) throw new Error(`Error al crear recibo: ${error.message}`)
+    const recibo = data as Recibo
+
+    if (comprobanteIds.length === 0) return recibo
+
+    // 2. Insertar filas en recibo_comprobantes
+    const { error: rcError } = await supabase
+      .from('recibo_comprobantes')
+      .insert(comprobanteIds.map(cid => ({ recibo_id: recibo.id, comprobante_id: cid })))
+    if (rcError) {
+      console.warn(`Recibo ${recibo.id} creado, error al vincular facturas:`, rcError.message)
+    }
+
+    // 3. Marcar todas las facturas vinculadas como cobradas
+    const { error: updErr } = await supabase
+      .from('comprobantes')
+      .update({
+        estado: 'cobrada' as ComprobanteEstado,
+        recibo_id: recibo.id,
+        fecha_cobro: payload.fecha,
+      })
+      .in('id', comprobanteIds)
+    if (updErr) {
+      console.warn(`Error marcando comprobantes como cobradas:`, updErr.message)
+    }
+
+    return recibo
+  },
+
+  // ── Supabase Storage: subir PDF de comprobante ─────────────────
+  async uploadComprobantePDF(comprobanteId: string, file: File): Promise<string> {
+    const path = `${comprobanteId}.pdf`
+    const { error: uploadError } = await supabase.storage
+      .from('comprobantes-pdfs')
+      .upload(path, file, { upsert: true, contentType: 'application/pdf' })
+    if (uploadError) throw new Error(`Error al subir PDF: ${uploadError.message}`)
+
+    // Guardar el path en comprobantes.pdf_url
+    const { error: updErr } = await supabase
+      .from('comprobantes')
+      .update({ pdf_url: path })
+      .eq('id', comprobanteId)
+    if (updErr) throw new Error(`PDF subido pero error al actualizar registro: ${updErr.message}`)
+
+    return path
+  },
+
+  // ── Generar URL firmada para ver un PDF (1 hora de validez) ───
+  async getPDFSignedUrl(path: string): Promise<string> {
+    const { data, error } = await supabase.storage
+      .from('comprobantes-pdfs')
+      .createSignedUrl(path, 3600)
+    if (error) throw new Error(`Error al generar URL del PDF: ${error.message}`)
+    return data.signedUrl
   },
 }

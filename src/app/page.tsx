@@ -10,6 +10,7 @@ import Facturas     from '@/pages/Facturas'
 import Usuarios     from '@/pages/Usuarios'
 import Informe      from '@/pages/Informe'
 import Reservas     from '@/pages/Reservas'
+// @ts-ignore
 import AvisoIngreso from '@/pages/AvisoIngreso'
 import { Recibos, Clientes, NotasCredito, NotasDebito, Resumen } from '@/pages/OtherPages'
 

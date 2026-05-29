@@ -77,7 +77,7 @@ export default function Step1General({ form, updateForm, totalOpUSD }) {
 function MontoBlock({ title, children }) {
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-2">
-      <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: '#CC1C28' }}>{title}</p>
+      <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: 'var(--accent, #CC1C28)' }}>{title}</p>
       {children}
     </div>
   );

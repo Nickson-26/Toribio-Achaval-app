@@ -40,7 +40,7 @@ export default function Step2Inmueble({ form, updateForm }) {
           <FormField label="Codigo PROA" required hint="Proba con PROA-001 / PROA-002 / PROA-003 / PROA-004 / PROA-005">
             <div className="flex gap-2">
               <Input value={form.proa_code} placeholder="Ej: PROA-001" onChange={e => updateForm({ proa_code: e.target.value })} onKeyDown={e => e.key === 'Enter' && buscarPROA()} />
-              <button type="button" onClick={buscarPROA} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold text-white whitespace-nowrap transition-all hover:opacity-90" style={{ background: '#CC1C28' }}>
+              <button type="button" onClick={buscarPROA} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold text-white whitespace-nowrap transition-all hover:opacity-90" style={{ background: 'var(--accent, #CC1C28)' }}>
                 <Search size={14} />Buscar
               </button>
             </div>

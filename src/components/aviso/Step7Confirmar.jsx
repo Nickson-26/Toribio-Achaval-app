@@ -5,12 +5,12 @@ import { AlertTriangle } from 'lucide-react';
 function SumSection({ title, rows }) {
   return (
     <div className="mb-5">
-      <div className="text-xs font-black uppercase tracking-widest mb-2 pb-2 border-b-2" style={{ color: '#CC1C28', borderColor: '#CC1C28' }}>{title}</div>
+      <div className="text-xs font-black uppercase tracking-widest mb-2 pb-2 border-b-2" style={{ color: 'var(--accent, #CC1C28)', borderColor: 'var(--accent, #CC1C28)' }}>{title}</div>
       <div className="space-y-1">
         {rows.map(([key, val], i) => (
-          <div key={i} className="flex justify-between py-1.5 border-b border-gray-50 text-sm last:border-0">
-            <span className="text-gray-500 shrink-0 mr-4">{key}</span>
-            <span className="font-semibold text-gray-900 text-right">{val || '-'}</span>
+          <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid var(--border)', fontSize:14 }}>
+            <span style={{ color:"var(--text-secondary)", marginRight:16, flexShrink:0 }}>{key}</span>
+            <span style={{ fontWeight:600, color:"var(--text-primary)", textAlign:"right" }}>{val || '-'}</span>
           </div>
         ))}
       </div>

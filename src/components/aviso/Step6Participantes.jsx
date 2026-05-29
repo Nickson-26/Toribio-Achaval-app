@@ -5,10 +5,10 @@ import { UserCheck } from 'lucide-react';
 function ParticipantCard({ role, fieldKey, pctDisplay, showPct, pctOptions, pctKey, form, updateForm }) {
   const assigned = !!form[fieldKey];
   return (
-    <div className="border-2 rounded-xl p-4 transition-all" style={{ borderColor: assigned ? '#CC1C28' : '#E5E7EB', background: assigned ? '#FFF5F5' : '#FAFAFA' }}>
+    <div className="border-2 rounded-xl p-4 transition-all" style={{ borderColor: assigned ? 'var(--accent, #CC1C28)' : 'var(--border-strong)', background: assigned ? 'var(--accent-bg, rgba(200,16,46,0.08))' : 'var(--bg-secondary)' }}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-black uppercase tracking-widest" style={{ color: assigned ? '#CC1C28' : '#9CA3AF' }}>{role}</span>
-        {assigned && <UserCheck size={14} style={{ color: '#CC1C28' }} />}
+        <span className="text-xs font-black uppercase tracking-widest" style={{ color: assigned ? 'var(--accent, #CC1C28)' : '#9CA3AF' }}>{role}</span>
+        {assigned && <UserCheck size={14} style={{ color: 'var(--accent, #CC1C28)' }} />}
       </div>
       <FormField label="">
         <Select value={form[fieldKey]} onChange={e => updateForm({ [fieldKey]: e.target.value })}>
@@ -17,7 +17,7 @@ function ParticipantCard({ role, fieldKey, pctDisplay, showPct, pctOptions, pctK
         </Select>
       </FormField>
       <div className="mt-2 flex items-center justify-between">
-        <span className="inline-block text-xs font-bold px-3 py-1 rounded-full" style={{ background: assigned ? '#CC1C28' : '#E5E7EB', color: assigned ? '#fff' : '#9CA3AF' }}>{pctDisplay}</span>
+        <span className="inline-block text-xs font-bold px-3 py-1 rounded-full" style={{ background: assigned ? 'var(--accent, #CC1C28)' : 'var(--bg-tertiary)', color: assigned ? '#fff' : 'var(--text-tertiary)' }}>{pctDisplay}</span>
         {showPct && assigned && (
           <Select className="w-24 text-xs" value={form[pctKey]} onChange={e => updateForm({ [pctKey]: e.target.value })}>
             {(pctOptions || []).map(p => <option key={p} value={p}>{p}%</option>)}

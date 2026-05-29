@@ -10,11 +10,12 @@ import Facturas     from '@/pages/Facturas'
 import Usuarios     from '@/pages/Usuarios'
 import Informe      from '@/pages/Informe'
 import Reservas     from '@/pages/Reservas'
+import AvisoIngreso from '@/pages/AvisoIngreso'
 import { Recibos, Clientes, NotasCredito, NotasDebito, Resumen } from '@/pages/OtherPages'
 
 type Page = 'dashboard'|'facturas'|'recibos'|'clientes'|'nc'|'nd'|'usuarios'|'informe'|'reservas'
 type Theme = 'dark'|'light'|'accessible'
-type Modulo = 'facturacion' | 'reservas'
+type Modulo = 'facturacion' | 'reservas' | 'avisos'
 
 const NAV_FACTURACION: { id: Page; label: string; adminOnly?: boolean }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -76,7 +77,8 @@ export default function Home() {
 
   function switchModulo(m: Modulo) {
     setModulo(m)
-    setPage(m === 'reservas' ? 'reservas' : 'dashboard')
+    if (m === 'reservas') setPage('reservas')
+    else if (m === 'facturacion') setPage('dashboard')
     setMenuOpen(false)
   }
 
@@ -102,14 +104,14 @@ export default function Home() {
   function goTo(p: Page) { setPage(p); setMenuOpen(false) }
 
   const isReservas = modulo === 'reservas'
+  const isAvisos   = modulo === 'avisos'
   const visibleNav = NAV_FACTURACION.filter(n => !n.adminOnly || isAdmin)
   const PageComponent = COMPONENTS[isReservas ? 'reservas' : page]
   const initials = user.nombre.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase()
   const roleBadge = user.role === 'admin' ? 'badge-red' : user.role === 'editor' ? 'badge-blue' : 'badge-gray'
   const roleLabel = user.role === 'admin' ? 'Administrador' : user.role === 'editor' ? 'Editor' : 'Solo lectura'
 
-  // Colors per module
-  const moduleAccent = isReservas ? '#1a6bc8' : '#C8102E'
+  const moduleAccent = isAvisos ? '#CC1C28' : isReservas ? '#1a6bc8' : '#C8102E'
 
   return (
     <div className="app-shell">
@@ -123,22 +125,30 @@ export default function Home() {
               onClick={() => switchModulo('facturacion')}
               style={{
                 padding: '4px 12px', fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                background: !isReservas ? '#C8102E' : 'var(--bg-secondary)',
-                color: !isReservas ? '#fff' : 'var(--text-secondary)',
+                background: modulo === 'facturacion' ? '#C8102E' : 'var(--bg-secondary)',
+                color: modulo === 'facturacion' ? '#fff' : 'var(--text-secondary)',
                 border: 'none', transition: 'all .1s',
               }}>Facturación</button>
             <button
               onClick={() => switchModulo('reservas')}
               style={{
                 padding: '4px 12px', fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                background: isReservas ? '#1a6bc8' : 'var(--bg-secondary)',
-                color: isReservas ? '#fff' : 'var(--text-secondary)',
+                background: modulo === 'reservas' ? '#1a6bc8' : 'var(--bg-secondary)',
+                color: modulo === 'reservas' ? '#fff' : 'var(--text-secondary)',
                 border: 'none', borderLeft: '1px solid var(--border)', transition: 'all .1s',
               }}>Reservas</button>
+            <button
+              onClick={() => switchModulo('avisos')}
+              style={{
+                padding: '4px 12px', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                background: modulo === 'avisos' ? '#CC1C28' : 'var(--bg-secondary)',
+                color: modulo === 'avisos' ? '#fff' : 'var(--text-secondary)',
+                border: 'none', borderLeft: '1px solid var(--border)', transition: 'all .1s',
+              }}>Avisos de Ingreso</button>
           </div>
         </div>
 
-        {!isReservas && (
+        {!isReservas && !isAvisos && (
           <nav className="topnav-center">
             {visibleNav.map(n => (
               <button key={n.id} className={`topnav-item${page===n.id?' active':''}`} onClick={() => goTo(n.id)}>
@@ -150,22 +160,20 @@ export default function Home() {
           </nav>
         )}
 
-        {isReservas && <div style={{ flex: 1 }} />}
+        {(isReservas || isAvisos) && <div style={{ flex: 1 }} />}
 
         <div className="topnav-right">
-          {/* Hide numbers */}
           <button className="eye-btn" onClick={toggleHide} title={hidden ? 'Mostrar números' : 'Ocultar números'}>
             {hidden ? '🙈' : '👁'}
           </button>
 
-          {/* Theme switcher */}
           <div className="theme-switcher">
             <button className={`theme-btn${theme==='dark'?' active':''}`} onClick={() => applyTheme('dark')} title="Oscuro">🌙</button>
             <button className={`theme-btn${theme==='light'?' active':''}`} onClick={() => applyTheme('light')} title="Claro">☀️</button>
             <button className={`theme-btn${theme==='accessible'?' active':''}`} onClick={() => applyTheme('accessible')} title="Alto contraste">♿</button>
           </div>
 
-          {!isReservas && (isAdmin || user.role==='editor') && (
+          {!isReservas && !isAvisos && (isAdmin || user.role==='editor') && (
             <button className="btn btn-primary btn-sm" onClick={() => goTo('facturas')}>+ Nueva factura</button>
           )}
 
@@ -196,10 +204,11 @@ export default function Home() {
             <button className="mobile-menu-btn" onClick={() => setMenuOpen(v=>!v)}>☰</button>
             {menuOpen && (
               <div className="mobile-dropdown">
-                <button className="mobile-dd-item" onClick={() => switchModulo('facturacion')} style={{ fontWeight: !isReservas ? 600 : 400 }}>📊 Facturación</button>
-                <button className="mobile-dd-item" onClick={() => switchModulo('reservas')} style={{ fontWeight: isReservas ? 600 : 400 }}>🏠 Reservas</button>
+                <button className="mobile-dd-item" onClick={() => switchModulo('facturacion')} style={{ fontWeight: modulo==='facturacion' ? 600 : 400 }}>📊 Facturación</button>
+                <button className="mobile-dd-item" onClick={() => switchModulo('reservas')} style={{ fontWeight: modulo==='reservas' ? 600 : 400 }}>🏠 Reservas</button>
+                <button className="mobile-dd-item" onClick={() => switchModulo('avisos')} style={{ fontWeight: modulo==='avisos' ? 600 : 400 }}>📋 Avisos de Ingreso</button>
                 <div className="user-dd-divider" />
-                {!isReservas && visibleNav.map(n => (
+                {!isReservas && !isAvisos && visibleNav.map(n => (
                   <button key={n.id} className={`mobile-dd-item${page===n.id?' active':''}`} onClick={() => goTo(n.id)}>
                     {n.label}
                   </button>
@@ -214,8 +223,13 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="main-content">
-        <PageComponent onPendientesChange={setPendientes} />
+      <main className="main-content" style={{ padding: isAvisos ? 0 : undefined, background: isAvisos ? '#f9fafb' : undefined }}>
+        {isAvisos
+          ? <AvisoIngreso />
+          : isReservas
+            ? <Reservas onPendientesChange={setPendientes} />
+            : <PageComponent onPendientesChange={setPendientes} />
+        }
       </main>
 
       {showPassword && <CambiarPasswordModal onClose={() => setShowPassword(false)} />}

@@ -342,18 +342,14 @@ export async function POST(req: NextRequest) {
   const SHEET_TITLE = 'Reservas Toribio Achával'
   const updatedAt = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
 
-  // 3. Buscar o crear el Google Sheet
+  // 3. Obtener o crear el Google Sheet
+  // Si SHEETS_RESERVAS_ID está configurado, actualiza ese archivo directamente.
+  // Si no, crea uno nuevo y devuelve el ID para configurar en Vercel.
   let spreadsheetId: string
+  const savedId = process.env.SHEETS_RESERVAS_ID
 
-  const searchResp = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`name='${SHEET_TITLE}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`)}&fields=files(id,name)`,
-    { headers: gHeaders }
-  )
-  const searchJson = await searchResp.json()
-  const existingFile = searchJson.files?.[0]
-
-  if (existingFile) {
-    spreadsheetId = existingFile.id
+  if (savedId) {
+    spreadsheetId = savedId
   } else {
     const createResp = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
       method: 'POST',
@@ -471,5 +467,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     url: spreadsheetUrl,
     total: reservas!.length,
+    spreadsheetId,
+    ...(!savedId ? { action: 'CREADO — guardá este ID en la variable SHEETS_RESERVAS_ID de Vercel para que los próximos exports actualicen este mismo archivo' } : { action: 'ACTUALIZADO' }),
   })
 }

@@ -86,7 +86,7 @@ async function proaLogin(): Promise<string> {
     },
     body: new URLSearchParams({
       _token: csrf,
-      email: process.env.PROA_USERNAME!,
+      user: process.env.PROA_USERNAME!,
       password: process.env.PROA_PASSWORD!,
     }).toString(),
     redirect: 'manual',

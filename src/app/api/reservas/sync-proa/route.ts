@@ -48,33 +48,41 @@ function parseDate(raw: string): string | null {
 }
 
 async function proaLogin(): Promise<string> {
-  // 1. GET login page para obtener CSRF token
+  // 1. GET login page para obtener CSRF token y cookie de sesión inicial
   const loginPage = await fetch(`${PROA_BASE}/login`, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
     redirect: 'follow',
   })
   const html = await loginPage.text()
-  const cookieHeader = loginPage.headers.get('set-cookie') || ''
 
-  // Extraer cookies de sesión
-  const sessionCookies = cookieHeader.split(',')
-    .map(c => c.split(';')[0].trim())
-    .filter(c => c.includes('='))
-    .join('; ')
+  // Node 18+ soporta getSetCookie() para múltiples cookies
+  const initialCookies: string[] = (loginPage.headers as any).getSetCookie?.() ||
+    (loginPage.headers.get('set-cookie') || '').split(/,(?=[^ ])/)
+
+  const cookieMap = new Map<string, string>()
+  initialCookies.forEach((c: string) => {
+    const part = c.split(';')[0].trim()
+    const [name, ...rest] = part.split('=')
+    if (name && rest.length) cookieMap.set(name.trim(), `${name.trim()}=${rest.join('=')}`)
+  })
 
   // Extraer CSRF token del HTML
   const csrfMatch = html.match(/name="_token"\s+value="([^"]+)"/) ||
                     html.match(/<meta name="csrf-token" content="([^"]+)"/)
   const csrf = csrfMatch ? csrfMatch[1] : ''
+  if (!csrf) throw new Error('No CSRF token found on login page')
+
+  const cookieString = Array.from(cookieMap.values()).join('; ')
 
   // 2. POST login
   const loginResp = await fetch(`${PROA_BASE}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Cookie': sessionCookies,
+      'Cookie': cookieString,
       'User-Agent': 'Mozilla/5.0',
       'Referer': `${PROA_BASE}/login`,
+      'Accept': 'text/html,application/xhtml+xml,*/*',
     },
     body: new URLSearchParams({
       _token: csrf,
@@ -84,22 +92,25 @@ async function proaLogin(): Promise<string> {
     redirect: 'manual',
   })
 
-  // Capturar cookies post-login
-  const postLoginCookies = loginResp.headers.get('set-cookie') || ''
-  const allCookies = [...sessionCookies.split('; '), ...postLoginCookies.split(',').map(c => c.split(';')[0].trim())]
-    .filter(c => c.includes('=') && c.trim().length > 0)
+  // Capturar cookies post-login (incluye la sesión autenticada)
+  const postCookies: string[] = (loginResp.headers as any).getSetCookie?.() ||
+    (loginResp.headers.get('set-cookie') || '').split(/,(?=[^ ])/)
 
-  // Deduplicar por nombre
-  const cookieMap = new Map<string, string>()
-  allCookies.forEach(c => {
-    const [name, ...rest] = c.split('=')
+  postCookies.forEach((c: string) => {
+    const part = c.split(';')[0].trim()
+    const [name, ...rest] = part.split('=')
     if (name && rest.length) cookieMap.set(name.trim(), `${name.trim()}=${rest.join('=')}`)
   })
 
   const finalCookies = Array.from(cookieMap.values()).join('; ')
+
+  // Verificar que tenemos sesión
   if (!finalCookies.includes('proa_session') && !finalCookies.includes('laravel_session')) {
-    throw new Error('Login fallido — no se obtuvo sesión válida')
+    const status = loginResp.status
+    const location = loginResp.headers.get('location') || ''
+    throw new Error(`Login fallido — status: ${status}, redirect: ${location}, cookies: ${finalCookies.substring(0, 100)}`)
   }
+
   return finalCookies
 }
 

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/reservas",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/export-sheets",
+      "schedule": "0 12 * * 1"
     }
   ]
 }

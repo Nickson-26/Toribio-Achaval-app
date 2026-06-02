@@ -8,6 +8,7 @@ import { useHideNumbers } from '@/components/HideNumbers'
 type Tab = 'DASHBOARD' | 'EMPRENDIMIENTOS' | 'RESIDENCIAL' | 'COMERCIAL'
 type Operacion = 'all' | 'VENTA' | 'ALQUILER'
 type FirmoFilter = 'all' | 'PENDIENTE' | 'FIRMADO'
+type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio' | 'all'
 
 export interface Reserva {
   id: number
@@ -53,11 +54,31 @@ export default function Reservas(_: any) {
   const [unidadFilt, setUnidadFilt] = useState('all')
   const [mesFilt,    setMesFilt]    = useState('all')
   const [anioFilt,   setAnioFilt]   = useState('2026')
+  const [periodo,    setPeriodo]    = useState<Periodo>('mes')
   const [search,     setSearch]     = useState('')
   const [modal,      setModal]      = useState<'new'|'edit'|null>(null)
   const [sel,        setSel]        = useState<Reserva|null>(null)
+  const [exporting,  setExporting]  = useState(false)
 
   const { hidden } = useHideNumbers()
+
+  async function exportToSheets() {
+    setExporting(true)
+    try {
+      const resp = await fetch('/api/reservas/export-sheets', { method: 'POST' })
+      const json = await resp.json()
+      if (json.url) {
+        window.open(json.url, '_blank')
+        toast('Sheet creado con ' + json.total + ' reservas')
+      } else {
+        toast('Error al exportar: ' + (json.error || 'desconocido'))
+      }
+    } catch {
+      toast('Error al exportar')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const load = async () => {
     setLoading(true)
@@ -68,6 +89,35 @@ export default function Reservas(_: any) {
   }
   useEffect(() => { load() }, [])
   useEffect(() => { setUnidadFilt('all') }, [tab])
+
+  // Compute dashRows based on selected period
+  function getPeriodoRows(rows: Reserva[]): Reserva[] {
+    const now = new Date()
+    if (periodo === 'semana') {
+      const day = now.getDay() === 0 ? 6 : now.getDay() - 1 // Monday=0
+      const mon = new Date(now); mon.setDate(now.getDate() - day); mon.setHours(0,0,0,0)
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999)
+      const from = mon.toISOString().slice(0,10)
+      const to   = sun.toISOString().slice(0,10)
+      return rows.filter(r => r.fecha >= from && r.fecha <= to)
+    }
+    if (periodo === 'mes') {
+      const y = now.getFullYear().toString()
+      const m = String(now.getMonth() + 1).padStart(2,'0')
+      return rows.filter(r => r.fecha?.startsWith(`${y}-${m}`))
+    }
+    if (periodo === 'trimestre') {
+      const y = now.getFullYear()
+      const q = Math.floor(now.getMonth() / 3)
+      const mStart = q * 3
+      const months = [0,1,2].map(i => `${y}-${String(mStart + i + 1).padStart(2,'0')}`)
+      return rows.filter(r => months.some(m => r.fecha?.startsWith(m)))
+    }
+    if (periodo === 'anio') {
+      return rows.filter(r => r.fecha?.startsWith(now.getFullYear().toString()))
+    }
+    return rows // 'all'
+  }
 
   async function handleDelete(id: number) {
     if (!confirm('¿Eliminar esta reserva?')) return
@@ -100,11 +150,14 @@ export default function Reservas(_: any) {
 
   const tabData = applyFilters(getBaseRows(tab))
 
-  // Dashboard: use only year filter for overview
-  const dashRows = anioFilt !== 'all' ? all.filter(r => r.fecha?.startsWith(anioFilt)) : all
+  // Dashboard: filtered by period selector
+  const dashRows = getPeriodoRows(all)
   const empRows  = dashRows.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-  const resRows  = dashRows.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
+  const resRows  = dashRows.filter(r => RESIDENCIAL_UNIDADES.includes(r.unidad))
   const comRows  = dashRows.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
+
+  function sumaARS(rows: Reserva[]) { return rows.reduce((s,r) => s + (r.monto_ars||0), 0) }
+  function sumaUSD(rows: Reserva[]) { return rows.reduce((s,r) => s + (r.monto_usd||0), 0) }
 
   const TABS = [
     { id: 'DASHBOARD' as Tab,       label: '◈ Dashboard' },
@@ -124,9 +177,19 @@ export default function Reservas(_: any) {
           <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas</p>
         </div>
         {tab !== 'DASHBOARD' && (
-          <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
-            + Nueva reserva
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              style={{ background: '#0f9d58', borderColor: '#0f9d58', color: '#fff' }}
+              onClick={exportToSheets}
+              disabled={exporting}
+            >
+              {exporting ? '⏳ Exportando...' : '📊 Exportar a Sheets'}
+            </button>
+            <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
+              + Nueva reserva
+            </button>
+          </div>
         )}
       </div>
 
@@ -153,54 +216,50 @@ export default function Reservas(_: any) {
       {/* ── DASHBOARD ── */}
       {tab === 'DASHBOARD' && (
         loading ? <Spinner /> : <>
-          {/* Filtros del dashboard */}
-          <div className="dash-filters" style={{ marginBottom:20 }}>
-            <label>Año</label>
-            <select value={anioFilt} onChange={e => setAnioFilt(e.target.value)}>
-              <option value="all">Todos</option>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-            </select>
-            <span className="filter-sep"/>
-            <label>Mes</label>
-            <select value={mesFilt} onChange={e => setMesFilt(e.target.value)}>
-              <option value="all">Todos</option>
-              {MESES.map(m => <option key={m.num} value={m.num}>{m.label}</option>)}
-            </select>
-            {(mesFilt !== 'all') && (
-              <button className="btn btn-sm" onClick={() => setMesFilt('all')}>Limpiar</button>
-            )}
+          {/* Selector de período */}
+          <div className="dash-filters" style={{ marginBottom:20, alignItems:'center' }}>
+            {(['semana','mes','trimestre','anio','all'] as Periodo[]).map(p => {
+              const labels: Record<Periodo,string> = { semana:'Esta semana', mes:'Este mes', trimestre:'Este trimestre', anio:'Este año', all:'Todo' }
+              return (
+                <button
+                  key={p}
+                  className={`btn btn-sm${periodo===p?' btn-primary':''}`}
+                  style={periodo===p ? { background:'#1a6bc8', borderColor:'#1a6bc8', color:'#fff' } : {}}
+                  onClick={() => setPeriodo(p)}
+                >{labels[p]}</button>
+              )
+            })}
           </div>
 
-          {/* KPIs */}
+          {/* KPIs por unidad de negocio */}
           <div className="metrics-grid" style={{ marginBottom:20 }}>
             <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
               <div className="metric-label">Total Reservas</div>
-              <div className="metric-value">{dashRows.length}</div>
-              <div className="metric-sub">{dashRows.filter(r=>r.operacion==='VENTA').length} ventas · {dashRows.filter(r=>r.operacion==='ALQUILER').length} alquileres</div>
+              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(dashRows))}</div>
+              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(dashRows))} · {dashRows.length} reservas</div>
             </div>
             <div className="metric-card">
               <div className="metric-label">Emprendimientos</div>
-              <div className="metric-value">{empRows.length}</div>
-              <div className="metric-sub">{empRows.filter(r=>r.operacion==='VENTA').length}V · {empRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
+              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(empRows))}</div>
+              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(empRows))} · {empRows.length} res.</div>
             </div>
             <div className="metric-card">
               <div className="metric-label">Residencial</div>
-              <div className="metric-value">{resRows.length}</div>
-              <div className="metric-sub">{resRows.filter(r=>r.operacion==='VENTA').length}V · {resRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
+              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(resRows))}</div>
+              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(resRows))} · {resRows.length} res.</div>
             </div>
             <div className="metric-card">
               <div className="metric-label">Comercial</div>
-              <div className="metric-value">{comRows.length}</div>
-              <div className="metric-sub">{comRows.filter(r=>r.operacion==='VENTA').length}V · {comRows.filter(r=>r.operacion==='ALQUILER').length}A</div>
+              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(comRows))}</div>
+              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(comRows))} · {comRows.length} res.</div>
             </div>
           </div>
 
-          {/* 3 tablas */}
-          <ResumenTable titulo="Emprendimientos" rows={empRows} unidades={EMPRENDIMIENTOS_UNIDADES} mesFilt={mesFilt} />
-          <ResumenTable titulo="Residencial — Plataformas" rows={resRows} unidades={RESIDENCIAL_UNIDADES} mesFilt={mesFilt} />
-          <ResumenTable titulo="Comercial" rows={comRows} unidades={COMERCIAL_UNIDADES} mesFilt={mesFilt} />
+          {/* 3 tablas con montos */}
+          <ResumenTable titulo="Emprendimientos" rows={empRows} unidades={EMPRENDIMIENTOS_UNIDADES} hidden={hidden} />
+          <ResumenTable titulo="Residencial — Plataformas" rows={resRows} unidades={RESIDENCIAL_UNIDADES} hidden={hidden} />
+          <ResumenTable titulo="Comercial" rows={comRows} unidades={COMERCIAL_UNIDADES} hidden={hidden} />
         </>
       )}
 
@@ -308,98 +367,85 @@ export default function Reservas(_: any) {
   )
 }
 
-// ── Tabla resumen por unidad ──────────────────────────────────
-function ResumenTable({ titulo, rows, unidades, mesFilt }: {
-  titulo: string; rows: Reserva[]; unidades: string[]; mesFilt: string
+// ── Tabla resumen por unidad (montos) ────────────────────────
+function ResumenTable({ titulo, rows, unidades, hidden }: {
+  titulo: string; rows: Reserva[]; unidades: string[]; hidden?: boolean
 }) {
   if (!rows.length) return null
 
-  // Get months that have data
-  const mesesConDatos = Array.from(new Set(rows.map(r => r.fecha?.slice(0,7)))).filter(Boolean).sort()
-  const mesesFiltrados = mesFilt !== 'all'
-    ? mesesConDatos.filter(m => m?.slice(5,7) === mesFilt)
-    : mesesConDatos
+  function uARS(unidad: string) {
+    return rows.filter(r => r.unidad === unidad).reduce((s,r) => s + (r.monto_ars||0), 0)
+  }
+  function uUSD(unidad: string) {
+    return rows.filter(r => r.unidad === unidad).reduce((s,r) => s + (r.monto_usd||0), 0)
+  }
+  function uCount(unidad: string) {
+    return rows.filter(r => r.unidad === unidad).length
+  }
 
-  function count(unidad: string, mes: string, op: string) {
-    return rows.filter(r => r.unidad===unidad && r.fecha?.slice(0,7)===mes && r.operacion===op).length
-  }
-  function countAll(unidad: string, op: string) {
-    return rows.filter(r => r.unidad===unidad && r.operacion===op).length
-  }
+  const totalARS = rows.reduce((s,r) => s + (r.monto_ars||0), 0)
+  const totalUSD = rows.reduce((s,r) => s + (r.monto_usd||0), 0)
+
+  const unidadesConDatos = unidades.filter(u => uCount(u) > 0)
+  if (!unidadesConDatos.length) return null
 
   return (
     <div className="card" style={{ marginBottom:20 }}>
       <div className="card-header">
         <span className="card-title">{titulo}</span>
-        <span className="card-hint">
-          {rows.filter(r=>r.operacion==='VENTA').length} ventas · {rows.filter(r=>r.operacion==='ALQUILER').length} alquileres
-        </span>
+        <span className="card-hint">{rows.length} reservas</span>
       </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th style={{ minWidth:160 }}>Unidad</th>
-              {mesesFiltrados.map(m => (
-                <th key={m} className="text-right" colSpan={2}
-                  style={{ borderLeft:'1px solid var(--border)', fontSize:10 }}>
-                  {m?.slice(5,7)}/{m?.slice(2,4)}
-                </th>
-              ))}
-              <th className="text-right" colSpan={2} style={{ borderLeft:'1px solid var(--border)', background:'var(--bg-tertiary)', fontSize:10 }}>
-                TOTAL
-              </th>
-            </tr>
-            <tr>
-              <th style={{ fontSize:9 }}></th>
-              {mesesFiltrados.map(m => (<>
-                <th key={`${m}v`} style={{ fontSize:9, color:'var(--danger)', borderLeft:'1px solid var(--border)', textAlign:'right' }}>V</th>
-                <th key={`${m}a`} style={{ fontSize:9, color:'var(--info)', textAlign:'right' }}>A</th>
-              </>))}
-              <th style={{ fontSize:9, color:'var(--danger)', borderLeft:'1px solid var(--border)', textAlign:'right', background:'var(--bg-tertiary)' }}>V</th>
-              <th style={{ fontSize:9, color:'var(--info)', textAlign:'right', background:'var(--bg-tertiary)' }}>A</th>
+              <th style={{ minWidth:180 }}>Sub-unidad</th>
+              <th className="text-right">Reservas</th>
+              <th className="text-right">Monto ARS</th>
+              <th className="text-right">Monto USD</th>
+              <th className="text-right" style={{ fontSize:10, color:'var(--text-tertiary)' }}>% del total</th>
             </tr>
           </thead>
           <tbody>
-            {unidades.map(u => {
-              const totalV = countAll(u,'VENTA')
-              const totalA = countAll(u,'ALQUILER')
-              if (totalV + totalA === 0) return null
+            {unidadesConDatos.map(u => {
+              const arsVal = uARS(u)
+              const usdVal = uUSD(u)
+              const cnt    = uCount(u)
+              const share  = totalARS > 0 && arsVal > 0 ? Math.round((arsVal / totalARS) * 100) : (totalUSD > 0 && usdVal > 0 ? Math.round((usdVal / totalUSD) * 100) : 0)
               return (
                 <tr key={u}>
                   <td style={{ fontWeight:500, fontSize:12 }}>{u}</td>
-                  {mesesFiltrados.map(m => {
-                    const v = count(u, m!, 'VENTA')
-                    const a = count(u, m!, 'ALQUILER')
-                    return (<>
-                      <td key={`${u}${m}v`} className="text-right" style={{ borderLeft:'1px solid var(--border)', color: v>0?'var(--danger)':'var(--text-tertiary)', fontWeight: v>0?600:400 }}>{v||'—'}</td>
-                      <td key={`${u}${m}a`} className="text-right" style={{ color: a>0?'var(--info)':'var(--text-tertiary)', fontWeight: a>0?600:400 }}>{a||'—'}</td>
-                    </>)
-                  })}
-                  <td className="text-right" style={{ borderLeft:'1px solid var(--border)', color:'var(--danger)', fontWeight:700, background:'var(--bg-secondary)' }}>{totalV||'—'}</td>
-                  <td className="text-right" style={{ color:'var(--info)', fontWeight:700, background:'var(--bg-secondary)' }}>{totalA||'—'}</td>
+                  <td className="text-right" style={{ color:'var(--text-secondary)', fontSize:12 }}>{cnt}</td>
+                  <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight: arsVal>0?600:400, color: arsVal>0?'var(--text-primary)':'var(--text-tertiary)' }}>
+                    {arsVal > 0 ? ars(arsVal) : '—'}
+                  </td>
+                  <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight: usdVal>0?600:400, color: usdVal>0?'var(--info)':'var(--text-tertiary)' }}>
+                    {usdVal > 0 ? usd(usdVal) : '—'}
+                  </td>
+                  <td className="text-right" style={{ fontSize:11 }}>
+                    {share > 0 ? (
+                      <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end' }}>
+                        <div style={{ width:48, height:4, background:'var(--bg-tertiary)', borderRadius:2, overflow:'hidden' }}>
+                          <div style={{ width:`${share}%`, height:'100%', background:'#1a6bc8', borderRadius:2 }} />
+                        </div>
+                        <span style={{ color:'var(--text-tertiary)', minWidth:28 }}>{share}%</span>
+                      </div>
+                    ) : '—'}
+                  </td>
                 </tr>
               )
             })}
-            <tr style={{ background:'var(--bg-secondary)' }}>
-              <td style={{ fontWeight:700, fontSize:12 }}>TOTAL</td>
-              {mesesFiltrados.map(m => {
-                const v = rows.filter(r=>r.fecha?.slice(0,7)===m&&r.operacion==='VENTA').length
-                const a = rows.filter(r=>r.fecha?.slice(0,7)===m&&r.operacion==='ALQUILER').length
-                return (<>
-                  <td key={`tot${m}v`} className="text-right" style={{ borderLeft:'1px solid var(--border)', fontWeight:700, color:'var(--danger)' }}>{v||'—'}</td>
-                  <td key={`tot${m}a`} className="text-right" style={{ fontWeight:700, color:'var(--info)' }}>{a||'—'}</td>
-                </>)
-              })}
-              <td className="text-right" style={{ borderLeft:'1px solid var(--border)', fontWeight:700, color:'var(--danger)' }}>{rows.filter(r=>r.operacion==='VENTA').length}</td>
-              <td className="text-right" style={{ fontWeight:700, color:'var(--info)' }}>{rows.filter(r=>r.operacion==='ALQUILER').length}</td>
-            </tr>
           </tbody>
+          <tfoot>
+            <tr style={{ background:'var(--bg-secondary)', borderTop:'1px solid var(--border)' }}>
+              <td style={{ fontWeight:700, fontSize:12 }}>TOTAL</td>
+              <td className="text-right" style={{ fontWeight:700 }}>{rows.length}</td>
+              <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700 }}>{totalARS > 0 ? ars(totalARS) : '—'}</td>
+              <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, color:'var(--info)' }}>{totalUSD > 0 ? usd(totalUSD) : '—'}</td>
+              <td />
+            </tr>
+          </tfoot>
         </table>
-      </div>
-      <div style={{ padding:'6px 16px', fontSize:11, color:'var(--text-tertiary)' }}>
-        <span style={{ color:'var(--danger)', fontWeight:600 }}>V</span> = Ventas &nbsp;·&nbsp;
-        <span style={{ color:'var(--info)', fontWeight:600 }}>A</span> = Alquileres
       </div>
     </div>
   )

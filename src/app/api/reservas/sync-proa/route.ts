@@ -104,34 +104,42 @@ async function proaLogin(): Promise<string> {
 }
 
 async function fetchReservadas(cookies: string) {
-  // Primero visitar la página para inicializar la sesión DataTables
-  await fetch(`${PROA_BASE}/propiedades/reservas`, {
-    headers: { 'Cookie': cookies, 'User-Agent': 'Mozilla/5.0' },
-  })
-
-  // Obtener XSRF token actualizado
-  const xsrf = cookies.split(';').find(c => c.trim().startsWith('XSRF-TOKEN='))?.split('=').slice(1).join('=') || ''
-
+  // Endpoint real: GET /propiedades/reservas/buscar con params de DataTables
   const params = new URLSearchParams({
-    'f_estado_reserva_id[]': '1',
-    'f_anio_reserva': '',
-    'f_sucursal_id': 'MISSUC',
     'draw': '1',
     'start': '0',
     'length': '500',
+    'order[0][column]': '7',
+    'order[0][dir]': 'desc',
+    'tipo_propiedad_id': '0',
+    'tipo_operacion_id': '0',
+    'moneda': '',
+    'sucursal_id': 'MISSUC',
+    'codigo': '',
+    'estado_reserva_id[]': '1',
+    'direccion': '',
+    'reserva_desde': '',
+    'reserva_hasta': '',
+    'ubicacion': '',
+    'broker_id': '0',
+    'canal_arribo_id': '0',
+    'solo_indirectas': 'false',
+    'productor_id': '0',
+    'coordinador_id': '0',
+    'anio_reserva': '',
+    'contenedora_id': '',
+    'salida': 'tabla',
   })
 
-  const resp = await fetch(`${PROA_BASE}/propiedades/reservas`, {
-    method: 'POST',
+  const resp = await fetch(`${PROA_BASE}/propiedades/reservas/buscar?${params.toString()}`, {
+    method: 'GET',
     headers: {
       'Cookie': cookies,
-      'Content-Type': 'application/x-www-form-urlencoded',
       'X-Requested-With': 'XMLHttpRequest',
-      'X-XSRF-TOKEN': decodeURIComponent(xsrf),
       'Referer': `${PROA_BASE}/propiedades/reservas`,
       'User-Agent': 'Mozilla/5.0',
+      'Accept': 'application/json, text/javascript, */*',
     },
-    body: params.toString(),
   })
 
   if (!resp.ok) throw new Error(`PROA fetch failed: ${resp.status}`)

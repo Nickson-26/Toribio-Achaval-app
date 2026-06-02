@@ -56,8 +56,27 @@ export default function Reservas(_: any) {
   const [search,     setSearch]     = useState('')
   const [modal,      setModal]      = useState<'new'|'edit'|null>(null)
   const [sel,        setSel]        = useState<Reserva|null>(null)
+  const [exporting,  setExporting]  = useState(false)
 
   const { hidden } = useHideNumbers()
+
+  async function exportToSheets() {
+    setExporting(true)
+    try {
+      const resp = await fetch('/api/reservas/export-sheets', { method: 'POST' })
+      const json = await resp.json()
+      if (json.url) {
+        window.open(json.url, '_blank')
+        toast('Sheet creado con ' + json.total + ' reservas')
+      } else {
+        toast('Error al exportar: ' + (json.error || 'desconocido'))
+      }
+    } catch {
+      toast('Error al exportar')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const load = async () => {
     setLoading(true)
@@ -124,9 +143,19 @@ export default function Reservas(_: any) {
           <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas</p>
         </div>
         {tab !== 'DASHBOARD' && (
-          <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
-            + Nueva reserva
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              style={{ background: '#0f9d58', borderColor: '#0f9d58', color: '#fff' }}
+              onClick={exportToSheets}
+              disabled={exporting}
+            >
+              {exporting ? '⏳ Exportando...' : '📊 Exportar a Sheets'}
+            </button>
+            <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
+              + Nueva reserva
+            </button>
+          </div>
         )}
       </div>
 

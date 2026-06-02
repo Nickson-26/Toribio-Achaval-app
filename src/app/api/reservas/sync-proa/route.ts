@@ -127,7 +127,6 @@ async function fetchReservadas(cookies: string) {
     'moneda': '',
     'sucursal_id': 'MISSUC',
     'codigo': '',
-    'estado_reserva_id[]': '1',
     'direccion': '',
     'reserva_desde': '',
     'reserva_hasta': '',
@@ -142,7 +141,10 @@ async function fetchReservadas(cookies: string) {
     'salida': 'tabla',
   })
 
-  const resp = await fetch(`${PROA_BASE}/propiedades/reservas/buscar?${params.toString()}`, {
+  // estado_reserva_id[] se debe pasar como array explícito
+  const url = `${PROA_BASE}/propiedades/reservas/buscar?${params.toString()}&estado_reserva_id%5B%5D=1`
+
+  const resp = await fetch(url, {
     method: 'GET',
     headers: {
       'Cookie': cookies,

@@ -5,12 +5,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-<<<<<<< HEAD
-// ─── Mapeo prefijo PROA → unidad en DB ────────────────────────
-=======
 const PROA_BASE = 'https://proa.toribioachaval.net'
 
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
 const CODE_TO_UNIDAD: Record<string, string> = {
   TAR: 'PLAT. PALERMO',    TCD: 'PLAT. PALERMO',
   TMO: 'PLAT. CABALLITO',  TRO: 'PLAT. CABALLITO',
@@ -30,13 +26,10 @@ const CODE_TO_UNIDAD: Record<string, string> = {
   TAP: 'TAP',
 }
 
-<<<<<<< HEAD
-=======
 function stripHtml(s: string) {
   return (s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
 }
 
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
 function parsePrecio(raw: string) {
   if (!raw) return { monto_ars: null, monto_usd: null }
   const clean = raw.replace(/\./g, '').replace(/,/g, '.').replace(/[^\d.]/g, '')
@@ -54,27 +47,6 @@ function parseDate(raw: string): string | null {
   return `${m[3]}-${m[2]}-${m[1]}`
 }
 
-<<<<<<< HEAD
-function stripHtml(s: string) {
-  return s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
-}
-
-async function fetchProaReservadas(sessionCookie: string) {
-  // PROA usa DataTables con AJAX — intentamos el endpoint de datos
-  const baseUrl = 'https://proa.toribioachaval.net/propiedades/reservas'
-  const headers: Record<string, string> = {
-    'Cookie': sessionCookie,
-    'Accept': 'application/json, text/javascript, */*',
-    'X-Requested-With': 'XMLHttpRequest',
-    'Referer': baseUrl,
-  }
-
-  // DataTables suele postear a la misma URL con parámetros
-  const params = new URLSearchParams({
-    'f_estado_reserva_id[]': '1',  // 1 = Reservada
-    'f_anio_reserva': '',
-    'f_sucursal_id': 'MISSUC',
-=======
 async function proaLogin(): Promise<string> {
   // 1. GET login page para obtener CSRF token y cookie de sesión inicial
   const loginPage = await fetch(`${PROA_BASE}/login`, {
@@ -145,44 +117,11 @@ async function proaLogin(): Promise<string> {
 async function fetchReservadas(cookies: string) {
   // Endpoint real: GET /propiedades/reservas/buscar con params de DataTables
   const params = new URLSearchParams({
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
     'draw': '1',
     'start': '0',
     'length': '500',
     'order[0][column]': '7',
     'order[0][dir]': 'desc',
-<<<<<<< HEAD
-  })
-
-  const resp = await fetch(baseUrl, {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  })
-
-  if (!resp.ok) throw new Error(`PROA HTTP ${resp.status}`)
-  const text = await resp.text()
-
-  // Si PROA devuelve JSON de DataTables
-  let rawRows: string[][] = []
-  try {
-    const json = JSON.parse(text)
-    if (Array.isArray(json?.data)) {
-      rawRows = json.data
-    }
-  } catch {
-    // No es JSON — PROA puede requerir que visitemos la página primero
-    // Devolvemos vacío para no romper el cron, se loggea
-    console.warn('[sync-proa] PROA no devolvió JSON. Primeros 300 chars:', text.slice(0, 300))
-    return []
-  }
-
-  return rawRows.map((row) => {
-    const codigoRaw = stripHtml(row[1] || '').split('\n')[0].trim()
-    const prefijo = codigoRaw.split(' ')[0]?.toUpperCase().slice(0, 3)
-    const unidad = CODE_TO_UNIDAD[prefijo] || 'SIN CLASIFICAR'
-
-=======
     'tipo_propiedad_id': '0',
     'tipo_operacion_id': '0',
     'moneda': '',
@@ -233,22 +172,13 @@ async function fetchReservadas(cookies: string) {
     const codigoRaw = stripHtml(row[1] || '').split('\n')[0].trim()
     const prefijo = codigoRaw.split(' ')[0]?.toUpperCase().slice(0, 3)
     const unidad = CODE_TO_UNIDAD[prefijo] || 'SIN CLASIFICAR'
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
     const dirRaw = stripHtml(row[3] || '').split('\n')[0].trim()
     const opText = stripHtml(row[5] || '')
     const opMatch = opText.match(/Venta|Alquiler/i)
     const operacion = opMatch ? opMatch[0].toUpperCase() : 'VENTA'
-<<<<<<< HEAD
-
     const precioRaw = stripHtml(row[8] || '').split('\n')
     const { monto_ars, monto_usd } = parsePrecio(precioRaw[0] || '')
     const modo_pago = precioRaw[1]?.trim().toUpperCase() || null
-
-=======
-    const precioRaw = stripHtml(row[8] || '').split('\n')
-    const { monto_ars, monto_usd } = parsePrecio(precioRaw[0] || '')
-    const modo_pago = precioRaw[1]?.trim().toUpperCase() || null
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
     const fechaRaw = stripHtml(row[7] || '').trim()
     const fechaFirmaRaw = stripHtml(row[9] || '').trim()
 
@@ -268,34 +198,16 @@ async function fetchReservadas(cookies: string) {
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
-<<<<<<< HEAD
-  const secret = process.env.RESERVAS_IMPORT_SECRET
-  if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
-
-  const sessionCookie = process.env.PROA_SESSION_COOKIE
-  if (!sessionCookie) {
-    return NextResponse.json({ error: 'PROA_SESSION_COOKIE not set' }, { status: 500 })
-  }
-
-=======
   if (auth !== `Bearer ${process.env.RESERVAS_IMPORT_SECRET}`) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } }
   )
 
-<<<<<<< HEAD
-  let reservas
-  try {
-    reservas = await fetchProaReservadas(sessionCookie)
-=======
   let cookies: string
   try {
     cookies = await proaLogin()
@@ -306,7 +218,6 @@ export async function POST(req: NextRequest) {
   let reservas
   try {
     reservas = await fetchReservadas(cookies)
->>>>>>> a4343938931ed8a59dda57ac20398f80bb773185
   } catch (e: any) {
     return NextResponse.json({ error: 'proa_fetch_failed', detail: e.message }, { status: 500 })
   }

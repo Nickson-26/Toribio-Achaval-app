@@ -59,8 +59,32 @@ export default function Reservas(_: any) {
   const [modal,      setModal]      = useState<'new'|'edit'|null>(null)
   const [sel,        setSel]        = useState<Reserva|null>(null)
   const [exporting,  setExporting]  = useState(false)
+  const [importing,  setImporting]  = useState(false)
 
   const { hidden } = useHideNumbers()
+
+  async function importProaExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const resp = await fetch('/api/reservas/import-excel', { method: 'POST', body: fd })
+      const json = await resp.json()
+      if (json.ok) {
+        toast(`✓ ${json.updated} reservas actualizadas con Precio Reserva`)
+        load()
+      } else {
+        toast('Error al importar: ' + (json.error || 'desconocido'))
+      }
+    } catch {
+      toast('Error al importar')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
 
   async function exportToSheets() {
     setExporting(true)
@@ -176,21 +200,28 @@ export default function Reservas(_: any) {
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Módulo de Reservas</h2>
           <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas</p>
         </div>
-        {tab !== 'DASHBOARD' && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn"
-              style={{ background: '#0f9d58', borderColor: '#0f9d58', color: '#fff' }}
-              onClick={exportToSheets}
-              disabled={exporting}
-            >
-              {exporting ? '⏳ Exportando...' : '📊 Exportar a Sheets'}
-            </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            style={{ background: '#0f9d58', borderColor: '#0f9d58', color: '#fff' }}
+            onClick={exportToSheets}
+            disabled={exporting}
+          >
+            {exporting ? '⏳ Exportando...' : '📊 Exportar a Sheets'}
+          </button>
+          <label
+            className="btn"
+            style={{ background: importing ? '#555' : '#7b2d8b', borderColor: '#7b2d8b', color: '#fff', cursor: 'pointer' }}
+          >
+            {importing ? '⏳ Importando...' : '📥 Importar Excel PROA'}
+            <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={importProaExcel} disabled={importing} />
+          </label>
+          {tab !== 'DASHBOARD' && (
             <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
               + Nueva reserva
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

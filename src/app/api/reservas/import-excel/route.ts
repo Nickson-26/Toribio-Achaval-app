@@ -4,49 +4,15 @@ import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Lee un archivo .xlsx de PROA y actualiza/inserta reservas en Supabase.
-// Columnas usadas: A=Código, B=Tipo, D=Dirección, F=PrecioPub, H=Operación, M=PrecioReserva
-//
-// Regla de moneda:
-//   - Venta        → monto_usd
-//   - Alquiler >= 100000 → monto_ars (residencial ARS)
-//   - Alquiler <  100000 → monto_usd (comercial USD)
-
-const UNIDAD_MAP: Record<string, string> = {
-  TCD: 'PLAT. PALERMO',
-  TJU: 'PLAT. RECOLETA',
-  TNP: 'PLAT. BELGRANO',
-  TRO: 'PLAT. CABALLITO',
-  TBA: 'PLAT. BARILOCHE',
-  TPI: 'PLAT. PILAR',
-  TPA: 'PLAT. ANGOSTURA',
-  TCN: 'PLAT. CANNING',
-  TMO: 'PLAT. BELGRANO',
-  TAR: 'PLAT. PALERMO',
-  TRS: 'DPTO DE BÚSQUEDA',
-  TAE: 'EMPRENDIMIENTOS',
-  TES: 'EMPRENDIMIENTOS',
-  TUN: 'EMPRENDIMIENTOS',
-  TUC: 'EMPRENDIMIENTOS',
-  TII: 'INDUSTRIA',
-  TOE: 'OFICINAS Y EDIFICIOS',
-  TLT: 'LOCALES Y TERRENOS',
-  TAP: 'TAP',
-}
-
-function getUnidad(codigo: string): string {
-  const prefix = codigo?.slice(0, 3).toUpperCase()
-  return UNIDAD_MAP[prefix] || 'EMPRENDIMIENTOS'
-}
-
-function parsePrecio(precio: number, operacion: string) {
-  if (!precio) return { monto_ars: null, monto_usd: null }
-  const op = operacion?.toUpperCase() || ''
-  if (op.includes('ALQUILER') && precio >= 100000) {
-    return { monto_ars: precio, monto_usd: null }
-  }
-  return { monto_ars: null, monto_usd: precio }
-}
+// Columnas del Excel PROA que se usan:
+//   A = Código Propiedad  → proa_codigo
+//   B = Tipo              → tipo_inmueble
+//   D = Dirección         → direccion
+//   F = Precio Publicado  → precio_publicado
+//   H = Operación         → operacion (VENTA / ALQUILER)
+//   K = Estado Reserva    → estado_reserva
+//   M = Precio Reserva    → precio_reserva
+//   P = Medio de Pago     → modo_pago
 
 export async function POST(req: NextRequest) {
   const sb = createClient(
@@ -61,43 +27,52 @@ export async function POST(req: NextRequest) {
 
   const buffer = await file.arrayBuffer()
 
-  // Parsear xlsx con ExcelJS (disponible en entorno Node)
   const ExcelJS = await import('exceljs')
   const wb = new ExcelJS.default.Workbook()
   await wb.xlsx.load(buffer)
   const ws = wb.worksheets[0]
 
-  let updated = 0, inserted = 0, skipped = 0, errors = 0
+  const updates: Promise<any>[] = []
+  let skipped = 0
 
   ws.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return // skip header
+    if (rowNumber === 1) return
 
-    const codigo    = String(row.getCell(1).value || '').trim()  // A
-    const direccion = String(row.getCell(4).value || '').trim()  // D
-    const operacion = String(row.getCell(8).value || '').trim()  // H
-    const precioRaw = row.getCell(13).value                      // M
+    const codigo        = String(row.getCell(1).value ?? '').trim()
+    const tipoInmueble  = String(row.getCell(2).value ?? '').trim()
+    const direccion     = String(row.getCell(4).value ?? '').trim()
+    const precioPubRaw  = row.getCell(6).value
+    const operacionRaw  = String(row.getCell(8).value ?? '').trim()
+    const estadoRes     = String(row.getCell(11).value ?? '').trim()
+    const precioResRaw  = row.getCell(13).value
+    const medioPago     = String(row.getCell(16).value ?? '').trim()
 
-    if (!codigo || !precioRaw) { skipped++; return }
+    if (!codigo) { skipped++; return }
 
-    const precio = typeof precioRaw === 'number' ? precioRaw : parseFloat(String(precioRaw))
-    if (isNaN(precio)) { skipped++; return }
+    const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
+    const precioPublicado = precioPubRaw ? parseFloat(String(precioPubRaw)) : null
+    const precioReserva   = precioResRaw ? parseFloat(String(precioResRaw)) : null
 
-    const op = operacion.toUpperCase().includes('ALQUILER') ? 'ALQUILER' : 'VENTA'
-    const { monto_ars, monto_usd } = parsePrecio(precio, op)
-    const unidad = getUnidad(codigo)
+    const patch = {
+      tipo_inmueble:    tipoInmueble || null,
+      direccion:        direccion    || null,
+      precio_publicado: isNaN(precioPublicado!) ? null : precioPublicado,
+      operacion:        op,
+      estado_reserva:   estadoRes   || null,
+      precio_reserva:   isNaN(precioReserva!)   ? null : precioReserva,
+      modo_pago:        medioPago   || null,
+    }
 
-    // Intentar actualizar primero; si no existe, insertar
-    sb.from('reservas')
-      .update({ monto_ars, monto_usd })
-      .eq('proa_codigo', codigo)
-      .then(({ error: e }) => {
-        if (e) errors++
-        else updated++
-      })
+    updates.push(
+      sb.from('reservas')
+        .update(patch)
+        .eq('proa_codigo', codigo)
+    )
   })
 
-  // Dar tiempo a que terminen las promesas
-  await new Promise(r => setTimeout(r, 3000))
+  const results = await Promise.all(updates)
+  const errors  = results.filter(r => r.error).length
+  const updated = results.length - errors - skipped
 
-  return NextResponse.json({ ok: true, updated, inserted, skipped, errors })
+  return NextResponse.json({ ok: true, updated, skipped, errors })
 }

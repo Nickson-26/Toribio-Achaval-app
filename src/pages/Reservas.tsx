@@ -12,15 +12,21 @@ type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio' | 'all'
 
 export interface Reserva {
   id: number
-  fecha: string
+  proa_codigo: string | null
+  tipo_inmueble: string | null
   direccion: string
+  precio_publicado: number | null
+  operacion: string
+  precio_reserva: number | null
+  estado_reserva: string | null
+  modo_pago: string | null
+  // legacy
+  fecha: string
   broker: string | null
   cliente: string | null
-  operacion: string
   unidad: string
   monto_ars: number | null
   monto_usd: number | null
-  modo_pago: string | null
   firmo: string
 }
 
@@ -355,27 +361,38 @@ export default function Reservas(_: any) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Fecha</th><th>Dirección</th><th>Broker</th><th>Cliente</th>
-                      <th>Tipo</th><th>Unidad</th>
-                      <th className="text-right">ARS</th><th className="text-right">USD</th>
-                      <th>Pago</th><th>Estado</th><th></th>
+                      <th>Código PROA</th>
+                      <th>Tipo</th>
+                      <th>Dirección</th>
+                      <th className="text-right">Precio Publicado</th>
+                      <th>Operación</th>
+                      <th className="text-right">Precio Reserva</th>
+                      <th>Estado Reserva</th>
+                      <th>Medio de Pago</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {tabData.length === 0 ? (
-                      <tr><td colSpan={11} className="empty-row">Sin reservas</td></tr>
+                      <tr><td colSpan={9} className="empty-row">Sin reservas</td></tr>
                     ) : tabData.map(r => (
                       <tr key={r.id}>
-                        <td>{fdate(r.fecha)}</td>
-                        <td style={{ maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
-                        <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.broker||'—'}</td>
-                        <td style={{ fontSize:11.5 }}>{r.cliente||'—'}</td>
+                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo||'—'}</td>
+                        <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.tipo_inmueble||'—'}</td>
+                        <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
+                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontSize:12 }}>
+                          {r.precio_publicado ? usd(r.precio_publicado) : '—'}
+                        </td>
                         <td><span className={`badge ${r.operacion==='VENTA'?'badge-red':'badge-blue'}`}>{r.operacion}</span></td>
-                        <td style={{ fontSize:11, color:'var(--text-tertiary)' }}>{r.unidad}</td>
-                        <td className="text-right text-mono">{ars(r.monto_ars)}</td>
-                        <td className="text-right text-mono">{usd(r.monto_usd)}</td>
-                        <td style={{ fontSize:11 }}>{r.modo_pago}</td>
-                        <td><span className={`badge ${r.firmo==='FIRMADO'?'badge-green':'badge-amber'}`}>{r.firmo}</span></td>
+                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, fontSize:13 }}>
+                          {r.precio_reserva ? usd(r.precio_reserva) : (r.monto_usd ? usd(r.monto_usd) : r.monto_ars ? ars(r.monto_ars) : '—')}
+                        </td>
+                        <td>
+                          <span className={`badge ${r.estado_reserva==='Reservada'?'badge-green': r.firmo==='FIRMADO'?'badge-green':'badge-amber'}`}>
+                            {r.estado_reserva || r.firmo || '—'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize:11 }}>{r.modo_pago||'—'}</td>
                         <td>
                           <div style={{ display:'flex', gap:4 }}>
                             <button className="btn btn-sm" onClick={()=>{setSel(r);setModal('edit')}}>Editar</button>

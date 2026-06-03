@@ -115,22 +115,20 @@ function updateBorders(sheetId: number, r1: number, r2: number, c1: number, c2: 
 }
 
 // ── Datos ─────────────────────────────────────────────────────
-// Columnas: Unidad(0) Broker(1) Dirección(2) Operación(3) ARS(4) USD(5) Modo Pago(6) Fecha(7) Estado(8) Código(9)
-const NCOLS = 10
-const HEADER_ROW = ['Unidad', 'Broker', 'Dirección', 'Operación', 'Precio ARS', 'Precio USD', 'Modo Pago', 'Fecha', 'Estado', 'Código']
+// Columnas: Código(0) Tipo(1) Dirección(2) PrecioPub(3) Operación(4) PrecioRes(5) Estado(6) MedioPago(7)
+const NCOLS = 8
+const HEADER_ROW = ['Código PROA', 'Tipo', 'Dirección', 'Precio Publicado', 'Operación', 'Precio Reserva', 'Estado Reserva', 'Medio de Pago']
 
 function toRows(list: any[]) {
   return list.map(r => [
-    r.unidad     || '',
-    r.broker     || '',
-    r.direccion  || '',
-    r.operacion  || '',
-    r.monto_ars  || '',
-    r.monto_usd  || '',
-    r.modo_pago  || '',
-    r.fecha      || '',
-    r.firmo      || '',
-    r.proa_codigo || '',
+    r.proa_codigo       || '',
+    r.tipo_inmueble     || '',
+    r.direccion         || '',
+    r.precio_publicado  || '',
+    r.operacion         || '',
+    r.precio_reserva    || r.monto_usd || r.monto_ars || '',
+    r.estado_reserva    || r.firmo     || '',
+    r.modo_pago         || '',
   ])
 }
 
@@ -185,8 +183,15 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
     },
   }))
 
-  // ── Price columns header: ARS(4), USD(5) — slightly brighter
-  reqs.push(repeatCell(sheetId, 3, 4, 4, 6, {
+  // ── Price columns header: PrecioPub(3), PrecioRes(5) — slightly brighter
+  reqs.push(repeatCell(sheetId, 3, 4, 3, 4, {
+    userEnteredFormat: {
+      backgroundColor: { red: 0.200, green: 0.400, blue: 0.800 },
+      textFormat: { foregroundColor: rgb(C.white), bold: true, fontSize: 10 },
+      horizontalAlignment: 'RIGHT',
+    },
+  }))
+  reqs.push(repeatCell(sheetId, 3, 4, 5, 6, {
     userEnteredFormat: {
       backgroundColor: { red: 0.200, green: 0.400, blue: 0.800 },
       textFormat: { foregroundColor: rgb(C.white), bold: true, fontSize: 10 },
@@ -209,8 +214,16 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
       },
     }))
 
-    // Price columns bg
-    reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 4, 6, {
+    // Precio Publicado (col 3) y Precio Reserva (col 5)
+    reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 3, 4, {
+      userEnteredFormat: {
+        backgroundColor: isAlt ? rgb(C.altRow) : rgb(C.white),
+        textFormat: { fontSize: 10 },
+        horizontalAlignment: 'RIGHT',
+        numberFormat: { type: 'NUMBER', pattern: '#,##0' },
+      },
+    }))
+    reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 5, 6, {
       userEnteredFormat: {
         backgroundColor: rgb(C.priceBg),
         textFormat: { bold: true, fontSize: 10 },
@@ -219,10 +232,10 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
       },
     }))
 
-    // Operación cell (col 3)
-    const op = dataRows[i][3]
+    // Operación cell (col 4)
+    const op = dataRows[i][4]
     if (op === 'VENTA') {
-      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 3, 4, {
+      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 4, 5, {
         userEnteredFormat: {
           backgroundColor: rgb(C.ventaBg),
           textFormat: { foregroundColor: rgb(C.ventaFg), bold: true, fontSize: 10 },
@@ -230,7 +243,7 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
         },
       }))
     } else if (op === 'ALQUILER') {
-      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 3, 4, {
+      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 4, 5, {
         userEnteredFormat: {
           backgroundColor: rgb(C.alqBg),
           textFormat: { foregroundColor: rgb(C.alqFg), bold: true, fontSize: 10 },
@@ -239,10 +252,10 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
       }))
     }
 
-    // Estado cell (col 8)
-    const estado = dataRows[i][8]
-    if (estado === 'FIRMADO') {
-      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 8, 9, {
+    // Estado cell (col 6)
+    const estado = dataRows[i][6]
+    if (estado === 'Reservada' || estado === 'FIRMADO') {
+      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 6, 7, {
         userEnteredFormat: {
           backgroundColor: rgb(C.firmadoBg),
           textFormat: { foregroundColor: rgb(C.firmadoFg), bold: true, fontSize: 10 },
@@ -250,7 +263,7 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
         },
       }))
     } else if (estado === 'PENDIENTE') {
-      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 8, 9, {
+      reqs.push(repeatCell(sheetId, rowIdx, rowIdx + 1, 6, 7, {
         userEnteredFormat: {
           backgroundColor: rgb(C.pendBg),
           textFormat: { foregroundColor: rgb(C.pendFg), bold: true, fontSize: 10 },
@@ -265,8 +278,8 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
     reqs.push(updateBorders(sheetId, 3, lastDataRow, 0, NCOLS))
   }
 
-  // ── Column widths (px)
-  const widths = [160, 150, 220, 90, 110, 110, 110, 90, 90, 80]
+  // ── Column widths (px): Código, Tipo, Dirección, PrecioPub, Operación, PrecioRes, Estado, MedioPago
+  const widths = [110, 120, 260, 130, 90, 130, 110, 110]
   widths.forEach((w, c) => reqs.push(setColWidth(sheetId, c, w)))
 
   // ── Freeze title + summary + separator + header (4 rows)

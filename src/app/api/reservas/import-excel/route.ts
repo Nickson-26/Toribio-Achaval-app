@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
-  const buffer = Buffer.from(await file.arrayBuffer())
+  const buffer = await file.arrayBuffer()
 
   // Parsear xlsx con ExcelJS (disponible en entorno Node)
   const ExcelJS = await import('exceljs')

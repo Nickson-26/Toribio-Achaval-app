@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
       sb.from('reservas')
         .update(patch)
         .eq('proa_codigo', codigo)
+        .then(r => r)
     )
   })
 

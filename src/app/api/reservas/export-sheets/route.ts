@@ -334,6 +334,7 @@ export async function POST(req: NextRequest) {
   const { data: reservas, error } = await sb
     .from('reservas')
     .select('*')
+    .not('proa_codigo', 'is', null)
     .order('unidad', { ascending: true })
     .order('fecha', { ascending: false })
 

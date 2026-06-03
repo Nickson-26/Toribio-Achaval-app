@@ -32,8 +32,7 @@ export async function POST(req: NextRequest) {
   await wb.xlsx.load(buffer)
   const ws = wb.worksheets[0]
 
-  const updates: Promise<any>[] = []
-  let skipped = 0
+  const rows: { codigo: string; patch: any }[] = []
 
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return
@@ -47,33 +46,32 @@ export async function POST(req: NextRequest) {
     const precioResRaw  = row.getCell(13).value
     const medioPago     = String(row.getCell(16).value ?? '').trim()
 
-    if (!codigo) { skipped++; return }
+    if (!codigo) return
 
     const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
     const precioPublicado = precioPubRaw ? parseFloat(String(precioPubRaw)) : null
     const precioReserva   = precioResRaw ? parseFloat(String(precioResRaw)) : null
 
-    const patch = {
-      tipo_inmueble:    tipoInmueble || null,
-      direccion:        direccion    || null,
-      precio_publicado: isNaN(precioPublicado!) ? null : precioPublicado,
-      operacion:        op,
-      estado_reserva:   estadoRes   || null,
-      precio_reserva:   isNaN(precioReserva!)   ? null : precioReserva,
-      modo_pago:        medioPago   || null,
-    }
-
-    updates.push(
-      sb.from('reservas')
-        .update(patch)
-        .eq('proa_codigo', codigo)
-        .then(r => r)
-    )
+    rows.push({
+      codigo,
+      patch: {
+        tipo_inmueble:    tipoInmueble || null,
+        direccion:        direccion    || null,
+        precio_publicado: precioPublicado && !isNaN(precioPublicado) ? precioPublicado : null,
+        operacion:        op,
+        estado_reserva:   estadoRes   || null,
+        precio_reserva:   precioReserva && !isNaN(precioReserva) ? precioReserva : null,
+        modo_pago:        medioPago   || null,
+      },
+    })
   })
 
-  const results = await Promise.all(updates)
-  const errors  = results.filter(r => r.error).length
-  const updated = results.length - errors - skipped
+  let updated = 0, errors = 0
+  for (const { codigo, patch } of rows) {
+    const { error } = await sb.from('reservas').update(patch).eq('proa_codigo', codigo)
+    if (error) errors++
+    else updated++
+  }
 
-  return NextResponse.json({ ok: true, updated, skipped, errors })
+  return NextResponse.json({ ok: true, updated, skipped: 0, errors })
 }

@@ -4,20 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Columnas del Excel PROA (A,B,D,F,H,K,L,M):
-//   A (1)  = Codigo Propiedad -> proa_codigo
-//   B (2)  = Tipo             -> tipo_inmueble
-//   D (4)  = Direccion        -> direccion
-//   F (6)  = Precio Publicado -> precio_publicado
-//   H (8)  = Operacion        -> operacion
-//   K (11) = Estado Reserva   -> estado_reserva
-//   L (12) = Fecha Reserva    -> fecha
-//   M (13) = Precio Reserva   -> precio_reserva
-//
-// Todos los registros hacen UPSERT por proa_codigo.
-// Para codigos sin numero (ej: TRS sin sufijo), se genera un codigo sintetico
-// deterministico "TRS|Direccion" para evitar duplicados en re-imports.
-
 const UNIDAD_BY_PREFIX: Record<string, string> = {
   TAR: 'RESIDENCIAL', TCD: 'RESIDENCIAL', TMO: 'RESIDENCIAL', TRO: 'RESIDENCIAL',
   TJU: 'RESIDENCIAL', TCR: 'RESIDENCIAL', TBB: 'RESIDENCIAL', TNP: 'RESIDENCIAL',
@@ -83,21 +69,26 @@ export async function POST(req: NextRequest) {
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return
 
-    const rawCodigo    = String(row.getCell(1).value ?? '').trim()
+    const rawCodigo    = row.getCell(1).value
+    const rawDireccion = row.getCell(4).value
+
+    // Saltar filas vacias o de totales
+    if (!rawCodigo || !rawDireccion) return
+    const codigoStr    = String(rawCodigo).trim()
+    const direccionStr = String(rawDireccion).trim()
+    if (!codigoStr || !direccionStr) return
+    if (codigoStr.toLowerCase().startsWith('total')) return
+
     const tipoInmueble = String(row.getCell(2).value ?? '').trim()
-    const direccion    = String(row.getCell(4).value ?? '').trim()
     const precioPubRaw = row.getCell(6).value
     const operacionRaw = String(row.getCell(8).value ?? '').trim()
     const estadoRes    = String(row.getCell(11).value ?? '').trim()
     const fechaRaw     = row.getCell(12).value
     const precioResRaw = row.getCell(13).value
 
-    if (!rawCodigo || !direccion) return
-
-    // Si no tiene numero, generar codigo sintetico deterministico
-    const proaCodigo = hasNumber(rawCodigo)
-      ? rawCodigo
-      : rawCodigo + '|' + direccion
+    const proaCodigo = hasNumber(codigoStr)
+      ? codigoStr
+      : codigoStr + '|' + direccionStr
 
     const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
 
@@ -114,13 +105,13 @@ export async function POST(req: NextRequest) {
     records.push({
       proa_codigo:      proaCodigo,
       tipo_inmueble:    tipoInmueble || null,
-      direccion:        direccion,
+      direccion:        direccionStr,
       precio_publicado: validPub,
       operacion:        op,
       estado_reserva:   estadoRes || null,
       precio_reserva:   validRes,
       fecha:            fecha,
-      unidad:           getUnidad(rawCodigo),
+      unidad:           getUnidad(codigoStr),
       firmo:            'PENDIENTE',
       broker:           null,
       cliente:          null,

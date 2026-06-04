@@ -365,34 +365,30 @@ export default function Reservas(_: any) {
                       <th>Tipo</th>
                       <th>Dirección</th>
                       <th className="text-right">Precio Publicado</th>
-                      <th>Operación</th>
-                      <th className="text-right">Precio Reserva</th>
                       <th>Estado Reserva</th>
-                      <th>Medio de Pago</th>
+                      <th className="text-right">Precio Reserva</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {tabData.length === 0 ? (
-                      <tr><td colSpan={9} className="empty-row">Sin reservas</td></tr>
+                      <tr><td colSpan={7} className="empty-row">Sin reservas</td></tr>
                     ) : tabData.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo||'—'}</td>
                         <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.tipo_inmueble||'—'}</td>
-                        <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
+                        <td style={{ maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
                         <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontSize:12 }}>
                           {r.precio_publicado ? usd(r.precio_publicado) : '—'}
-                        </td>
-                        <td><span className={`badge ${r.operacion==='VENTA'?'badge-red':'badge-blue'}`}>{r.operacion}</span></td>
-                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, fontSize:13 }}>
-                          {r.precio_reserva ? usd(r.precio_reserva) : (r.monto_usd ? usd(r.monto_usd) : r.monto_ars ? ars(r.monto_ars) : '—')}
                         </td>
                         <td>
                           <span className={`badge ${r.estado_reserva==='Reservada'?'badge-green': r.firmo==='FIRMADO'?'badge-green':'badge-amber'}`}>
                             {r.estado_reserva || r.firmo || '—'}
                           </span>
                         </td>
-                        <td style={{ fontSize:11 }}>{r.modo_pago||'—'}</td>
+                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, fontSize:13 }}>
+                          {r.precio_reserva ? usd(r.precio_reserva) : (r.monto_usd ? usd(r.monto_usd) : r.monto_ars ? ars(r.monto_ars) : '—')}
+                        </td>
                         <td>
                           <div style={{ display:'flex', gap:4 }}>
                             <button className="btn btn-sm" onClick={()=>{setSel(r);setModal('edit')}}>Editar</button>

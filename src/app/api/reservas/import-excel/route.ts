@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Columnas del Excel PROA sincronizadas (A,B,D,F,K,M + H,L para la DB):
+// Columnas del Excel PROA (A,B,D,F,H,K,L,M):
 //   A (1)  = Codigo Propiedad -> proa_codigo
 //   B (2)  = Tipo             -> tipo_inmueble
 //   D (4)  = Direccion        -> direccion
@@ -14,8 +14,9 @@ export const dynamic = 'force-dynamic'
 //   L (12) = Fecha Reserva    -> fecha
 //   M (13) = Precio Reserva   -> precio_reserva
 //
-// UPSERT por proa_codigo si el codigo tiene numero (ej: TRS 65556).
-// Si el codigo es solo prefijo sin numero (ej: TRS), se inserta sin proa_codigo.
+// Todos los registros hacen UPSERT por proa_codigo.
+// Para codigos sin numero (ej: TRS sin sufijo), se genera un codigo sintetico
+// deterministico "TRS|Direccion" para evitar duplicados en re-imports.
 
 const UNIDAD_BY_PREFIX: Record<string, string> = {
   TAR: 'RESIDENCIAL', TCD: 'RESIDENCIAL', TMO: 'RESIDENCIAL', TRO: 'RESIDENCIAL',
@@ -59,39 +60,6 @@ function parseExcelDate(raw: any): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function buildRecord(codigo: string, tipoInmueble: string, direccion: string,
-  precioPubRaw: any, operacionRaw: string, estadoRes: string,
-  fechaRaw: any, precioResRaw: any): any {
-
-  const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
-
-  const precioPubStr    = precioPubRaw ? String(precioPubRaw).replace(/,/g, '') : ''
-  const precioPublicado = precioPubStr ? parseFloat(precioPubStr) : null
-
-  const precioResStr  = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
-  const precioReserva = precioResStr ? parseFloat(precioResStr) : null
-
-  const fecha    = parseExcelDate(fechaRaw)
-  const validPub = precioPublicado !== null && !isNaN(precioPublicado) ? precioPublicado : null
-  const validRes = precioReserva !== null && !isNaN(precioReserva) ? precioReserva : null
-
-  return {
-    tipo_inmueble:    tipoInmueble || null,
-    direccion:        direccion,
-    precio_publicado: validPub,
-    operacion:        op,
-    estado_reserva:   estadoRes || null,
-    precio_reserva:   validRes,
-    fecha:            fecha,
-    unidad:           getUnidad(codigo),
-    firmo:            'PENDIENTE',
-    broker:           null,
-    cliente:          null,
-    monto_ars:        null,
-    monto_usd:        validRes,
-  }
-}
-
 export async function POST(req: NextRequest) {
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -110,15 +78,12 @@ export async function POST(req: NextRequest) {
   await wb.xlsx.load(buffer)
   const ws = wb.worksheets[0]
 
-  // Batch 1: codigos con numero -> upsert por proa_codigo
-  const upsertRecords: any[] = []
-  // Batch 2: codigos solo prefijo sin numero -> insert sin proa_codigo
-  const insertRecords: any[] = []
+  const records: any[] = []
 
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return
 
-    const codigo       = String(row.getCell(1).value ?? '').trim()
+    const rawCodigo    = String(row.getCell(1).value ?? '').trim()
     const tipoInmueble = String(row.getCell(2).value ?? '').trim()
     const direccion    = String(row.getCell(4).value ?? '').trim()
     const precioPubRaw = row.getCell(6).value
@@ -127,41 +92,55 @@ export async function POST(req: NextRequest) {
     const fechaRaw     = row.getCell(12).value
     const precioResRaw = row.getCell(13).value
 
-    if (!codigo || !direccion) return
+    if (!rawCodigo || !direccion) return
 
-    const base = buildRecord(codigo, tipoInmueble, direccion,
-      precioPubRaw, operacionRaw, estadoRes, fechaRaw, precioResRaw)
+    // Si no tiene numero, generar codigo sintetico deterministico
+    const proaCodigo = hasNumber(rawCodigo)
+      ? rawCodigo
+      : rawCodigo + '|' + direccion
 
-    if (hasNumber(codigo)) {
-      upsertRecords.push({ ...base, proa_codigo: codigo })
-    } else {
-      insertRecords.push(base)
-    }
+    const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
+
+    const precioPubStr    = precioPubRaw ? String(precioPubRaw).replace(/,/g, '') : ''
+    const precioPublicado = precioPubStr ? parseFloat(precioPubStr) : null
+
+    const precioResStr  = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
+    const precioReserva = precioResStr ? parseFloat(precioResStr) : null
+
+    const fecha    = parseExcelDate(fechaRaw)
+    const validPub = precioPublicado !== null && !isNaN(precioPublicado) ? precioPublicado : null
+    const validRes = precioReserva !== null && !isNaN(precioReserva) ? precioReserva : null
+
+    records.push({
+      proa_codigo:      proaCodigo,
+      tipo_inmueble:    tipoInmueble || null,
+      direccion:        direccion,
+      precio_publicado: validPub,
+      operacion:        op,
+      estado_reserva:   estadoRes || null,
+      precio_reserva:   validRes,
+      fecha:            fecha,
+      unidad:           getUnidad(rawCodigo),
+      firmo:            'PENDIENTE',
+      broker:           null,
+      cliente:          null,
+      monto_ars:        null,
+      monto_usd:        validRes,
+    })
   })
 
-  let upserted = 0
-  let inserted = 0
-  let errors   = 0
-
-  // Upsert registros con codigo unico
-  if (upsertRecords.length) {
-    const { error, data } = await sb
-      .from('reservas')
-      .upsert(upsertRecords, { onConflict: 'proa_codigo', ignoreDuplicates: false })
-      .select('id')
-    if (error) errors++
-    else upserted = data?.length ?? upsertRecords.length
+  if (!records.length) {
+    return NextResponse.json({ ok: true, upserted: 0, errors: 0 })
   }
 
-  // Insert registros sin codigo unico (TRS sin numero, etc.)
-  if (insertRecords.length) {
-    const { error, data } = await sb
-      .from('reservas')
-      .insert(insertRecords)
-      .select('id')
-    if (error) errors++
-    else inserted = data?.length ?? insertRecords.length
+  const { error, data } = await sb
+    .from('reservas')
+    .upsert(records, { onConflict: 'proa_codigo', ignoreDuplicates: false })
+    .select('id')
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, upserted, inserted, errors })
+  return NextResponse.json({ ok: true, upserted: data?.length ?? records.length, errors: 0 })
 }

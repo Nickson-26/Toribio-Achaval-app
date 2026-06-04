@@ -335,6 +335,8 @@ export async function POST(req: NextRequest) {
     .from('reservas')
     .select('*')
     .not('proa_codigo', 'is', null)
+    .not('tipo_inmueble', 'is', null)
+    .not('precio_reserva', 'is', null)
     .order('unidad', { ascending: true })
     .order('fecha', { ascending: false })
 

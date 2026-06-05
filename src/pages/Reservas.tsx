@@ -385,6 +385,7 @@ export default function Reservas(_: any) {
                       <th>Dirección</th>
                       <th className="text-right">Precio Publicado</th>
                       <th>Fecha Reserva</th>
+                      <th>Operación</th>
                       <th>Estado Reserva</th>
                       <th className="text-right">Precio Reserva</th>
                       <th></th>
@@ -392,7 +393,7 @@ export default function Reservas(_: any) {
                   </thead>
                   <tbody>
                     {tabData.length === 0 ? (
-                      <tr><td colSpan={8} className="empty-row">Sin reservas</td></tr>
+                      <tr><td colSpan={9} className="empty-row">Sin reservas</td></tr>
                     ) : tabData.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo||'—'}</td>
@@ -402,6 +403,7 @@ export default function Reservas(_: any) {
                           {r.precio_publicado ? usd(r.precio_publicado) : '—'}
                         </td>
                         <td style={{ fontSize:11, color:'var(--text-secondary)', whiteSpace:'nowrap' }}>{fdate(r.fecha)}</td>
+                        <td><span className={`badge ${r.operacion==='VENTA'?'badge-red':'badge-blue'}`}>{r.operacion}</span></td>
                         <td>
                           <span className={`badge ${r.estado_reserva==='Reservada'?'badge-green': r.firmo==='FIRMADO'?'badge-green':'badge-amber'}`}>
                             {r.estado_reserva || r.firmo || '—'}

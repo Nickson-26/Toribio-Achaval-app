@@ -116,8 +116,8 @@ function updateBorders(sheetId: number, r1: number, r2: number, c1: number, c2: 
 
 // ── Datos ─────────────────────────────────────────────────────
 // Columnas: Código(0) Tipo(1) Dirección(2) PrecioPub(3) Operación(4) PrecioRes(5) Estado(6) MedioPago(7)
-const NCOLS = 8
-const HEADER_ROW = ['Código PROA', 'Tipo', 'Dirección', 'Precio Publicado', 'Operación', 'Precio Reserva', 'Estado Reserva', 'Medio de Pago']
+const NCOLS = 9
+const HEADER_ROW = ['Código PROA', 'Tipo', 'Dirección', 'Precio Publicado', 'Fecha Reserva', 'Operación', 'Precio Reserva', 'Estado Reserva', 'Medio de Pago']
 
 function toRows(list: any[]) {
   return list.map(r => [
@@ -125,6 +125,7 @@ function toRows(list: any[]) {
     r.tipo_inmueble     || '',
     r.direccion         || '',
     r.precio_publicado  || '',
+    r.fecha             || '',
     r.operacion         || '',
     r.precio_reserva    || r.monto_usd || r.monto_ars || '',
     r.estado_reserva    || r.firmo     || '',
@@ -279,7 +280,7 @@ function buildFormatRequests(sheetId: number, dataRows: any[][], totalARS: numbe
   }
 
   // ── Column widths (px): Código, Tipo, Dirección, PrecioPub, Operación, PrecioRes, Estado, MedioPago
-  const widths = [110, 120, 260, 130, 90, 130, 110, 110]
+  const widths = [110, 120, 260, 130, 100, 90, 130, 110, 110]
   widths.forEach((w, c) => reqs.push(setColWidth(sheetId, c, w)))
 
   // ── Freeze title + summary + separator + header (4 rows)

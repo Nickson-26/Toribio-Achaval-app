@@ -34,7 +34,7 @@ const EMPRENDIMIENTOS_UNIDADES = ['EMPRENDIMIENTOS']
 const RESIDENCIAL_UNIDADES = [
   'PLAT. PALERMO','PLAT. BELGRANO','PLAT. CABALLITO','PLAT. RECOLETA',
   'PLAT. BARILOCHE','PLAT. ANGOSTURA','PLAT. PILAR','PLAT. CANNING',
-  'DPTO DE BÚSQUEDA',
+  'DPTO DE BÚSQUEDA','RESIDENCIAL',
 ]
 const COMERCIAL_UNIDADES = ['OFICINAS Y EDIFICIOS','LOCALES Y TERRENOS','CONSULTORIA','INDUSTRIA','TAP']
 
@@ -183,7 +183,7 @@ export default function Reservas(_: any) {
   // Dashboard: filtered by period selector
   const dashRows = getPeriodoRows(all)
   const empRows  = dashRows.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-  const resRows  = dashRows.filter(r => RESIDENCIAL_UNIDADES.includes(r.unidad))
+  const resRows  = dashRows.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
   const comRows  = dashRows.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
 
   function sumaARS(rows: Reserva[]) { return rows.reduce((s,r) => s + (r.monto_ars||0), 0) }
@@ -249,6 +249,25 @@ export default function Reservas(_: any) {
           </button>
         ))}
       </div>
+
+      {/* Totales globales — siempre visibles en el dashboard */}
+      {tab === 'DASHBOARD' && !loading && (
+        <div className="metrics-grid" style={{ marginBottom:16, gridTemplateColumns:'repeat(3,minmax(0,1fr))' }}>
+          <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
+            <div className="metric-label">Total Reservas</div>
+            <div className="metric-value">{all.length}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">Total Reserva Pesos</div>
+            <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:15 }}>{ars(all.reduce((s,r)=>s+(r.monto_ars||0),0))}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">Total Reserva Dolares</div>
+            <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:15, color:'var(--info)' }}>{usd(all.reduce((s,r)=>s+(r.monto_usd||0),0))}</div>
+          </div>
+        </div>
+      )}
 
       {/* ── DASHBOARD ── */}
       {tab === 'DASHBOARD' && (

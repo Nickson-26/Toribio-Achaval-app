@@ -296,7 +296,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
           </div>
           <div className="dash-hero-value">
             <span className={hidden ? 'num-hidden' : ''}>{ars(totalNeto)}</span>
-            <small>Facturado neto · <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span> bruto</small>
+            <small>Facturado neto &nbsp;·&nbsp; Bruto: <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }} className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</strong></small>
           </div>
           <div className="dash-hero-meter">
             <div className="dash-meter-track">
@@ -350,10 +350,10 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
       </div>
 
       <div className="dash-kpi-grid">
-        <div className="dash-kpi primary" style={{ gridColumn: 'span 2' }}>
+        <div className="dash-kpi primary">
           <span className="kpi-kicker">Facturado neto</span>
-          <strong className={hidden ? 'num-hidden' : ''} style={{ fontSize: '2rem' }}>{ars(totalNeto)}</strong>
-          <small>{pctLabel(yoyNeto)} · bruto: <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span></small>
+          <strong className={hidden ? 'num-hidden' : ''} style={{ fontSize: '1.6rem' }}>{ars(totalNeto)}</strong>
+          <small>{pctLabel(yoyNeto)}</small>
         </div>
         <div className="dash-kpi">
           <span className="kpi-kicker">IVA estimado</span>

@@ -295,8 +295,8 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
             </div>
           </div>
           <div className="dash-hero-value">
-            <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span>
-            <small>Total bruto equivalente</small>
+            <span className={hidden ? 'num-hidden' : ''}>{ars(totalNeto)}</span>
+            <small>Facturado neto · <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span> bruto</small>
           </div>
           <div className="dash-hero-meter">
             <div className="dash-meter-track">
@@ -350,10 +350,10 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
       </div>
 
       <div className="dash-kpi-grid">
-        <div className="dash-kpi primary">
+        <div className="dash-kpi primary" style={{ gridColumn: 'span 2' }}>
           <span className="kpi-kicker">Facturado neto</span>
-          <strong className={hidden ? 'num-hidden' : ''}>{ars(totalNeto)}</strong>
-          <small>{pctLabel(yoyNeto)}</small>
+          <strong className={hidden ? 'num-hidden' : ''} style={{ fontSize: '2rem' }}>{ars(totalNeto)}</strong>
+          <small>{pctLabel(yoyNeto)} · bruto: <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span></small>
         </div>
         <div className="dash-kpi">
           <span className="kpi-kicker">IVA estimado</span>

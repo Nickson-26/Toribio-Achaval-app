@@ -121,17 +121,17 @@ export async function POST(req: NextRequest) {
   })
 
   if (!records.length) {
-    return NextResponse.json({ ok: true, upserted: 0, errors: 0 })
+    return NextResponse.json({ ok: true, inserted: 0, errors: 0 })
   }
 
-  const { error, data } = await sb
+  // Borrar todas las reservas existentes y reemplazar con el Excel nuevo
+  const { error: delError } = await sb
     .from('reservas')
-    .upsert(records, { onConflict: 'proa_codigo', ignoreDuplicates: false })
-    .select('id')
+    .delete()
+    .neq('id', 0)  // borra todo
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (delError) {
+    return NextResponse.json({ ok: false, error: 'Error al limpiar tabla: ' + delError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, upserted: data?.length ?? records.length, errors: 0 })
-}
+  const { error, data } = await

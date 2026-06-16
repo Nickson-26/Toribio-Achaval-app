@@ -29,10 +29,9 @@ function getUnidad(codigo: string): string {
   return UNIDAD_BY_PREFIX[prefix] ?? 'RESIDENCIAL'
 }
 
-// Detecta si el monto de entrega es en USD ("u$s ...") o ARS ("$ ...")
-function detectCurrency(montoEntregaRaw: any): 'usd' | 'ars' | null {
-  if (!montoEntregaRaw) return null
-  const s = String(montoEntregaRaw).toLowerCase().trim()
+function detectCurrency(raw: any): 'usd' | 'ars' | null {
+  if (!raw) return null
+  const s = String(raw).toLowerCase().trim()
   if (s.startsWith('u$s') || s.startsWith('u$') || s.startsWith('usd')) return 'usd'
   if (s.startsWith('$')) return 'ars'
   return null
@@ -77,7 +76,6 @@ export async function POST(req: NextRequest) {
     const rawCodigo    = row.getCell(1).value
     const rawDireccion = row.getCell(4).value
 
-    // Saltar filas vacias o de totales
     if (!rawCodigo || !rawDireccion) return
     const codigoStr    = String(rawCodigo).trim()
     const direccionStr = String(rawDireccion).trim()
@@ -90,31 +88,65 @@ export async function POST(req: NextRequest) {
     const estadoRes       = String(row.getCell(11).value ?? '').trim()
     const fechaRaw        = row.getCell(12).value
     const precioResRaw    = row.getCell(13).value
-    const montoEntregaRaw = row.getCell(17).value   // col 17: "Monto Entrega" — indica moneda
-    const brokerRaw       = row.getCell(20).value   // col 20: "Broker 1"
-
-    // Usar el código tal cual (nunca agregar pipe + dirección)
-    const proaCodigo = codigoStr
+    const montoEntregaRaw = row.getCell(17).value
+    const brokerRaw       = row.getCell(20).value
 
     const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
 
     const precioPubStr    = precioPubRaw ? String(precioPubRaw).replace(/,/g, '') : ''
     const precioPublicado = precioPubStr ? parseFloat(precioPubStr) : null
-
-    const precioResStr  = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
-    const precioReserva = precioResStr ? parseFloat(precioResStr) : null
+    const precioResStr    = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
+    const precioReserva   = precioResStr ? parseFloat(precioResStr) : null
 
     const fecha    = parseExcelDate(fechaRaw)
     const validPub = precioPublicado !== null && !isNaN(precioPublicado) ? precioPublicado : null
-    const validRes = precioReserva !== null && !isNaN(precioReserva) ? precioReserva : null
+    const validRes = precioReserva   !== null && !isNaN(precioReserva)   ? precioReserva   : null
     const broker   = brokerRaw ? String(brokerRaw).trim() || null : null
 
-    // Detectar moneda: si Monto Entrega dice "u$s" → USD, si dice "$" → ARS
-    // Por defecto: ventas en USD, alquileres según indicador (o USD si no hay indicador)
-    const currency = detectCurrency(montoEntregaRaw) ?? (op === 'ALQUILER' ? null : 'usd')
+    const currency = detectCurrency(montoEntregaRaw) ?? (op === 'VENTA' ? 'usd' : 'ars')
 
     records.push({
-      proa_codigo:      proaCodigo,
+      proa_codigo:      codigoStr,
       tipo_inmueble:    tipoInmueble || null,
       direccion:        direccionStr,
-      
+      precio_publicado: validPub,
+      operacion:        op,
+      estado_reserva:   estadoRes || null,
+      precio_reserva:   validRes,
+      fecha:            fecha,
+      unidad:           getUnidad(codigoStr),
+      firmo:            'PENDIENTE',
+      broker:           broker,
+      cliente:          null,
+      monto_ars:        currency === 'ars' ? validRes : null,
+      monto_usd:        currency === 'usd' ? validRes : null,
+    })
+  })
+
+  if (!records.length) {
+    return NextResponse.json({ ok: true, inserted: 0, errors: 0 })
+  }
+
+  const { error: delError } = await sb
+    .from('reservas')
+    .delete()
+    .neq('id', 0)
+
+  if (delError) {
+    return NextResponse.json(
+      { ok: false, error: 'Error al limpiar tabla: ' + delError.message },
+      { status: 500 }
+    )
+  }
+
+  const { error, data } = await sb
+    .from('reservas')
+    .insert(records)
+    .select('id')
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, inserted: data?.length ?? records.length, errors: 0 })
+}

@@ -296,7 +296,7 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
           </div>
           <div className="dash-hero-value">
             <span className={hidden ? 'num-hidden' : ''}>{ars(totalNeto)}</span>
-            <small>Facturado neto &nbsp;·&nbsp; Bruto: <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }} className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</strong></small>
+            <small style={{ color: 'var(--text-primary)', opacity: 0.75 }}>Facturado neto &nbsp;·&nbsp; Bruto: <span className={hidden ? 'num-hidden' : ''}>{ars(totalBruto)}</span></small>
           </div>
           <div className="dash-hero-meter">
             <div className="dash-meter-track">

@@ -29,8 +29,13 @@ function getUnidad(codigo: string): string {
   return UNIDAD_BY_PREFIX[prefix] ?? 'RESIDENCIAL'
 }
 
-function hasNumber(s: string): boolean {
-  return /\d/.test(s)
+// Detecta si el monto de entrega es en USD ("u$s ...") o ARS ("$ ...")
+function detectCurrency(montoEntregaRaw: any): 'usd' | 'ars' | null {
+  if (!montoEntregaRaw) return null
+  const s = String(montoEntregaRaw).toLowerCase().trim()
+  if (s.startsWith('u$s') || s.startsWith('u$') || s.startsWith('usd')) return 'usd'
+  if (s.startsWith('$')) return 'ars'
+  return null
 }
 
 function parseExcelDate(raw: any): string {
@@ -79,16 +84,17 @@ export async function POST(req: NextRequest) {
     if (!codigoStr || !direccionStr) return
     if (codigoStr.toLowerCase().startsWith('total')) return
 
-    const tipoInmueble = String(row.getCell(2).value ?? '').trim()
-    const precioPubRaw = row.getCell(6).value
-    const operacionRaw = String(row.getCell(8).value ?? '').trim()
-    const estadoRes    = String(row.getCell(11).value ?? '').trim()
-    const fechaRaw     = row.getCell(12).value
-    const precioResRaw = row.getCell(13).value
+    const tipoInmueble    = String(row.getCell(2).value ?? '').trim()
+    const precioPubRaw    = row.getCell(6).value
+    const operacionRaw    = String(row.getCell(8).value ?? '').trim()
+    const estadoRes       = String(row.getCell(11).value ?? '').trim()
+    const fechaRaw        = row.getCell(12).value
+    const precioResRaw    = row.getCell(13).value
+    const montoEntregaRaw = row.getCell(17).value   // col 17: "Monto Entrega" — indica moneda
+    const brokerRaw       = row.getCell(20).value   // col 20: "Broker 1"
 
-    const proaCodigo = hasNumber(codigoStr)
-      ? codigoStr
-      : codigoStr + '|' + direccionStr
+    // Usar el código tal cual (nunca agregar pipe + dirección)
+    const proaCodigo = codigoStr
 
     const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
 
@@ -101,37 +107,14 @@ export async function POST(req: NextRequest) {
     const fecha    = parseExcelDate(fechaRaw)
     const validPub = precioPublicado !== null && !isNaN(precioPublicado) ? precioPublicado : null
     const validRes = precioReserva !== null && !isNaN(precioReserva) ? precioReserva : null
+    const broker   = brokerRaw ? String(brokerRaw).trim() || null : null
+
+    // Detectar moneda: si Monto Entrega dice "u$s" → USD, si dice "$" → ARS
+    // Por defecto: ventas en USD, alquileres según indicador (o USD si no hay indicador)
+    const currency = detectCurrency(montoEntregaRaw) ?? (op === 'ALQUILER' ? null : 'usd')
 
     records.push({
       proa_codigo:      proaCodigo,
       tipo_inmueble:    tipoInmueble || null,
       direccion:        direccionStr,
-      precio_publicado: validPub,
-      operacion:        op,
-      estado_reserva:   estadoRes || null,
-      precio_reserva:   validRes,
-      fecha:            fecha,
-      unidad:           getUnidad(codigoStr),
-      firmo:            'PENDIENTE',
-      broker:           null,
-      cliente:          null,
-      monto_ars:        null,
-      monto_usd:        validRes,
-    })
-  })
-
-  if (!records.length) {
-    return NextResponse.json({ ok: true, inserted: 0, errors: 0 })
-  }
-
-  // Borrar todas las reservas existentes y reemplazar con el Excel nuevo
-  const { error: delError } = await sb
-    .from('reservas')
-    .delete()
-    .neq('id', 0)  // borra todo
-
-  if (delError) {
-    return NextResponse.json({ ok: false, error: 'Error al limpiar tabla: ' + delError.message }, { status: 500 })
-  }
-
-  const { error, data } = await
+      

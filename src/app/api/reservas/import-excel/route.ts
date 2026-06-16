@@ -29,6 +29,14 @@ function getUnidad(codigo: string): string {
   return UNIDAD_BY_PREFIX[prefix] ?? 'RESIDENCIAL'
 }
 
+// Codes without a numeric suffix (bare "TRS", "TJU", etc.) must be unique.
+// We append the first 30 chars of the address so the UNIQUE constraint passes.
+// The UI can strip everything from "|" onward for display.
+function buildProaCodigo(codigoStr: string, direccionStr: string): string {
+  if (/\d/.test(codigoStr)) return codigoStr
+  return codigoStr + '|' + direccionStr.slice(0, 30).trim()
+}
+
 function detectCurrency(raw: any): 'usd' | 'ars' | null {
   if (!raw) return null
   const s = String(raw).toLowerCase().trim()
@@ -106,7 +114,7 @@ export async function POST(req: NextRequest) {
     const currency = detectCurrency(montoEntregaRaw) ?? (op === 'VENTA' ? 'usd' : 'ars')
 
     records.push({
-      proa_codigo:      codigoStr,
+      proa_codigo:      buildProaCodigo(codigoStr, direccionStr),
       tipo_inmueble:    tipoInmueble || null,
       direccion:        direccionStr,
       precio_publicado: validPub,

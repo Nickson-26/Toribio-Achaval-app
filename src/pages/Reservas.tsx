@@ -396,7 +396,7 @@ export default function Reservas(_: any) {
                       <tr><td colSpan={9} className="empty-row">Sin reservas</td></tr>
                     ) : tabData.map(r => (
                       <tr key={r.id}>
-                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo||'—'}</td>
+                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo ? r.proa_codigo.split('|')[0] : '—'}</td>
                         <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.tipo_inmueble||'—'}</td>
                         <td style={{ maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
                         <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontSize:12 }}>

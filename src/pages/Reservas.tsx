@@ -79,7 +79,7 @@ export default function Reservas(_: any) {
       const resp = await fetch('/api/reservas/import-excel', { method: 'POST', body: fd })
       const json = await resp.json()
       if (json.ok) {
-        toast(`✓ ${json.updated} reservas actualizadas con Precio Reserva`)
+        toast(`✓ ${json.inserted} reservas importadas (base reemplazada)`)
         load()
       } else {
         toast('Error al importar: ' + (json.error || 'desconocido'))

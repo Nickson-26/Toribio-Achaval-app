@@ -335,9 +335,6 @@ export async function POST(req: NextRequest) {
   const { data: reservas, error } = await sb
     .from('reservas')
     .select('*')
-    .not('proa_codigo', 'is', null)
-    .not('tipo_inmueble', 'is', null)
-    .not('precio_reserva', 'is', null)
     .order('unidad', { ascending: true })
     .order('fecha', { ascending: false })
 

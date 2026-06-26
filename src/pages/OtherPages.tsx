@@ -519,7 +519,7 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
   const [facturas,setFacturas]=useState<Comprobante[]>([])
 
   useEffect(()=>{
-    supabase.from('comprobantes').select('id,tipo,cliente,fecha,monto_ars,neto_ars,persona').in('tipo',['FACT A','FACT B','FACT DE CREDITO','FACT E']).neq('estado','anulada').order('numero',{ascending:false}).limit(200).then(({data})=>setFacturas((data||[]) as Comprobante[]))
+    supabase.from('comprobantes').select('id,tipo,cliente,fecha,monto_ars,neto_ars,persona,estado').in('tipo',['FACT A','FACT B','FACT DE CREDITO','FACT E']).order('numero',{ascending:false}).limit(200).then(({data})=>setFacturas((data||[]) as Comprobante[]))
   },[])
 
   useEffect(()=>{
@@ -537,7 +537,6 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
   },[facturaId,facturas])
 
   async function save() {
-    if(!cliente.trim()) return toast('El cliente es obligatorio')
     setSaving(true)
     try {
       const {data:last}=await supabase.from('comprobantes').select('numero').eq('tipo',tipo).order('numero',{ascending:false}).limit(1)
@@ -557,10 +556,10 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
         <FG label="Fecha"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
         <FG label="Factura a anular" full>
           <input value={facturaId} onChange={e=>setFacturaId(e.target.value)} placeholder="Buscar o ingresar ID de factura…" list="nc-fact-list"/>
-          <datalist id="nc-fact-list">{facturas.map(f=><option key={f.id} value={f.id}>{f.id} — {f.cliente} ({fdate(f.fecha)})</option>)}</datalist>
+          <datalist id="nc-fact-list">{facturas.map(f=><option key={f.id} value={f.id}>{f.id} — {f.cliente} ({fdate(f.fecha)}){f.estado==='anulada'?' ⚠ ya anulada':''}</option>)}</datalist>
           <span style={{fontSize:11,color:'var(--text-secondary)'}}>Seleccioná la factura que esta NC cancela (opcional)</span>
         </FG>
-        <FG label="Cliente *" full><input value={cliente} onChange={e=>setCliente(e.target.value)} placeholder="Razón social" list="nc-cl"/><datalist id="nc-cl">{clientes.map(c=><option key={c} value={c}/>)}</datalist></FG>
+        {cliente&&<FG label="Cliente" full><input readOnly value={cliente} style={{background:'var(--bg-secondary)',opacity:0.8}}/></FG>}
         <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <div/>
         <FG label="Neto ARS"><input type="number" placeholder="0" value={neto} onChange={e=>setNeto(e.target.value)}/><span className="calc-hint">IVA y total se calculan solos</span></FG>

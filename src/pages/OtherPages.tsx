@@ -439,9 +439,16 @@ export function NotasCredito(_: any) {
 
   async function handleDelete(id:string) {
     if(!confirm(`¿Eliminar ${id}?`)) return
+    const nc = data.find(f=>f.id===id)
     const {error}=await supabase.from('comprobantes').delete().eq('id',id)
     if(error){toast('Error al eliminar');return}
-    toast(`${id} eliminada`); load()
+    if(nc?.factura_asociada_id) {
+      await supabase.from('comprobantes').update({estado:'emitida'}).eq('id',nc.factura_asociada_id)
+      toast(`✓ NC eliminada — factura ${nc.factura_asociada_id} restaurada a emitida`)
+    } else {
+      toast(`${id} eliminada`)
+    }
+    load()
   }
 
   async function handleSaveEdit(id:string,patch:Partial<Comprobante>) {
@@ -465,7 +472,7 @@ export function NotasCredito(_: any) {
         {loading?<Spinner/>:(
           <div className="table-wrap">
             <table>
-              <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Persona</th><th className="text-right">Neto</th><th className="text-right">IVA</th><th className="text-right">Total ARS</th><th>Concepto</th><th></th></tr></thead>
+              <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Persona</th><th className="text-right">Neto</th><th className="text-right">IVA</th><th className="text-right">Total ARS</th><th>Concepto</th><th>Factura anulada</th><th></th></tr></thead>
               <tbody>
                 {data.length===0?<tr><td colSpan={10} className="empty-row">Sin notas de crédito</td></tr>:
                   data.map(f=>(
@@ -478,6 +485,7 @@ export function NotasCredito(_: any) {
                       <td className="text-right text-mono">{ars(f.iva)}</td>
                       <td className="text-right text-mono" style={{fontWeight:500}}>{ars(f.monto_ars)}</td>
                       <td style={{maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',fontSize:11.5,color:'var(--text-secondary)'}}>{f.concepto}</td>
+                      <td>{f.factura_asociada_id?<span style={{color:'var(--danger)',fontWeight:500,fontSize:11}}>{f.factura_asociada_id}</span>:null}</td>
                       <td>
                         <div style={{display:'flex',gap:4}}>
                           <button className="btn btn-sm" onClick={()=>{setSel(f);setModal('edit')}}>Editar</button>
@@ -507,12 +515,26 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
   const [neto,setNeto]=useState('')
   const [iva,setIva]=useState('')
   const [concepto,setConcepto]=useState('')
+  const [facturaId,setFacturaId]=useState('')
+  const [facturas,setFacturas]=useState<Comprobante[]>([])
+
+  useEffect(()=>{
+    supabase.from('comprobantes').select('id,tipo,cliente,fecha,monto_ars,neto_ars,persona').in('tipo',['FACT A','FACT B','FACT DE CREDITO','FACT E']).neq('estado','anulada').order('numero',{ascending:false}).limit(200).then(({data})=>setFacturas((data||[]) as Comprobante[]))
+  },[])
 
   useEffect(()=>{
     const n=parseFloat(neto)
     if(!isNaN(n)&&n>0){setIva(String(Math.round(n*0.21*100)/100));setArs(String(Math.round(n*1.21*100)/100))}
     else{setIva('');setArs('')}
   },[neto])
+
+  useEffect(()=>{
+    const fid=facturaId.trim()
+    if(!fid) return
+    const f=facturas.find(x=>x.id===fid)
+    if(f){setCliente(f.cliente||'')}
+    if(f){setPersona(f.persona||PERSONAS[0])}
+  },[facturaId,facturas])
 
   async function save() {
     if(!cliente.trim()) return toast('El cliente es obligatorio')
@@ -521,8 +543,10 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
       const {data:last}=await supabase.from('comprobantes').select('numero').eq('tipo',tipo).order('numero',{ascending:false}).limit(1)
       const nextNum=last&&last[0]?(last[0].numero??400)+1:401
       const id=`${tipo.replace(/\s/g,'-')}-${nextNum}`
-      await supabase.from('comprobantes').insert({id,tipo,numero:nextNum,fecha,cliente:cliente.trim(),persona,concepto:concepto.trim(),monto_ars:arsV?parseFloat(arsV):null,neto_ars:neto?parseFloat(neto):null,iva:iva?parseFloat(iva):null,estado:'emitida'})
-      toast(`✓ ${id} creada`); onSaved()
+      const fid=facturaId.trim()||null
+      await supabase.from('comprobantes').insert({id,tipo,numero:nextNum,fecha,cliente:cliente.trim(),persona,concepto:concepto.trim(),monto_ars:arsV?parseFloat(arsV):null,neto_ars:neto?parseFloat(neto):null,iva:iva?parseFloat(iva):null,estado:'emitida',factura_asociada_id:fid})
+      if(fid){await supabase.from('comprobantes').update({estado:'anulada'}).eq('id',fid)}
+      toast(`✓ ${id} creada${fid?' — anula '+fid:''}`); onSaved()
     } catch(e:any){toast('Error: '+(e.message||''))} finally{setSaving(false)}
   }
 
@@ -531,6 +555,11 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
       <div className="form-grid">
         <FG label="Tipo"><select value={tipo} onChange={e=>setTipo(e.target.value)}>{['NC A','NC B','NC FACT DE CREDITO'].map(t=><option key={t}>{t}</option>)}</select></FG>
         <FG label="Fecha"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
+        <FG label="Factura a anular" full>
+          <input value={facturaId} onChange={e=>setFacturaId(e.target.value)} placeholder="Buscar o ingresar ID de factura…" list="nc-fact-list"/>
+          <datalist id="nc-fact-list">{facturas.map(f=><option key={f.id} value={f.id}>{f.id} — {f.cliente} ({fdate(f.fecha)})</option>)}</datalist>
+          <span style={{fontSize:11,color:'var(--text-secondary)'}}>Seleccioná la factura que esta NC cancela (opcional)</span>
+        </FG>
         <FG label="Cliente *" full><input value={cliente} onChange={e=>setCliente(e.target.value)} placeholder="Razón social" list="nc-cl"/><datalist id="nc-cl">{clientes.map(c=><option key={c} value={c}/>)}</datalist></FG>
         <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <div/>

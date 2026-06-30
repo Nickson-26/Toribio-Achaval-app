@@ -9,13 +9,13 @@
   --accent-bg:     rgba(200,16,46,0.08);
   --accent-text:   #ff6680;
 
-  --bg-base:       #0c0c0e;
-  --bg-primary:    #111114;
-  --bg-secondary:  #18181c;
+  --bg-base:       #09090b;
+  --bg-primary:    #0d0d10;
+  --bg-secondary:  #141418;
   --bg-tertiary:   #1e1e24;
-  --bg-card:       #16161a;
+  --bg-card:       #0e0e12;
   --bg-hover:      #202026;
-  --bg-elevated:   #1c1c22;
+  --bg-elevated:   #181820;
 
   --text-primary:  #f0f0f2;
   --text-secondary:#9898a8;
@@ -788,7 +788,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 .dash-hero-main,
 .dash-control-panel {
   background:
-    linear-gradient(135deg, rgba(200,16,46,0.16), transparent 42%),
+    linear-gradient(135deg, rgba(8,38,28,0.92) 0%, rgba(12,52,38,0.65) 28%, transparent 58%),
     linear-gradient(180deg, var(--bg-card), var(--bg-primary));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

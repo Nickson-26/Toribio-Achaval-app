@@ -79,7 +79,7 @@ export default function Reservas(_: any) {
       const resp = await fetch('/api/reservas/import-excel', { method: 'POST', body: fd })
       const json = await resp.json()
       if (json.ok) {
-        toast(`✓ ${json.updated} reservas actualizadas con Precio Reserva`)
+        toast(`✓ ${json.inserted} reservas importadas (base reemplazada)`)
         load()
       } else {
         toast('Error al importar: ' + (json.error || 'desconocido'))
@@ -388,15 +388,16 @@ export default function Reservas(_: any) {
                       <th>Operación</th>
                       <th>Estado Reserva</th>
                       <th className="text-right">Precio Reserva</th>
+                      <th>Broker</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {tabData.length === 0 ? (
-                      <tr><td colSpan={9} className="empty-row">Sin reservas</td></tr>
+                      <tr><td colSpan={10} className="empty-row">Sin reservas</td></tr>
                     ) : tabData.map(r => (
                       <tr key={r.id}>
-                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo||'—'}</td>
+                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo ? r.proa_codigo.split('|')[0] : '—'}</td>
                         <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.tipo_inmueble||'—'}</td>
                         <td style={{ maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
                         <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontSize:12 }}>
@@ -412,6 +413,7 @@ export default function Reservas(_: any) {
                         <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, fontSize:13 }}>
                           {r.precio_reserva ? usd(r.precio_reserva) : (r.monto_usd ? usd(r.monto_usd) : r.monto_ars ? ars(r.monto_ars) : '—')}
                         </td>
+                        <td style={{ fontSize:12, color:'var(--text-secondary)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis' }}>{r.broker || '—'}</td>
                         <td>
                           <div style={{ display:'flex', gap:4 }}>
                             <button className="btn btn-sm" onClick={()=>{setSel(r);setModal('edit')}}>Editar</button>

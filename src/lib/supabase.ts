@@ -42,6 +42,7 @@ export type Comprobante = {
   fecha_cobro: string | null
   punto_venta: string  // '0002' | '0004' — default '0002'
   pdf_url?: string | null  // path en Supabase Storage (bucket comprobantes-pdfs)
+  factura_asociada_id?: string | null
   created_at: string
 }
 

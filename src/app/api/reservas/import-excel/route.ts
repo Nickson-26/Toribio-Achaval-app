@@ -29,8 +29,20 @@ function getUnidad(codigo: string): string {
   return UNIDAD_BY_PREFIX[prefix] ?? 'RESIDENCIAL'
 }
 
-function hasNumber(s: string): boolean {
-  return /\d/.test(s)
+// Codes without a numeric suffix (bare "TRS", "TJU", etc.) must be unique.
+// We append the first 30 chars of the address so the UNIQUE constraint passes.
+// The UI can strip everything from "|" onward for display.
+function buildProaCodigo(codigoStr: string, direccionStr: string): string {
+  if (/\d/.test(codigoStr)) return codigoStr
+  return codigoStr + '|' + direccionStr.slice(0, 30).trim()
+}
+
+function detectCurrency(raw: any): 'usd' | 'ars' | null {
+  if (!raw) return null
+  const s = String(raw).toLowerCase().trim()
+  if (s.startsWith('u$s') || s.startsWith('u$') || s.startsWith('usd')) return 'usd'
+  if (s.startsWith('$')) return 'ars'
+  return null
 }
 
 function parseExcelDate(raw: any): string {
@@ -72,38 +84,37 @@ export async function POST(req: NextRequest) {
     const rawCodigo    = row.getCell(1).value
     const rawDireccion = row.getCell(4).value
 
-    // Saltar filas vacias o de totales
     if (!rawCodigo || !rawDireccion) return
     const codigoStr    = String(rawCodigo).trim()
     const direccionStr = String(rawDireccion).trim()
     if (!codigoStr || !direccionStr) return
     if (codigoStr.toLowerCase().startsWith('total')) return
 
-    const tipoInmueble = String(row.getCell(2).value ?? '').trim()
-    const precioPubRaw = row.getCell(6).value
-    const operacionRaw = String(row.getCell(8).value ?? '').trim()
-    const estadoRes    = String(row.getCell(11).value ?? '').trim()
-    const fechaRaw     = row.getCell(12).value
-    const precioResRaw = row.getCell(13).value
-
-    const proaCodigo = hasNumber(codigoStr)
-      ? codigoStr
-      : codigoStr + '|' + direccionStr
+    const tipoInmueble    = String(row.getCell(2).value ?? '').trim()
+    const precioPubRaw    = row.getCell(6).value
+    const operacionRaw    = String(row.getCell(8).value ?? '').trim()
+    const estadoRes       = String(row.getCell(11).value ?? '').trim()
+    const fechaRaw        = row.getCell(12).value
+    const precioResRaw    = row.getCell(13).value
+    const montoEntregaRaw = row.getCell(17).value
+    const brokerRaw       = row.getCell(20).value
 
     const op = operacionRaw.toLowerCase().includes('alquiler') ? 'ALQUILER' : 'VENTA'
 
     const precioPubStr    = precioPubRaw ? String(precioPubRaw).replace(/,/g, '') : ''
     const precioPublicado = precioPubStr ? parseFloat(precioPubStr) : null
-
-    const precioResStr  = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
-    const precioReserva = precioResStr ? parseFloat(precioResStr) : null
+    const precioResStr    = precioResRaw ? String(precioResRaw).replace(/,/g, '') : ''
+    const precioReserva   = precioResStr ? parseFloat(precioResStr) : null
 
     const fecha    = parseExcelDate(fechaRaw)
     const validPub = precioPublicado !== null && !isNaN(precioPublicado) ? precioPublicado : null
-    const validRes = precioReserva !== null && !isNaN(precioReserva) ? precioReserva : null
+    const validRes = precioReserva   !== null && !isNaN(precioReserva)   ? precioReserva   : null
+    const broker   = brokerRaw ? String(brokerRaw).trim() || null : null
+
+    const currency = detectCurrency(montoEntregaRaw) ?? (op === 'VENTA' ? 'usd' : 'ars')
 
     records.push({
-      proa_codigo:      proaCodigo,
+      proa_codigo:      buildProaCodigo(codigoStr, direccionStr),
       tipo_inmueble:    tipoInmueble || null,
       direccion:        direccionStr,
       precio_publicado: validPub,
@@ -113,25 +124,37 @@ export async function POST(req: NextRequest) {
       fecha:            fecha,
       unidad:           getUnidad(codigoStr),
       firmo:            'PENDIENTE',
-      broker:           null,
+      broker:           broker,
       cliente:          null,
-      monto_ars:        null,
-      monto_usd:        validRes,
+      monto_ars:        currency === 'ars' ? validRes : null,
+      monto_usd:        currency === 'usd' ? validRes : null,
     })
   })
 
   if (!records.length) {
-    return NextResponse.json({ ok: true, upserted: 0, errors: 0 })
+    return NextResponse.json({ ok: true, inserted: 0, errors: 0 })
+  }
+
+  const { error: delError } = await sb
+    .from('reservas')
+    .delete()
+    .neq('id', 0)
+
+  if (delError) {
+    return NextResponse.json(
+      { ok: false, error: 'Error al limpiar tabla: ' + delError.message },
+      { status: 500 }
+    )
   }
 
   const { error, data } = await sb
     .from('reservas')
-    .upsert(records, { onConflict: 'proa_codigo', ignoreDuplicates: false })
+    .insert(records)
     .select('id')
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, upserted: data?.length ?? records.length, errors: 0 })
+  return NextResponse.json({ ok: true, inserted: data?.length ?? records.length, errors: 0 })
 }

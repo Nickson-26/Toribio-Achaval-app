@@ -611,11 +611,21 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             {selected.concepto && <div className="detail-item detail-full"><div className="detail-label">Concepto</div><div className="concept-box">{selected.concepto}</div></div>}
           </div>
           <div className="amounts-box">
-            {selected.neto_ars && <div className="amount-row"><span>Neto</span><span className="text-mono">{ars(selected.neto_ars)}</span></div>}
-            {selected.iva && <div className="amount-row"><span>IVA 21%</span><span className="text-mono">{ars(selected.iva)}</span></div>}
-            {selected.monto_ars && <div className="amount-row"><span style={{ fontWeight:600 }}>Total ARS</span><span className="text-mono" style={{ fontWeight:600 }}>{ars(selected.monto_ars)}</span></div>}
-            {selected.monto_usd && <div className="amount-row"><span>Total USD</span><span className="text-mono">{usd(selected.monto_usd)}</span></div>}
-            {selected.tipo_cambio && <div className="amount-row"><span>Tipo de cambio</span><span className="text-mono">${selected.tipo_cambio}</span></div>}
+            {selected.monto_usd ? (
+              <>
+                {selected.neto_ars && selected.tipo_cambio && <div className="amount-row"><span>Neto</span><span className="text-mono">{usd(selected.neto_ars / selected.tipo_cambio)}</span></div>}
+                {selected.iva && selected.tipo_cambio && <div className="amount-row"><span>IVA 21%</span><span className="text-mono">{usd(selected.iva / selected.tipo_cambio)}</span></div>}
+                {selected.monto_usd && <div className="amount-row"><span style={{ fontWeight:600 }}>Total USD</span><span className="text-mono" style={{ fontWeight:600 }}>{usd(selected.monto_usd)}</span></div>}
+                {selected.monto_ars && <div className="amount-row"><span>Total ARS</span><span className="text-mono">{ars(selected.monto_ars)}</span></div>}
+                {selected.tipo_cambio && <div className="amount-row"><span>Tipo de cambio</span><span className="text-mono">${selected.tipo_cambio}</span></div>}
+              </>
+            ) : (
+              <>
+                {selected.neto_ars && <div className="amount-row"><span>Neto</span><span className="text-mono">{ars(selected.neto_ars)}</span></div>}
+                {selected.iva && <div className="amount-row"><span>IVA 21%</span><span className="text-mono">{ars(selected.iva)}</span></div>}
+                {selected.monto_ars && <div className="amount-row"><span style={{ fontWeight:600 }}>Total ARS</span><span className="text-mono" style={{ fontWeight:600 }}>{ars(selected.monto_ars)}</span></div>}
+              </>
+            )}
             {selected.recibo_id && <div className="amount-row"><span>N° Recibo</span><span>{selected.recibo_id}</span></div>}
             {selected.fecha_cobro && <div className="amount-row"><span>Fecha de cobro</span><span>{fdate(selected.fecha_cobro)}</span></div>}
           </div>

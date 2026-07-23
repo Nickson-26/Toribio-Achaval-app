@@ -424,6 +424,7 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   const [pago,      setPago]      = useState('transferencia')
   const [echeq,     setEcheq]     = useState('')
   const [loadingN,  setLoadingN]  = useState(true)
+  const [existente, setExistente] = useState(false)
 
   // Load next recibo ID dynamically from DB
   useEffect(() => {
@@ -446,31 +447,33 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         fecha_cobro: fecha,
       })
 
-      // Step 2: create recibo — if duplicate key, just skip (recibo already exists)
-      const { error: reciboError } = await supabase.from('recibos').insert({
-        id: rId,
-        fecha,
-        cliente:    comp.cliente,
-        nro_fact:   comp.id,
-        persona:    comp.persona,
-        monto_ars:  comp.monto_ars,
-        monto_usd:  comp.monto_usd,
-        forma_pago: pago,
-        retencion:  null,
-        nro_echeq:  echeq || null,
-      })
+      // Step 2: create recibo only if not linking to an existing one
+      if (!existente) {
+        const { error: reciboError } = await supabase.from('recibos').insert({
+          id: rId,
+          fecha,
+          cliente:    comp.cliente,
+          nro_fact:   comp.id,
+          persona:    comp.persona,
+          monto_ars:  comp.monto_ars,
+          monto_usd:  comp.monto_usd,
+          forma_pago: pago,
+          retencion:  null,
+          nro_echeq:  echeq || null,
+        })
 
-      if (reciboError) {
-        if (reciboError.code === '23505') {
-          // Duplicate key — recibo already exists, factura ya fue marcada cobrada igual
-          toast(`✓ Factura ${comp.id} marcada como cobrada (Recibo ${rId} ya existía)`)
+        if (reciboError) {
+          if (reciboError.code === '23505') {
+            toast(`✓ Factura ${comp.id} marcada como cobrada (Recibo ${rId} ya existía)`)
+          } else {
+            await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
+            throw new Error('Error al crear recibo: ' + reciboError.message)
+          }
         } else {
-          // Other error — rollback factura to pendiente
-          await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
-          throw new Error('Error al crear recibo: ' + reciboError.message)
+          toast(`✓ Cobro registrado — Recibo ${rId}`)
         }
       } else {
-        toast(`✓ Cobro registrado — Recibo ${rId}`)
+        toast(`✓ Factura ${comp.id} vinculada al Recibo ${rId}`)
       }
 
       onSaved()
@@ -499,6 +502,12 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
             placeholder={loadingN ? 'Cargando…' : ''}
           />
           <span className="calc-hint">Número sugerido basado en el último recibo</span>
+        </FG>
+        <FG label=" " full>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', color:'var(--text-secondary)' }}>
+            <input type="checkbox" checked={existente} onChange={e => setExistente(e.target.checked)} style={{ width:14, height:14 }} />
+            Usar recibo existente (no crear uno nuevo)
+          </label>
         </FG>
         <FG label="Forma de pago">
           <select value={pago} onChange={e => setPago(e.target.value)}>

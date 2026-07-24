@@ -440,14 +440,7 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
       const rId = parseInt(nroRecibo)
       if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
 
-      // Step 1: mark factura as cobrada
-      await db.updateComprobante(comp.id, {
-        estado: 'cobrada',
-        recibo_id: rId,
-        fecha_cobro: fecha,
-      })
-
-      // Step 2: upsert recibo — create if not exists, skip if already there
+      // Step 1: upsert recibo FIRST (FK requires recibo to exist before linking)
       const reciboData = {
         id: rId,
         fecha,
@@ -465,9 +458,15 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         .upsert(reciboData, { onConflict: 'id', ignoreDuplicates: true })
 
       if (reciboError) {
-        await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
         throw new Error('Error al registrar recibo: ' + reciboError.message)
       }
+
+      // Step 2: now mark factura as cobrada (recibo already exists, FK satisfied)
+      await db.updateComprobante(comp.id, {
+        estado: 'cobrada',
+        recibo_id: rId,
+        fecha_cobro: fecha,
+      })
 
       toast(existente
         ? `✓ Factura ${comp.id} vinculada al Recibo ${rId}`

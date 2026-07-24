@@ -447,34 +447,32 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         fecha_cobro: fecha,
       })
 
-      // Step 2: create recibo only if not linking to an existing one
-      if (!existente) {
-        const { error: reciboError } = await supabase.from('recibos').insert({
-          id: rId,
-          fecha,
-          cliente:    comp.cliente,
-          nro_fact:   comp.id,
-          persona:    comp.persona,
-          monto_ars:  comp.monto_ars,
-          monto_usd:  comp.monto_usd,
-          forma_pago: pago,
-          retencion:  null,
-          nro_echeq:  echeq || null,
-        })
-
-        if (reciboError) {
-          if (reciboError.code === '23505') {
-            toast(`✓ Factura ${comp.id} marcada como cobrada (Recibo ${rId} ya existía)`)
-          } else {
-            await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
-            throw new Error('Error al crear recibo: ' + reciboError.message)
-          }
-        } else {
-          toast(`✓ Cobro registrado — Recibo ${rId}`)
-        }
-      } else {
-        toast(`✓ Factura ${comp.id} vinculada al Recibo ${rId}`)
+      // Step 2: upsert recibo — create if not exists, skip if already there
+      const reciboData = {
+        id: rId,
+        fecha,
+        cliente:    comp.cliente,
+        nro_fact:   comp.id,
+        persona:    comp.persona,
+        monto_ars:  comp.monto_ars,
+        monto_usd:  comp.monto_usd,
+        forma_pago: existente ? 'transferencia' : pago,
+        retencion:  null,
+        nro_echeq:  existente ? null : (echeq || null),
       }
+      const { error: reciboError } = await supabase
+        .from('recibos')
+        .upsert(reciboData, { onConflict: 'id', ignoreDuplicates: true })
+
+      if (reciboError) {
+        await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
+        throw new Error('Error al registrar recibo: ' + reciboError.message)
+      }
+
+      toast(existente
+        ? `✓ Factura ${comp.id} vinculada al Recibo ${rId}`
+        : `✓ Cobro registrado — Recibo ${rId}`
+      )
 
       onSaved()
     } catch (e: any) {

@@ -55,9 +55,10 @@ export function tipoColor(t: string): string {
 }
 
 export function estadoColor(e: string): string {
-  if (e === 'cobrada')  return 'badge-green'
-  if (e === 'pendiente') return 'badge-amber'
-  if (e === 'anulada')   return 'badge-gray'
+  if (e === 'cobrada')             return 'badge-green'
+  if (e === 'pendiente')           return 'badge-amber'
+  if (e === 'anulada')             return 'badge-gray'
+  if (e === 'faltan_retenciones')  return 'badge-orange'
   return 'badge-gray'
 }
 

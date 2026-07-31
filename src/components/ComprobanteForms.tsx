@@ -427,9 +427,10 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   const [pago,      setPago]      = useState('transferencia')
   const [echeq,     setEcheq]     = useState('')
   const [loadingN,  setLoadingN]  = useState(true)
-  const [existente, setExistente] = useState(false)
-  const [showRet,   setShowRet]   = useState(false)
-  const [retCfg,    setRetCfg]    = useState<Record<string, RetCfg>>(
+  const [existente,      setExistente]      = useState(false)
+  const [sinRetenciones, setSinRetenciones] = useState(false)
+  const [showRet,        setShowRet]        = useState(false)
+  const [retCfg,         setRetCfg]         = useState<Record<string, RetCfg>>(
     Object.fromEntries(TIPOS_RET.map(t => [t, { aplica: false, importe: '', docRef: '' }]))
   )
 
@@ -449,6 +450,19 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
       const rId = parseInt(nroRecibo)
       if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
 
+      if (sinRetenciones) {
+        // Pago recibido pero sin retenciones todavía — NO se crea recibo
+        await db.updateComprobante(comp.id, {
+          estado: 'faltan_retenciones',
+          pago_recibido: true,
+          fecha_pago: fecha,
+          medio_pago: pago,
+        } as any)
+        toast(`✓ Pago registrado — Recibo pendiente hasta recibir retenciones`)
+        onSaved()
+        return
+      }
+
       // Step 1: upsert recibo FIRST (FK constraint requires recibo to exist before linking)
       if (!existente) {
         const { error: reciboError } = await supabase.from('recibos').insert({
@@ -462,22 +476,9 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         }
       }
 
-      // Step 2: build retention rows (only those marked as aplica)
-      const retItems = activeRets.map(t => ({
-        tipo: t as TipoRetencion,
-        aplica: true as const,
-        recibida: false as const,
-        importe: retCfg[t].importe ? parseFloat(retCfg[t].importe) : null,
-        documento_ref: retCfg[t].docRef || null,
-        fecha_recepcion: null,
-      }))
-
-      // Step 3: compute estado (cobrada if no retenciones pending)
-      const nuevoEstado = calcEstadoComprobante(true, retItems)
-
-      // Step 4: update comprobante with payment info + estado
+      // Step 2: update comprobante as cobrada
       await db.updateComprobante(comp.id, {
-        estado: nuevoEstado,
+        estado: 'cobrada',
         recibo_id: rId,
         fecha_cobro: fecha,
         pago_recibido: true,
@@ -485,16 +486,8 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         medio_pago: pago,
       } as any)
 
-      // Step 5: persist retenciones if any
-      if (retItems.length > 0) {
-        await db.upsertRetenciones(comp.id, retItems)
-      }
-
-      const suffix = nuevoEstado === 'faltan_retenciones'
-        ? ' — retenciones pendientes de recepción'
-        : ''
       const label = existente ? `vinculada al Recibo ${rId}` : `Recibo ${rId} registrado`
-      toast(`✓ ${label}${suffix}`)
+      toast(`✓ ${label}`)
       onSaved()
     } catch (e: any) {
       toast('Error: ' + (e.message || 'No se pudo registrar'))
@@ -505,14 +498,33 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
     <Modal title={`Registrar cobro — ${comp.id}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving || loadingN}>
-          {saving ? 'Guardando…' : activeRets.length > 0 ? 'Marcar cobrada (con retenciones)' : 'Marcar cobrada'}
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || (loadingN && !sinRetenciones)}>
+          {saving ? 'Guardando…' : sinRetenciones ? 'Registrar pago (sin recibo)' : 'Marcar cobrada'}
         </button>
       </>}>
       <div className="form-grid">
         <FG label="Fecha de cobro *">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
         </FG>
+        <FG label="Forma de pago">
+          <select value={pago} onChange={e => setPago(e.target.value)}>
+            {['transferencia','cheque','e-cheq','efectivo'].map(p => <option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        <FG label=" " full>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', padding:'8px 10px', borderRadius:'var(--radius-sm)', background: sinRetenciones ? 'rgba(234,88,12,.08)' : 'transparent', border: sinRetenciones ? '1px solid rgba(234,88,12,.25)' : '1px solid transparent', transition:'all .15s' }}>
+            <input type="checkbox" checked={sinRetenciones} onChange={e => { setSinRetenciones(e.target.checked); if (e.target.checked) setShowRet(false) }} style={{ width:15, height:15 }} />
+            <span style={{ color: sinRetenciones ? '#f97316' : 'var(--text-secondary)', fontWeight: sinRetenciones ? 600 : 400 }}>
+              El cliente pagó pero todavía no me mandó las retenciones
+            </span>
+          </label>
+        </FG>
+        {sinRetenciones && (
+          <div className="full" style={{ padding:'10px 12px', background:'rgba(234,88,12,.06)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(234,88,12,.2)', fontSize:12, color:'var(--text-secondary)' }}>
+            Se va a registrar el pago sin crear recibo. La factura queda en estado <strong style={{color:'#f97316'}}>Faltan retenciones</strong> para que no te olvides. Cuando lleguen las retenciones, usás "Cobrar" de nuevo para crear el recibo.
+          </div>
+        )}
+        {!sinRetenciones && <>
         <FG label="N° Recibo *">
           <input type="number" value={nroRecibo} onChange={e => setNroRecibo(e.target.value)}
             placeholder={loadingN ? 'Cargando…' : ''} />
@@ -524,11 +536,7 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
             Usar recibo existente (no crear uno nuevo)
           </label>
         </FG>
-        <FG label="Forma de pago">
-          <select value={pago} onChange={e => setPago(e.target.value)}>
-            {['transferencia','cheque','e-cheq','efectivo'].map(p => <option key={p}>{p}</option>)}
-          </select>
-        </FG>
+        </>}
         <FG label="N° E-Cheq (si aplica)">
           <input placeholder="—" value={echeq} onChange={e => setEcheq(e.target.value)} />
         </FG>

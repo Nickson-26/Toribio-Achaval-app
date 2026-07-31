@@ -427,8 +427,9 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   const [pago,      setPago]      = useState('transferencia')
   const [echeq,     setEcheq]     = useState('')
   const [loadingN,  setLoadingN]  = useState(true)
-  const [existente,      setExistente]      = useState(false)
-  const [sinRetenciones, setSinRetenciones] = useState(false)
+  const [existente,        setExistente]        = useState(false)
+  const [sinRetenciones,   setSinRetenciones]   = useState(false)
+  const [fechaAcreditacion, setFechaAcreditacion] = useState('')
   const [showRet,        setShowRet]        = useState(false)
   const [retCfg,         setRetCfg]         = useState<Record<string, RetCfg>>(
     Object.fromEntries(TIPOS_RET.map(t => [t, { aplica: false, importe: '', docRef: '' }]))
@@ -449,6 +450,20 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
     try {
       const rId = parseInt(nroRecibo)
       if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
+
+      // E-cheq con fecha futura → registrar sin recibo, acreditar después
+      if (pago === 'e-cheq' && fechaAcreditacion && !sinRetenciones) {
+        await db.updateComprobante(comp.id, {
+          estado: 'echeq_pendiente',
+          fecha_cobro: fecha,
+          medio_pago: 'e-cheq',
+          referencia_pago: fechaAcreditacion,
+          observaciones_pago: echeq || null,
+        } as any)
+        toast(`✓ E-Cheq registrado — acredita el ${fechaAcreditacion.split('-').reverse().join('/')}`)
+        onSaved()
+        return
+      }
 
       if (sinRetenciones) {
         // Pago recibido pero sin retenciones todavía — NO se crea recibo
@@ -499,7 +514,10 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving || (loadingN && !sinRetenciones)}>
-          {saving ? 'Guardando…' : sinRetenciones ? 'Registrar pago (sin recibo)' : 'Marcar cobrada'}
+          {saving ? 'Guardando…'
+            : sinRetenciones ? 'Registrar pago (sin recibo)'
+            : (pago === 'e-cheq' && fechaAcreditacion) ? 'Registrar e-cheq'
+            : 'Marcar cobrada'}
         </button>
       </>}>
       <div className="form-grid">
@@ -537,9 +555,17 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
           </label>
         </FG>
         </>}
-        <FG label="N° E-Cheq (si aplica)">
-          <input placeholder="—" value={echeq} onChange={e => setEcheq(e.target.value)} />
-        </FG>
+        {pago === 'e-cheq' && (
+          <>
+            <FG label="N° E-Cheq">
+              <input placeholder="Ej: 000123456" value={echeq} onChange={e => setEcheq(e.target.value)} />
+            </FG>
+            <FG label="Fecha de acreditación *">
+              <input type="date" value={fechaAcreditacion} onChange={e => setFechaAcreditacion(e.target.value)} />
+              <span className="calc-hint" style={{ color:'var(--info)' }}>La factura queda en azul hasta que confirmás la acreditación</span>
+            </FG>
+          </>
+        )}
 
         {/* ── Retenciones opcionales ── */}
         <div className="full" style={{ borderTop:'1px solid var(--border)', paddingTop:12, marginTop:4 }}>
@@ -595,6 +621,82 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
             )}
           </div>
         )}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Confirmar acreditación de e-cheq ───────────────────────────
+export function ConfirmarAcreditacionModal({ comp, onClose, onSaved }: {
+  comp: Comprobante; onClose: () => void; onSaved: () => void
+}) {
+  const [saving,    setSaving]    = useState(false)
+  const [fecha,     setFecha]     = useState(today())
+  const [nroRecibo, setNroRecibo] = useState('')
+  const [loadingN,  setLoadingN]  = useState(true)
+
+  const fechaAcred  = comp.referencia_pago || ''
+  const nroEcheq    = (comp as any).observaciones_pago || ''
+
+  useEffect(() => {
+    getNextReciboId().then(n => { setNroRecibo(String(n)); setLoadingN(false) })
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const rId = parseInt(nroRecibo)
+      if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
+
+      // Create recibo
+      const { error: reciboError } = await supabase.from('recibos').insert({
+        id: rId, fecha,
+        cliente: comp.cliente, nro_fact: comp.id, persona: comp.persona,
+        monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
+        forma_pago: 'e-cheq', retencion: null, nro_echeq: nroEcheq || null,
+      })
+      if (reciboError && reciboError.code !== '23505') {
+        throw new Error('Error al crear recibo: ' + reciboError.message)
+      }
+
+      // Mark cobrada
+      await db.updateComprobante(comp.id, {
+        estado: 'cobrada',
+        recibo_id: rId,
+        fecha_cobro: fecha,
+        pago_recibido: true,
+        fecha_pago: fecha,
+      } as any)
+
+      toast(`✓ E-Cheq acreditado — Recibo ${rId}`)
+      onSaved()
+    } catch (e: any) {
+      toast('Error: ' + (e.message || ''))
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Confirmar acreditación — ${comp.id}`} subtitle={comp.cliente} onClose={onClose}
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || loadingN}>
+          {saving ? 'Guardando…' : 'Confirmar acreditación'}
+        </button>
+      </>}>
+      <div className="form-grid">
+        {fechaAcred && (
+          <div className="full" style={{ padding:'10px 12px', background:'var(--info-bg)', borderRadius:'var(--radius-sm)', fontSize:13, color:'var(--info)', marginBottom:4 }}>
+            E-Cheq{nroEcheq ? ` N° ${nroEcheq}` : ''} — fecha de acreditación: <strong>{fechaAcred.split('-').reverse().join('/')}</strong>
+          </div>
+        )}
+        <FG label="Fecha de acreditación *">
+          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+        </FG>
+        <FG label="N° Recibo *">
+          <input type="number" value={nroRecibo} onChange={e => setNroRecibo(e.target.value)}
+            placeholder={loadingN ? 'Cargando…' : ''} />
+          <span className="calc-hint">Número sugerido basado en el último recibo</span>
+        </FG>
       </div>
     </Modal>
   )

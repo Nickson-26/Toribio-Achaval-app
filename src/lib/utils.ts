@@ -59,6 +59,7 @@ export function estadoColor(e: string): string {
   if (e === 'pendiente')           return 'badge-amber'
   if (e === 'anulada')             return 'badge-gray'
   if (e === 'faltan_retenciones')  return 'badge-orange'
+  if (e === 'echeq_pendiente')     return 'badge-blue'
   return 'badge-gray'
 }
 

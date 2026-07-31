@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 })
 
 // ── Types ─────────────────────────────────────────────────────
-export type ComprobanteEstado = 'pendiente' | 'cobrada' | 'anulada' | 'emitida'
+export type ComprobanteEstado = 'pendiente' | 'cobrada' | 'anulada' | 'emitida' | 'faltan_retenciones'
 
 export type Comprobante = {
   id: string
@@ -43,6 +43,13 @@ export type Comprobante = {
   punto_venta: string  // '0002' | '0004' — default '0002'
   pdf_url?: string | null  // path en Supabase Storage (bucket comprobantes-pdfs)
   factura_asociada_id?: string | null
+  // Payment tracking (populated when pago is registered)
+  pago_recibido?:       boolean | null
+  fecha_pago?:          string | null
+  medio_pago?:          string | null
+  importe_pagado?:      number | null
+  referencia_pago?:     string | null
+  observaciones_pago?:  string | null
   created_at: string
 }
 
@@ -60,6 +67,31 @@ export type Recibo = {
   created_at: string
   // join from recibo_comprobantes (populated when queried with select join)
   recibo_comprobantes?: { comprobante_id: string }[]
+}
+
+// ── Retenciones ────────────────────────────────────────────────
+export type TipoRetencion = 'ganancias' | 'iva' | 'iibb' | 'suss'
+
+export type Retencion = {
+  id: string
+  comprobante_id: string
+  tipo: TipoRetencion
+  aplica: boolean
+  recibida: boolean
+  importe: number | null
+  documento_ref: string | null
+  fecha_recepcion: string | null
+  created_at: string
+}
+
+/** Calcula el estado automáticamente en base a pago y retenciones. */
+export function calcEstadoComprobante(
+  pagoRecibido: boolean,
+  retenciones: Pick<Retencion, 'aplica' | 'recibida'>[]
+): ComprobanteEstado {
+  if (!pagoRecibido) return 'pendiente'
+  const faltantes = retenciones.filter(r => r.aplica && !r.recibida)
+  return faltantes.length > 0 ? 'faltan_retenciones' : 'cobrada'
 }
 
 // ── API helpers ───────────────────────────────────────────────
@@ -146,6 +178,10 @@ export const db = {
           `Recibo ${recibo.id} guardado, pero no se pudo actualizar la factura ${recibo.nro_fact}: ${updErr.message}`
         )
       }
+      // Mark pago_recibido on the comprobante
+      await supabase.from('comprobantes')
+        .update({ pago_recibido: true, fecha_pago: recibo.fecha, medio_pago: recibo.forma_pago })
+        .eq('id', recibo.nro_fact)
     }
     return recibo
   },
@@ -190,6 +226,9 @@ export const db = {
         estado: 'cobrada' as ComprobanteEstado,
         recibo_id: recibo.id,
         fecha_cobro: payload.fecha,
+        pago_recibido: true,
+        fecha_pago: payload.fecha,
+        medio_pago: payload.forma_pago,
       })
       .in('id', comprobanteIds)
     if (updErr) {
@@ -224,5 +263,43 @@ export const db = {
       .createSignedUrl(path, 3600)
     if (error) throw new Error(`Error al generar URL del PDF: ${error.message}`)
     return data.signedUrl
+  },
+
+  // ── Retenciones ────────────────────────────────────────────────
+  async getRetenciones(comprobanteId: string): Promise<Retencion[]> {
+    const { data, error } = await supabase
+      .from('retenciones')
+      .select('*')
+      .eq('comprobante_id', comprobanteId)
+      .order('tipo')
+    if (error) throw new Error(`Error al cargar retenciones: ${error.message}`)
+    return (data || []) as Retencion[]
+  },
+
+  async upsertRetenciones(
+    comprobanteId: string,
+    items: Array<{
+      tipo: TipoRetencion
+      aplica: boolean
+      recibida: boolean
+      importe?: number | null
+      documento_ref?: string | null
+      fecha_recepcion?: string | null
+    }>
+  ): Promise<void> {
+    const rows = items.map(item => ({ comprobante_id: comprobanteId, ...item }))
+    const { error } = await supabase
+      .from('retenciones')
+      .upsert(rows, { onConflict: 'comprobante_id,tipo' })
+    if (error) throw new Error(`Error al guardar retenciones: ${error.message}`)
+  },
+
+  /** Recalcula y persiste el estado de un comprobante a partir de sus retenciones actuales. */
+  async recalcEstado(comprobanteId: string): Promise<ComprobanteEstado> {
+    const comp = await this.getComprobante(comprobanteId)
+    const rets = await this.getRetenciones(comprobanteId)
+    const nuevoEstado = calcEstadoComprobante(!!comp.pago_recibido, rets)
+    await this.updateComprobante(comprobanteId, { estado: nuevoEstado })
+    return nuevoEstado
   },
 }

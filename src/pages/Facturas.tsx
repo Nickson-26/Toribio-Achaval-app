@@ -567,7 +567,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                     <td onClick={e => e.stopPropagation()}>
                       <ActionMenu items={[
                         { label: 'Editar',       onClick: () => { setSelected(f); setModal('edit') } },
-                        { label: 'Cobrar',       onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' },
+                        { label: 'Cobrar',       onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' && f.estado !== 'faltan_retenciones' },
                         { label: 'Retenciones',  onClick: () => { setSelected(f); setModal('retenciones') }, hidden: f.estado === 'pendiente' || f.estado === 'anulada' || f.estado === 'emitida' },
                         { label: 'Anular',       onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
                         { label: 'Eliminar',     onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
@@ -612,7 +612,11 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             {(selected.estado === 'cobrada' || selected.estado === 'faltan_retenciones') && (
               <button className="btn" style={{ borderColor:'#f97316', color:'#f97316' }} onClick={() => setModal('retenciones')}>Retenciones</button>
             )}
-            {selected.estado === 'pendiente' && <button className="btn btn-primary" onClick={() => setModal('cobrar')}>Marcar cobrada</button>}
+            {(selected.estado === 'pendiente' || selected.estado === 'faltan_retenciones') && (
+              <button className="btn btn-primary" onClick={() => setModal('cobrar')}>
+                {selected.estado === 'faltan_retenciones' ? 'Completar cobro' : 'Marcar cobrada'}
+              </button>
+            )}
             <button className="btn" onClick={closeModal}>Cerrar</button>
           </>}>
           <div className="detail-grid">

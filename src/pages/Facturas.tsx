@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
-import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal } from '@/components/ComprobanteForms'
+import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal, GestionarRetencionesModal } from '@/components/ComprobanteForms'
 
-type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'eliminar' | 'anular' | 'exportar' | null
+type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'retenciones' | 'eliminar' | 'anular' | 'exportar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
 type ActionItem = { label: string; onClick: () => void; danger?: boolean; divider?: boolean; hidden?: boolean }
 
@@ -426,11 +426,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
     .sort((a, b) => (b.numero || 0) - (a.numero || 0))
 
-  const allPending = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
-  const tabPending = tabData.filter(f => f.estado === 'pendiente')
-  const totalARS   = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
-  const totalUSD   = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
-  const pendCount  = tabData.filter(f => f.estado === 'pendiente').length
+  const allPending  = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
+  const tabPending  = tabData.filter(f => f.estado === 'pendiente')
+  const totalARS    = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
+  const totalUSD    = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
+  const pendCount   = tabData.filter(f => f.estado === 'pendiente').length
+  const faltanRetCount = tabData.filter(f => f.estado === 'faltan_retenciones').length
 
   return (
     <>
@@ -457,6 +458,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <option value="all">Todos los estados</option>
             <option value="pendiente">Pendiente</option>
             <option value="cobrada">Cobrada</option>
+            <option value="faltan_retenciones">Faltan retenciones</option>
             <option value="anulada">Anulada</option>
           </select>
           <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width:120, border:'1px solid var(--border-strong)', background:'var(--bg-secondary)', color:'var(--text-primary)', padding:'7px 10px', borderRadius:'var(--radius)', fontSize:13, fontFamily:'var(--font)' }}>
@@ -510,10 +512,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           <div className="metric-value">{usd(totalUSD)}</div>
           <div className="metric-sub">{tabData.filter(f=>f.monto_usd).length} en dólares</div>
         </div>
-        <div className="metric-card">
+        <div className="metric-card" style={{ position:'relative' }}>
           <div className="metric-label">Pendientes de cobro</div>
           <div className="metric-value" style={{ color: pendCount > 0 ? 'var(--warn)' : 'var(--success)' }}>{pendCount}</div>
-          <div className="metric-sub">de {tabData.length} facturas</div>
+          <div className="metric-sub">
+            de {tabData.length} facturas
+            {faltanRetCount > 0 && (
+              <span className="badge badge-orange" style={{ marginLeft:8, fontSize:10 }}>
+                {faltanRetCount} faltan ret.
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -557,10 +566,11 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                     <td onClick={e => e.stopPropagation()}><EstadoBadge estado={f.estado} /></td>
                     <td onClick={e => e.stopPropagation()}>
                       <ActionMenu items={[
-                        { label: 'Editar',   onClick: () => { setSelected(f); setModal('edit') } },
-                        { label: 'Cobrar',   onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' },
-                        { label: 'Anular',   onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
-                        { label: 'Eliminar', onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
+                        { label: 'Editar',       onClick: () => { setSelected(f); setModal('edit') } },
+                        { label: 'Cobrar',       onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' },
+                        { label: 'Retenciones',  onClick: () => { setSelected(f); setModal('retenciones') }, hidden: f.estado === 'pendiente' || f.estado === 'anulada' || f.estado === 'emitida' },
+                        { label: 'Anular',       onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
+                        { label: 'Eliminar',     onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
                       ]} />
                     </td>
                   </tr>
@@ -599,6 +609,9 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           footer={<>
             <button className="btn btn-sm" style={{ borderColor:'var(--warn)', color:'var(--warn)' }} onClick={() => handleAnular(selected.id)}>Anular</button>
             <button className="btn" onClick={() => setModal('edit')}>Editar</button>
+            {(selected.estado === 'cobrada' || selected.estado === 'faltan_retenciones') && (
+              <button className="btn" style={{ borderColor:'#f97316', color:'#f97316' }} onClick={() => setModal('retenciones')}>Retenciones</button>
+            )}
             {selected.estado === 'pendiente' && <button className="btn btn-primary" onClick={() => setModal('cobrar')}>Marcar cobrada</button>}
             <button className="btn" onClick={closeModal}>Cerrar</button>
           </>}>
@@ -665,7 +678,8 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         </Modal>
       )}
-      {modal === 'cobrar' && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'cobrar'      && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'retenciones' && selected && <GestionarRetencionesModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
     </>
   )
 }

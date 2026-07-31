@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
-import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal, GestionarRetencionesModal } from '@/components/ComprobanteForms'
+import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal, ConfirmarAcreditacionModal, GestionarRetencionesModal } from '@/components/ComprobanteForms'
 
-type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'retenciones' | 'eliminar' | 'anular' | 'exportar' | null
+type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'acreditacion' | 'retenciones' | 'eliminar' | 'anular' | 'exportar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
 type ActionItem = { label: string; onClick: () => void; danger?: boolean; divider?: boolean; hidden?: boolean }
 
@@ -458,6 +458,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <option value="all">Todos los estados</option>
             <option value="pendiente">Pendiente</option>
             <option value="cobrada">Cobrada</option>
+            <option value="echeq_pendiente">E-Cheq pendiente</option>
             <option value="faltan_retenciones">Faltan retenciones</option>
             <option value="anulada">Anulada</option>
           </select>
@@ -567,8 +568,9 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                     <td onClick={e => e.stopPropagation()}>
                       <ActionMenu items={[
                         { label: 'Editar',       onClick: () => { setSelected(f); setModal('edit') } },
-                        { label: 'Cobrar',       onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' && f.estado !== 'faltan_retenciones' },
-                        { label: 'Retenciones',  onClick: () => { setSelected(f); setModal('retenciones') }, hidden: f.estado === 'pendiente' || f.estado === 'anulada' || f.estado === 'emitida' },
+                        { label: 'Cobrar',               onClick: () => { setSelected(f); setModal('cobrar') },       hidden: f.estado !== 'pendiente' && f.estado !== 'faltan_retenciones' },
+                        { label: 'Confirmar acreditación', onClick: () => { setSelected(f); setModal('acreditacion') }, hidden: f.estado !== 'echeq_pendiente' },
+                        { label: 'Retenciones',           onClick: () => { setSelected(f); setModal('retenciones') },  hidden: f.estado === 'pendiente' || f.estado === 'anulada' || f.estado === 'emitida' || f.estado === 'echeq_pendiente' },
                         { label: 'Anular',       onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
                         { label: 'Eliminar',     onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
                       ]} />
@@ -609,6 +611,9 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           footer={<>
             <button className="btn btn-sm" style={{ borderColor:'var(--warn)', color:'var(--warn)' }} onClick={() => handleAnular(selected.id)}>Anular</button>
             <button className="btn" onClick={() => setModal('edit')}>Editar</button>
+            {selected.estado === 'echeq_pendiente' && (
+              <button className="btn" style={{ borderColor:'var(--info)', color:'var(--info)' }} onClick={() => setModal('acreditacion')}>Confirmar acreditación</button>
+            )}
             {(selected.estado === 'cobrada' || selected.estado === 'faltan_retenciones') && (
               <button className="btn" style={{ borderColor:'#f97316', color:'#f97316' }} onClick={() => setModal('retenciones')}>Retenciones</button>
             )}
@@ -645,6 +650,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             )}
             {selected.recibo_id && <div className="amount-row"><span>N° Recibo</span><span>{selected.recibo_id}</span></div>}
             {selected.fecha_cobro && <div className="amount-row"><span>Fecha de cobro</span><span>{fdate(selected.fecha_cobro)}</span></div>}
+            {selected.estado === 'echeq_pendiente' && (selected as any).referencia_pago && (
+              <div className="amount-row" style={{ color:'var(--info)' }}>
+                <span>E-Cheq acredita</span>
+                <span style={{ fontWeight:600 }}>{((selected as any).referencia_pago as string).split('-').reverse().join('/')}</span>
+              </div>
+            )}
           </div>
           <div style={{ padding:'8px 22px 18px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', borderTop:'1px solid var(--border)', marginTop:8 }}>
             <span style={{ fontSize:11, color:'var(--text-tertiary)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', minWidth:30 }}>PDF</span>
@@ -682,8 +693,9 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         </Modal>
       )}
-      {modal === 'cobrar'      && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
-      {modal === 'retenciones' && selected && <GestionarRetencionesModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'cobrar'       && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'acreditacion' && selected && <ConfirmarAcreditacionModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'retenciones'  && selected && <GestionarRetencionesModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
     </>
   )
 }

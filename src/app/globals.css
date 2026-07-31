@@ -329,6 +329,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 .badge-red    { background: var(--danger-bg);  color: var(--danger); }
 .badge-teal   { background: rgba(20,184,166,.10); color: #2dd4bf; }
 .badge-gray   { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-strong); }
+.badge-orange { background: rgba(234,88,12,.12); color: #f97316; }
 
 /* ══════════════════════════════════════════════
    TOOLBAR / FILTERS

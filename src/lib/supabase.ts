@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 })
 
 // ── Types ─────────────────────────────────────────────────────
-export type ComprobanteEstado = 'pendiente' | 'cobrada' | 'anulada' | 'emitida' | 'faltan_retenciones'
+export type ComprobanteEstado = 'pendiente' | 'cobrada' | 'anulada' | 'emitida' | 'faltan_retenciones' | 'echeq_pendiente'
 
 export type Comprobante = {
   id: string

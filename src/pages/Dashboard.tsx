@@ -137,6 +137,27 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
   const consCobradasUSD = consCobradas.filter((f: any) => f.monto_usd).reduce((s: number, f: any) => s + (f.monto_usd || 0), 0)
   const consNetoCobrado = consCobradas.reduce((s: number, f: any) => s + toNeto(f), 0)
 
+  // Quincena breakdown: agrupar consultoriaAll por quincena (1-15 / 16-31)
+  const byQuincena: Record<string, { neto: number; count: number }> = {}
+  consultoriaAll.forEach((f: any) => {
+    if (!f.fecha) return
+    const day  = parseInt(f.fecha.slice(8, 10))
+    const mon  = f.fecha.slice(5, 7)
+    const q    = day <= 15 ? '1' : '2'
+    const key  = `${mon}-Q${q}`
+    if (!byQuincena[key]) byQuincena[key] = { neto: 0, count: 0 }
+    byQuincena[key].neto  += toNeto(f)
+    byQuincena[key].count += 1
+  })
+  const quincenas = Object.entries(byQuincena)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, v]) => {
+      const [mon, q] = key.split('-Q')
+      const mesIdx = parseInt(mon) - 1
+      return { label: `${MESES[mesIdx]} ${q === '1' ? '1–15' : '16–31'}`, neto: v.neto, count: v.count }
+    })
+  const maxQNeto = Math.max(...quincenas.map(q => q.neto), 1)
+
   const monthLabel = fMes === 'all' ? 'Todos los meses' : MESES[Number(fMes) - 1]
   const unitLabel = fUnidad === 'all' ? 'Todas las unidades' : fUnidad
   const selectedLabel = `${fYear} · ${monthLabel} · ${unitLabel}`
@@ -560,6 +581,30 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
               {consCobradas.length > 15 && (
                 <div className="dash-table-footer">Mostrando 15 mas recientes de {consCobradas.length}</div>
               )}
+            </div>
+          )}
+
+          {/* ── Quincena breakdown ── */}
+          {quincenas.length > 0 && (
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 12 }}>
+                Neto facturado por quincena — {fYear}
+              </div>
+              <div className="quincena-list">
+                {quincenas.map(q => {
+                  const pct = Math.round((q.neto / maxQNeto) * 100)
+                  return (
+                    <div key={q.label} className="quincena-row">
+                      <div className="quincena-label">{q.label}</div>
+                      <div className="quincena-track">
+                        <div className="quincena-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className={`quincena-value${hidden ? ' num-hidden' : ''}`}>{ars(q.neto)}</div>
+                      <div className="quincena-count">{q.count} fact.</div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>

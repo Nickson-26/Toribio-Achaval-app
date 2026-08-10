@@ -311,7 +311,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [fYear,         setFYear]         = useState('all')
   const [fPers,         setFPers]         = useState('all')
-  const [fEst,          setFEst]          = useState('all')
+  const [fEst,          setFEst]          = useState<string[]>([])
   const [fMoneda,       setFMoneda]       = useState<'all'|'ars'|'usd'>('all')
   const [fPV,           setFPV]           = useState<'all'|string>('all')
   const [clientes,      setClientes]      = useState<string[]>([])
@@ -327,13 +327,13 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await db.getComprobantes({ persona: fPers, estado: fEst, search: debouncedSearch || undefined })
+      const rows = await db.getComprobantes({ persona: fPers, search: debouncedSearch || undefined })
       const facts = rows.filter(r => r.tipo.startsWith('FACT'))
       setData(facts)
       setClientes(Array.from(new Set(facts.map(f => f.cliente).filter(Boolean))))
       onPendientesChange?.(facts.filter(f => f.estado === 'pendiente').length)
     } finally { setLoading(false) }
-  }, [fPers, fEst, debouncedSearch])
+  }, [fPers, debouncedSearch])
 
   useEffect(() => { load() }, [load])
 
@@ -407,6 +407,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       .filter(f => fYear === 'all' ? true : f.fecha?.startsWith(fYear))
       .filter(f => fMoneda === 'ars' ? (!!f.monto_ars && !f.monto_usd) : fMoneda === 'usd' ? !!f.monto_usd : true)
       .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
+      .filter(f => fEst.length === 0 || fEst.includes(f.estado))
     return {
       'FACT A':          base.filter(f => f.tipo === 'FACT A').length,
       'FACT B':          base.filter(f => f.tipo === 'FACT B').length,
@@ -424,6 +425,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       return true
     })
     .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
+    .filter(f => fEst.length === 0 || fEst.includes(f.estado))
     .sort((a, b) => (b.numero || 0) - (a.numero || 0))
 
   const allPending  = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
@@ -454,14 +456,26 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <option value="all">Todas las unidades</option>
             {PERSONAS.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <select value={fEst} onChange={e => setFEst(e.target.value)} style={{ width:140, border:'1px solid var(--border-strong)', background:'var(--bg-secondary)', color:'var(--text-primary)', padding:'7px 10px', borderRadius:'var(--radius)', fontSize:13, fontFamily:'var(--font)' }}>
-            <option value="all">Todos los estados</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="cobrada">Cobrada</option>
-            <option value="echeq_pendiente">E-Cheq pendiente</option>
-            <option value="faltan_retenciones">Faltan retenciones</option>
-            <option value="anulada">Anulada</option>
-          </select>
+          <div className="estado-chips">
+            {([
+              { v:'pendiente',          label:'Pendiente',   cls:'amber'  },
+              { v:'cobrada',            label:'Cobrada',     cls:'green'  },
+              { v:'echeq_pendiente',    label:'E-Cheq',      cls:'blue'   },
+              { v:'faltan_retenciones', label:'Ret. pend.',  cls:'orange' },
+              { v:'anulada',            label:'Anulada',     cls:'gray'   },
+            ] as const).map(o => {
+              const active = fEst.includes(o.v)
+              return (
+                <button key={o.v}
+                  className={`badge badge-${active ? o.cls : 'gray'} estado-chip${active ? ' active' : ''}`}
+                  onClick={() => setFEst(prev => active ? prev.filter(e => e !== o.v) : [...prev, o.v])}
+                >{o.label}</button>
+              )
+            })}
+            {fEst.length > 0 && (
+              <button className="chip-clear" onClick={() => setFEst([])}>✕</button>
+            )}
+          </div>
           <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width:120, border:'1px solid var(--border-strong)', background:'var(--bg-secondary)', color:'var(--text-primary)', padding:'7px 10px', borderRadius:'var(--radius)', fontSize:13, fontFamily:'var(--font)' }}>
             <option value="all">Todos los PV</option>
             {PUNTOS_VENTA.map(p => <option key={p} value={p}>PV {p}</option>)}

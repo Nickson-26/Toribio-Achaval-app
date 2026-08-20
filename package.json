@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test scripts/test-*.ts",
+    "verify": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

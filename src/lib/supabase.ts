@@ -1,4 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import {
+  verificarReciboCompatible,
+  resolverColision,
+  MAX_INTENTOS_RECIBO,
+  type ReciboMinimo,
+} from './cobro'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -292,6 +298,124 @@ export const db = {
       .from('retenciones')
       .upsert(rows, { onConflict: 'comprobante_id,tipo' })
     if (error) throw new Error(`Error al guardar retenciones: ${error.message}`)
+  },
+
+  // ── Registro de cobro (atómico) ────────────────────────────────
+  /**
+   * Vincula un comprobante a un recibo y lo marca como cobrado.
+   *
+   * Reemplaza al flujo anterior, que ante una colisión de ID (23505) se la
+   * tragaba y vinculaba igual — pudiendo asociar la factura a un recibo de
+   * OTRO CLIENTE mientras mostraba un toast de éxito.
+   *
+   * Garantías:
+   *  1. Nunca vincula a un recibo cuyo cliente no coincida con el del
+   *     comprobante (`verificarReciboCompatible`).
+   *  2. Ante colisión de número, distingue reintento idempotente del mismo
+   *     cobro de una carrera con otro usuario, y en ese caso renumera.
+   *  3. Si falla la actualización del comprobante después de haber creado el
+   *     recibo, elimina el recibo creado. No deja la operación a medias.
+   *  4. Si algo falla, lanza. El llamador NO debe informar éxito.
+   */
+  async registrarCobro(input: {
+    comprobante: Comprobante
+    fecha: string
+    formaPago: string
+    reciboId: number
+    /** true = el usuario eligió vincular a un recibo que ya existe */
+    vincularAExistente: boolean
+    nroEcheq?: string | null
+  }): Promise<{ reciboId: number; creado: boolean; renumerado: boolean }> {
+    const { comprobante: comp, fecha, formaPago, vincularAExistente, nroEcheq } = input
+
+    const leerRecibo = async (id: number): Promise<ReciboMinimo | null> => {
+      const { data } = await supabase
+        .from('recibos')
+        .select('id,cliente,nro_fact')
+        .eq('id', id)
+        .maybeSingle()
+      return (data as ReciboMinimo) ?? null
+    }
+
+    let reciboId = input.reciboId
+    let creado = false
+    let renumerado = false
+
+    if (vincularAExistente) {
+      // ── Vincular a un recibo preexistente ───────────────────────
+      const recibo = await leerRecibo(reciboId)
+      const check = verificarReciboCompatible(recibo, comp)
+      if (!check.ok) throw new Error(check.motivo)
+    } else {
+      // ── Crear recibo nuevo, tolerando carreras de numeración ────
+      let asignado = false
+      for (let intento = 0; intento < MAX_INTENTOS_RECIBO; intento++) {
+        const { error } = await supabase.from('recibos').insert({
+          id: reciboId,
+          fecha,
+          cliente: comp.cliente,
+          nro_fact: comp.id,
+          persona: comp.persona,
+          monto_ars: comp.monto_ars,
+          monto_usd: comp.monto_usd,
+          forma_pago: formaPago,
+          retencion: null,
+          nro_echeq: nroEcheq || null,
+        })
+
+        if (!error) { creado = true; asignado = true; break }
+        if (error.code !== '23505') {
+          throw new Error('Error al crear recibo: ' + error.message)
+        }
+
+        // El número ya estaba ocupado. ¿Es este mismo cobro repetido, o es otro?
+        const ocupante = await leerRecibo(reciboId)
+        if (resolverColision(ocupante, comp) === 'reusar') {
+          // Idempotencia: el recibo ya existía por un intento previo del
+          // mismo cobro. Se reutiliza sin crear nada.
+          asignado = true
+          break
+        }
+
+        // Es un recibo de otra operación: tomar el siguiente número libre.
+        const { data: ultimo } = await supabase
+          .from('recibos').select('id').order('id', { ascending: false }).limit(1)
+        const siguiente = ultimo && ultimo[0] ? ultimo[0].id + 1 : reciboId + 1
+        reciboId = Math.max(siguiente, reciboId + 1)
+        renumerado = true
+      }
+
+      if (!asignado) {
+        throw new Error(
+          `No se pudo asignar un número de recibo libre después de ${MAX_INTENTOS_RECIBO} intentos. ` +
+          'Probablemente haya varias personas cobrando al mismo tiempo. Reintentá en unos segundos.'
+        )
+      }
+    }
+
+    // ── Aplicar el cobro al comprobante ──────────────────────────
+    try {
+      await this.updateComprobante(comp.id, {
+        estado: 'cobrada',
+        recibo_id: reciboId,
+        fecha_cobro: fecha,
+        pago_recibido: true,
+        fecha_pago: fecha,
+        medio_pago: formaPago,
+      })
+    } catch (e: any) {
+      // Compensación: si creamos el recibo en este mismo flujo, lo deshacemos
+      // para no dejar un recibo huérfano sin factura asociada.
+      if (creado) {
+        await supabase.from('recibos').delete().eq('id', reciboId)
+      }
+      throw new Error(
+        `No se pudo marcar la factura como cobrada: ${e.message ?? e}. ` +
+        'No se aplicó ningún cambio.'
+      )
+    }
+
+    return { reciboId, creado, renumerado }
   },
 
   /** Recalcula y persiste el estado de un comprobante a partir de sus retenciones actuales. */

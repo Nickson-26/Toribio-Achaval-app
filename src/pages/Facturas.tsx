@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
-import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal } from '@/components/ComprobanteForms'
+import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal, ConfirmarAcreditacionModal, GestionarRetencionesModal } from '@/components/ComprobanteForms'
 
-type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'eliminar' | 'anular' | 'exportar' | null
+type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'acreditacion' | 'retenciones' | 'eliminar' | 'anular' | 'exportar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
 type ActionItem = { label: string; onClick: () => void; danger?: boolean; divider?: boolean; hidden?: boolean }
 
@@ -311,7 +311,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [fYear,         setFYear]         = useState('all')
   const [fPers,         setFPers]         = useState('all')
-  const [fEst,          setFEst]          = useState('all')
+  const [fEst,          setFEst]          = useState<string[]>([])
   const [fMoneda,       setFMoneda]       = useState<'all'|'ars'|'usd'>('all')
   const [fPV,           setFPV]           = useState<'all'|string>('all')
   const [clientes,      setClientes]      = useState<string[]>([])
@@ -327,13 +327,13 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await db.getComprobantes({ persona: fPers, estado: fEst, search: debouncedSearch || undefined })
+      const rows = await db.getComprobantes({ persona: fPers, search: debouncedSearch || undefined })
       const facts = rows.filter(r => r.tipo.startsWith('FACT'))
       setData(facts)
       setClientes(Array.from(new Set(facts.map(f => f.cliente).filter(Boolean))))
       onPendientesChange?.(facts.filter(f => f.estado === 'pendiente').length)
     } finally { setLoading(false) }
-  }, [fPers, fEst, debouncedSearch])
+  }, [fPers, debouncedSearch])
 
   useEffect(() => { load() }, [load])
 
@@ -407,6 +407,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       .filter(f => fYear === 'all' ? true : f.fecha?.startsWith(fYear))
       .filter(f => fMoneda === 'ars' ? (!!f.monto_ars && !f.monto_usd) : fMoneda === 'usd' ? !!f.monto_usd : true)
       .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
+      .filter(f => fEst.length === 0 || fEst.includes(f.estado))
     return {
       'FACT A':          base.filter(f => f.tipo === 'FACT A').length,
       'FACT B':          base.filter(f => f.tipo === 'FACT B').length,
@@ -424,13 +425,15 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       return true
     })
     .filter(f => fPV === 'all' ? true : (f.punto_venta || '0002') === fPV)
+    .filter(f => fEst.length === 0 || fEst.includes(f.estado))
     .sort((a, b) => (b.numero || 0) - (a.numero || 0))
 
-  const allPending = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
-  const tabPending = tabData.filter(f => f.estado === 'pendiente')
-  const totalARS   = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
-  const totalUSD   = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
-  const pendCount  = tabData.filter(f => f.estado === 'pendiente').length
+  const allPending  = data.filter(f => f.estado === 'pendiente').sort((a, b) => (a.numero || 0) - (b.numero || 0))
+  const tabPending  = tabData.filter(f => f.estado === 'pendiente')
+  const totalARS    = tabData.reduce((s, f) => s + (f.monto_ars || 0), 0)
+  const totalUSD    = tabData.filter(f => f.monto_usd).reduce((s, f) => s + (f.monto_usd || 0), 0)
+  const pendCount   = tabData.filter(f => f.estado === 'pendiente').length
+  const faltanRetCount = tabData.filter(f => f.estado === 'faltan_retenciones').length
 
   return (
     <>
@@ -453,12 +456,26 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             <option value="all">Todas las unidades</option>
             {PERSONAS.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <select value={fEst} onChange={e => setFEst(e.target.value)} style={{ width:140, border:'1px solid var(--border-strong)', background:'var(--bg-secondary)', color:'var(--text-primary)', padding:'7px 10px', borderRadius:'var(--radius)', fontSize:13, fontFamily:'var(--font)' }}>
-            <option value="all">Todos los estados</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="cobrada">Cobrada</option>
-            <option value="anulada">Anulada</option>
-          </select>
+          <div className="estado-chips">
+            {([
+              { v:'pendiente',          label:'Pendiente',   cls:'amber'  },
+              { v:'cobrada',            label:'Cobrada',     cls:'green'  },
+              { v:'echeq_pendiente',    label:'E-Cheq',      cls:'blue'   },
+              { v:'faltan_retenciones', label:'Ret. pend.',  cls:'orange' },
+              { v:'anulada',            label:'Anulada',     cls:'gray'   },
+            ] as const).map(o => {
+              const active = fEst.includes(o.v)
+              return (
+                <button key={o.v}
+                  className={`badge badge-${active ? o.cls : 'gray'} estado-chip${active ? ' active' : ''}`}
+                  onClick={() => setFEst(prev => active ? prev.filter(e => e !== o.v) : [...prev, o.v])}
+                >{o.label}</button>
+              )
+            })}
+            {fEst.length > 0 && (
+              <button className="chip-clear" onClick={() => setFEst([])}>✕</button>
+            )}
+          </div>
           <select value={fPV} onChange={e => setFPV(e.target.value)} style={{ width:120, border:'1px solid var(--border-strong)', background:'var(--bg-secondary)', color:'var(--text-primary)', padding:'7px 10px', borderRadius:'var(--radius)', fontSize:13, fontFamily:'var(--font)' }}>
             <option value="all">Todos los PV</option>
             {PUNTOS_VENTA.map(p => <option key={p} value={p}>PV {p}</option>)}
@@ -510,10 +527,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           <div className="metric-value">{usd(totalUSD)}</div>
           <div className="metric-sub">{tabData.filter(f=>f.monto_usd).length} en dólares</div>
         </div>
-        <div className="metric-card">
+        <div className="metric-card" style={{ position:'relative' }}>
           <div className="metric-label">Pendientes de cobro</div>
           <div className="metric-value" style={{ color: pendCount > 0 ? 'var(--warn)' : 'var(--success)' }}>{pendCount}</div>
-          <div className="metric-sub">de {tabData.length} facturas</div>
+          <div className="metric-sub">
+            de {tabData.length} facturas
+            {faltanRetCount > 0 && (
+              <span className="badge badge-orange" style={{ marginLeft:8, fontSize:10 }}>
+                {faltanRetCount} faltan ret.
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -557,10 +581,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
                     <td onClick={e => e.stopPropagation()}><EstadoBadge estado={f.estado} /></td>
                     <td onClick={e => e.stopPropagation()}>
                       <ActionMenu items={[
-                        { label: 'Editar',   onClick: () => { setSelected(f); setModal('edit') } },
-                        { label: 'Cobrar',   onClick: () => { setSelected(f); setModal('cobrar') }, hidden: f.estado !== 'pendiente' },
-                        { label: 'Anular',   onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
-                        { label: 'Eliminar', onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
+                        { label: 'Editar',       onClick: () => { setSelected(f); setModal('edit') } },
+                        { label: 'Cobrar',               onClick: () => { setSelected(f); setModal('cobrar') },       hidden: f.estado !== 'pendiente' && f.estado !== 'faltan_retenciones' },
+                        { label: 'Confirmar acreditación', onClick: () => { setSelected(f); setModal('acreditacion') }, hidden: f.estado !== 'echeq_pendiente' },
+                        { label: 'Retenciones',           onClick: () => { setSelected(f); setModal('retenciones') },  hidden: f.estado === 'pendiente' || f.estado === 'anulada' || f.estado === 'emitida' || f.estado === 'echeq_pendiente' },
+                        { label: 'Anular',       onClick: () => handleAnular(f.id), divider: true, hidden: f.estado === 'anulada' },
+                        { label: 'Eliminar',     onClick: () => { setSelected(f); setModal('eliminar') }, danger: true },
                       ]} />
                     </td>
                   </tr>
@@ -599,7 +625,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           footer={<>
             <button className="btn btn-sm" style={{ borderColor:'var(--warn)', color:'var(--warn)' }} onClick={() => handleAnular(selected.id)}>Anular</button>
             <button className="btn" onClick={() => setModal('edit')}>Editar</button>
-            {selected.estado === 'pendiente' && <button className="btn btn-primary" onClick={() => setModal('cobrar')}>Marcar cobrada</button>}
+            {selected.estado === 'echeq_pendiente' && (
+              <button className="btn" style={{ borderColor:'var(--info)', color:'var(--info)' }} onClick={() => setModal('acreditacion')}>Confirmar acreditación</button>
+            )}
+            {(selected.estado === 'cobrada' || selected.estado === 'faltan_retenciones') && (
+              <button className="btn" style={{ borderColor:'#f97316', color:'#f97316' }} onClick={() => setModal('retenciones')}>Retenciones</button>
+            )}
+            {(selected.estado === 'pendiente' || selected.estado === 'faltan_retenciones') && (
+              <button className="btn btn-primary" onClick={() => setModal('cobrar')}>
+                {selected.estado === 'faltan_retenciones' ? 'Completar cobro' : 'Marcar cobrada'}
+              </button>
+            )}
             <button className="btn" onClick={closeModal}>Cerrar</button>
           </>}>
           <div className="detail-grid">
@@ -628,6 +664,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             )}
             {selected.recibo_id && <div className="amount-row"><span>N° Recibo</span><span>{selected.recibo_id}</span></div>}
             {selected.fecha_cobro && <div className="amount-row"><span>Fecha de cobro</span><span>{fdate(selected.fecha_cobro)}</span></div>}
+            {selected.estado === 'echeq_pendiente' && (selected as any).referencia_pago && (
+              <div className="amount-row" style={{ color:'var(--info)' }}>
+                <span>E-Cheq acredita</span>
+                <span style={{ fontWeight:600 }}>{((selected as any).referencia_pago as string).split('-').reverse().join('/')}</span>
+              </div>
+            )}
           </div>
           <div style={{ padding:'8px 22px 18px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', borderTop:'1px solid var(--border)', marginTop:8 }}>
             <span style={{ fontSize:11, color:'var(--text-tertiary)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', minWidth:30 }}>PDF</span>
@@ -665,7 +707,9 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           </div>
         </Modal>
       )}
-      {modal === 'cobrar' && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'cobrar'       && selected && <MarcarCobradaModal comp={selected} nextReciboId={19200} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'acreditacion' && selected && <ConfirmarAcreditacionModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
+      {modal === 'retenciones'  && selected && <GestionarRetencionesModal comp={selected} onClose={closeModal} onSaved={() => { closeModal(); load() }} />}
     </>
   )
 }

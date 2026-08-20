@@ -329,6 +329,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 .badge-red    { background: var(--danger-bg);  color: var(--danger); }
 .badge-teal   { background: rgba(20,184,166,.10); color: #2dd4bf; }
 .badge-gray   { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-strong); }
+.badge-orange { background: rgba(234,88,12,.12); color: #f97316; }
 
 /* ══════════════════════════════════════════════
    TOOLBAR / FILTERS
@@ -722,6 +723,106 @@ tbody tr:hover td { background: var(--bg-hover); }
 .form-section .form-section-pill {
   background: var(--accent-bg); color: var(--accent-text);
   padding: 1px 8px; border-radius: 8px; font-size: 9.5px; letter-spacing: 0.04em;
+}
+
+/* ══════════════════════════════════════════════
+   ESTADO CHIPS (multi-select filter)
+══════════════════════════════════════════════ */
+.estado-chips {
+  display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+}
+.estado-chip {
+  cursor: pointer; border: none; font-family: var(--font);
+  font-size: 11.5px; font-weight: 600; padding: 4px 10px;
+  transition: opacity 120ms, transform 80ms;
+  opacity: 0.42; user-select: none;
+}
+.estado-chip:hover  { opacity: 0.75; }
+.estado-chip.active { opacity: 1; transform: scale(1.04); }
+.chip-clear {
+  font-size: 11px; color: var(--text-tertiary);
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font); padding: 2px 5px; border-radius: var(--radius);
+  transition: color var(--transition);
+}
+.chip-clear:hover { color: var(--text-primary); }
+
+/* ══════════════════════════════════════════════
+   QUINCENA BARS (Dashboard Consultoría)
+══════════════════════════════════════════════ */
+.quincena-list { display: flex; flex-direction: column; gap: 8px; }
+.quincena-row  {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 46px;
+  align-items: center; gap: 10px;
+}
+.quincena-label { font-size: 11.5px; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+.quincena-track { height: 7px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; }
+.quincena-fill  { height: 100%; background: var(--accent); border-radius: 4px; transition: width 400ms ease; }
+.quincena-value { font-size: 12px; font-weight: 600; text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.quincena-count { font-size: 10.5px; color: var(--text-tertiary); text-align: right; }
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE — MOBILE / SMALL WINDOW
+══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Nav */
+  .mobile-menu-btn { display: flex; }
+  .nav-links        { display: none; }
+
+  /* Page padding */
+  .page-content, .dashboard-shell { padding: 12px !important; }
+
+  /* Modales */
+  .modal {
+    width: calc(100vw - 20px) !important;
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+
+  /* Form grid: siempre 1 columna */
+  .form-grid { grid-template-columns: 1fr !important; }
+  .form-group.full, .full { grid-column: span 1 !important; }
+
+  /* Metrics grid: 2 columnas en mobile */
+  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Dashboard grids */
+  .dash-main-grid     { grid-template-columns: 1fr !important; }
+  .dash-analysis-grid { grid-template-columns: 1fr !important; }
+  .dash-hero-stats    { grid-template-columns: repeat(2, 1fr) !important; }
+  .wide-panel         { grid-column: span 1 !important; }
+
+  /* Tabs: scroll horizontal */
+  .fact-tabs { overflow-x: auto; white-space: nowrap; flex-wrap: nowrap !important; padding-bottom: 2px; }
+  .fact-tab  { flex-shrink: 0; }
+
+  /* Estado chips: wrap suavemente */
+  .estado-chips { gap: 4px; }
+
+  /* Quincena: ajustar columnas */
+  .quincena-row { grid-template-columns: 72px 1fr 88px 40px; gap: 7px; }
+
+  /* Tablas: solo scrollear */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* KPI del Hero */
+  .dash-hero { flex-direction: column !important; gap: 16px !important; }
+  .dash-control-panel { width: 100% !important; }
+
+  /* Consultoria summary: 1 columna */
+  .dash-consultoria-summary { grid-template-columns: 1fr !important; }
+
+  /* Card header: wrap si es muy largo */
+  .card-header { flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid { grid-template-columns: 1fr !important; }
+  .dash-hero-stats { grid-template-columns: 1fr !important; }
+  .quincena-row { grid-template-columns: 64px 1fr 80px; }
+  .quincena-count { display: none; }
+  td, th { padding: 7px 8px !important; font-size: 12px !important; }
 }
 
 /* ══════════════════════════════════════════════

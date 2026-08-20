@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db, Comprobante } from '@/lib/supabase'
+import { db, Comprobante, TipoRetencion, Retencion, calcEstadoComprobante } from '@/lib/supabase'
 import { Modal, FG, toast } from '@/components/ui'
-import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT } from '@/lib/utils'
+import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT, estadoColor } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 const IVA_RATE = 0.21
@@ -414,6 +414,9 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
 }
 
 // ── Marcar cobrada ─────────────────────────────────────────────
+const TIPOS_RET = ['ganancias', 'iva', 'iibb', 'suss'] as const
+type RetCfg = { aplica: boolean; importe: string; docRef: string }
+
 export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   comp: Comprobante; nextReciboId: number
   onClose: () => void; onSaved: () => void
@@ -424,15 +427,23 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
   const [pago,      setPago]      = useState('transferencia')
   const [echeq,     setEcheq]     = useState('')
   const [loadingN,  setLoadingN]  = useState(true)
-  const [existente, setExistente] = useState(false)
+  const [existente,        setExistente]        = useState(false)
+  const [sinRetenciones,   setSinRetenciones]   = useState(false)
+  const [fechaAcreditacion, setFechaAcreditacion] = useState('')
+  const [showRet,        setShowRet]        = useState(false)
+  const [retCfg,         setRetCfg]         = useState<Record<string, RetCfg>>(
+    Object.fromEntries(TIPOS_RET.map(t => [t, { aplica: false, importe: '', docRef: '' }]))
+  )
 
-  // Load next recibo ID dynamically from DB
   useEffect(() => {
-    getNextReciboId().then(n => {
-      setNroRecibo(String(n))
-      setLoadingN(false)
-    })
+    getNextReciboId().then(n => { setNroRecibo(String(n)); setLoadingN(false) })
   }, [])
+
+  function setRet(tipo: string, patch: Partial<RetCfg>) {
+    setRetCfg(prev => ({ ...prev, [tipo]: { ...prev[tipo], ...patch } }))
+  }
+
+  const activeRets = TIPOS_RET.filter(t => retCfg[t].aplica)
 
   async function handleSave() {
     setSaving(true)
@@ -440,42 +451,58 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
       const rId = parseInt(nroRecibo)
       if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
 
-      // Step 1: mark factura as cobrada
+      // E-cheq con fecha futura → registrar sin recibo, acreditar después
+      if (pago === 'e-cheq' && fechaAcreditacion && !sinRetenciones) {
+        await db.updateComprobante(comp.id, {
+          estado: 'echeq_pendiente',
+          fecha_cobro: fecha,
+          medio_pago: 'e-cheq',
+          referencia_pago: fechaAcreditacion,
+          observaciones_pago: echeq || null,
+        } as any)
+        toast(`✓ E-Cheq registrado — acredita el ${fechaAcreditacion.split('-').reverse().join('/')}`)
+        onSaved()
+        return
+      }
+
+      if (sinRetenciones) {
+        // Pago recibido pero sin retenciones todavía — NO se crea recibo
+        await db.updateComprobante(comp.id, {
+          estado: 'faltan_retenciones',
+          pago_recibido: true,
+          fecha_pago: fecha,
+          medio_pago: pago,
+        } as any)
+        toast(`✓ Pago registrado — Recibo pendiente hasta recibir retenciones`)
+        onSaved()
+        return
+      }
+
+      // Step 1: upsert recibo FIRST (FK constraint requires recibo to exist before linking)
+      if (!existente) {
+        const { error: reciboError } = await supabase.from('recibos').insert({
+          id: rId, fecha,
+          cliente: comp.cliente, nro_fact: comp.id, persona: comp.persona,
+          monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
+          forma_pago: pago, retencion: null, nro_echeq: echeq || null,
+        })
+        if (reciboError && reciboError.code !== '23505') {
+          throw new Error('Error al crear recibo: ' + reciboError.message)
+        }
+      }
+
+      // Step 2: update comprobante as cobrada
       await db.updateComprobante(comp.id, {
         estado: 'cobrada',
         recibo_id: rId,
         fecha_cobro: fecha,
-      })
+        pago_recibido: true,
+        fecha_pago: fecha,
+        medio_pago: pago,
+      } as any)
 
-      // Step 2: create recibo only if not linking to an existing one
-      if (!existente) {
-        const { error: reciboError } = await supabase.from('recibos').insert({
-          id: rId,
-          fecha,
-          cliente:    comp.cliente,
-          nro_fact:   comp.id,
-          persona:    comp.persona,
-          monto_ars:  comp.monto_ars,
-          monto_usd:  comp.monto_usd,
-          forma_pago: pago,
-          retencion:  null,
-          nro_echeq:  echeq || null,
-        })
-
-        if (reciboError) {
-          if (reciboError.code === '23505') {
-            toast(`✓ Factura ${comp.id} marcada como cobrada (Recibo ${rId} ya existía)`)
-          } else {
-            await db.updateComprobante(comp.id, { estado: 'pendiente', recibo_id: null, fecha_cobro: null })
-            throw new Error('Error al crear recibo: ' + reciboError.message)
-          }
-        } else {
-          toast(`✓ Cobro registrado — Recibo ${rId}`)
-        }
-      } else {
-        toast(`✓ Factura ${comp.id} vinculada al Recibo ${rId}`)
-      }
-
+      const label = existente ? `vinculada al Recibo ${rId}` : `Recibo ${rId} registrado`
+      toast(`✓ ${label}`)
       onSaved()
     } catch (e: any) {
       toast('Error: ' + (e.message || 'No se pudo registrar'))
@@ -486,21 +513,39 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
     <Modal title={`Registrar cobro — ${comp.id}`} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving || loadingN}>
-          {saving ? 'Guardando…' : 'Marcar cobrada'}
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || (loadingN && !sinRetenciones)}>
+          {saving ? 'Guardando…'
+            : sinRetenciones ? 'Registrar pago (sin recibo)'
+            : (pago === 'e-cheq' && fechaAcreditacion) ? 'Registrar e-cheq'
+            : 'Marcar cobrada'}
         </button>
       </>}>
       <div className="form-grid">
         <FG label="Fecha de cobro *">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
         </FG>
+        <FG label="Forma de pago">
+          <select value={pago} onChange={e => setPago(e.target.value)}>
+            {['transferencia','cheque','e-cheq','efectivo'].map(p => <option key={p}>{p}</option>)}
+          </select>
+        </FG>
+        <FG label=" " full>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', padding:'8px 10px', borderRadius:'var(--radius-sm)', background: sinRetenciones ? 'rgba(234,88,12,.08)' : 'transparent', border: sinRetenciones ? '1px solid rgba(234,88,12,.25)' : '1px solid transparent', transition:'all .15s' }}>
+            <input type="checkbox" checked={sinRetenciones} onChange={e => { setSinRetenciones(e.target.checked); if (e.target.checked) setShowRet(false) }} style={{ width:15, height:15 }} />
+            <span style={{ color: sinRetenciones ? '#f97316' : 'var(--text-secondary)', fontWeight: sinRetenciones ? 600 : 400 }}>
+              El cliente pagó pero todavía no me mandó las retenciones
+            </span>
+          </label>
+        </FG>
+        {sinRetenciones && (
+          <div className="full" style={{ padding:'10px 12px', background:'rgba(234,88,12,.06)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(234,88,12,.2)', fontSize:12, color:'var(--text-secondary)' }}>
+            Se va a registrar el pago sin crear recibo. La factura queda en estado <strong style={{color:'#f97316'}}>Faltan retenciones</strong> para que no te olvides. Cuando lleguen las retenciones, usás "Cobrar" de nuevo para crear el recibo.
+          </div>
+        )}
+        {!sinRetenciones && <>
         <FG label="N° Recibo *">
-          <input
-            type="number"
-            value={nroRecibo}
-            onChange={e => setNroRecibo(e.target.value)}
-            placeholder={loadingN ? 'Cargando…' : ''}
-          />
+          <input type="number" value={nroRecibo} onChange={e => setNroRecibo(e.target.value)}
+            placeholder={loadingN ? 'Cargando…' : ''} />
           <span className="calc-hint">Número sugerido basado en el último recibo</span>
         </FG>
         <FG label=" " full>
@@ -509,14 +554,281 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
             Usar recibo existente (no crear uno nuevo)
           </label>
         </FG>
-        <FG label="Forma de pago">
-          <select value={pago} onChange={e => setPago(e.target.value)}>
-            {['transferencia','cheque','e-cheq','efectivo'].map(p => <option key={p}>{p}</option>)}
-          </select>
+        </>}
+        {pago === 'e-cheq' && (
+          <>
+            <FG label="N° E-Cheq">
+              <input placeholder="Ej: 000123456" value={echeq} onChange={e => setEcheq(e.target.value)} />
+            </FG>
+            <FG label="Fecha de acreditación *">
+              <input type="date" value={fechaAcreditacion} onChange={e => setFechaAcreditacion(e.target.value)} />
+              <span className="calc-hint" style={{ color:'var(--info)' }}>La factura queda en azul hasta que confirmás la acreditación</span>
+            </FG>
+          </>
+        )}
+
+        {/* ── Retenciones opcionales ── */}
+        <div className="full" style={{ borderTop:'1px solid var(--border)', paddingTop:12, marginTop:4 }}>
+          <button type="button" onClick={() => setShowRet(s => !s)}
+            style={{ fontSize:12, fontWeight:600, color:'var(--text-secondary)', background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:0, fontFamily:'var(--font)' }}>
+            <span style={{ fontSize:13 }}>{showRet ? '▾' : '▸'}</span>
+            Retenciones
+            {activeRets.length > 0
+              ? <span className="badge badge-orange" style={{ fontSize:10, marginLeft:4 }}>{activeRets.length} configuradas</span>
+              : <span style={{ color:'var(--text-tertiary)', fontWeight:400, marginLeft:4 }}>(opcional)</span>}
+          </button>
+        </div>
+
+        {showRet && (
+          <div className="full">
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr>
+                  {['Tipo','Aplica','Importe','N° cert.'].map(h => (
+                    <th key={h} style={{ padding:'4px 8px', textAlign:'left', fontWeight:700, fontSize:10, color:'var(--text-tertiary)', textTransform:'uppercase', letterSpacing:'.05em', borderBottom:'1px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {TIPOS_RET.map(tipo => (
+                  <tr key={tipo} style={{ opacity: retCfg[tipo].aplica ? 1 : 0.5 }}>
+                    <td style={{ padding:'6px 8px', textTransform:'capitalize', fontWeight:600 }}>{tipo}</td>
+                    <td style={{ padding:'6px 8px' }}>
+                      <input type="checkbox" checked={retCfg[tipo].aplica}
+                        onChange={e => setRet(tipo, { aplica: e.target.checked })}
+                        style={{ width:15, height:15, cursor:'pointer' }} />
+                    </td>
+                    <td style={{ padding:'6px 8px' }}>
+                      <input type="number" min="0" step="0.01" placeholder="0.00"
+                        value={retCfg[tipo].importe} onChange={e => setRet(tipo, { importe: e.target.value })}
+                        disabled={!retCfg[tipo].aplica}
+                        style={{ width:100, padding:'4px 7px', fontSize:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', fontFamily:'var(--font-mono)', color:'var(--text-primary)' }} />
+                    </td>
+                    <td style={{ padding:'6px 8px' }}>
+                      <input type="text" placeholder="—"
+                        value={retCfg[tipo].docRef} onChange={e => setRet(tipo, { docRef: e.target.value })}
+                        disabled={!retCfg[tipo].aplica}
+                        style={{ width:130, padding:'4px 7px', fontSize:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', color:'var(--text-primary)' }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {activeRets.length > 0 && (
+              <p style={{ fontSize:11, color:'var(--warn)', marginTop:8, padding:'6px 8px', background:'var(--warn-bg)', borderRadius:'var(--radius-sm)' }}>
+                La factura quedará en estado "Faltan retenciones" hasta que las marques como recibidas.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Confirmar acreditación de e-cheq ───────────────────────────
+export function ConfirmarAcreditacionModal({ comp, onClose, onSaved }: {
+  comp: Comprobante; onClose: () => void; onSaved: () => void
+}) {
+  const [saving,    setSaving]    = useState(false)
+  const [fecha,     setFecha]     = useState(today())
+  const [nroRecibo, setNroRecibo] = useState('')
+  const [loadingN,  setLoadingN]  = useState(true)
+
+  const fechaAcred  = comp.referencia_pago || ''
+  const nroEcheq    = (comp as any).observaciones_pago || ''
+
+  useEffect(() => {
+    getNextReciboId().then(n => { setNroRecibo(String(n)); setLoadingN(false) })
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const rId = parseInt(nroRecibo)
+      if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
+
+      // Create recibo
+      const { error: reciboError } = await supabase.from('recibos').insert({
+        id: rId, fecha,
+        cliente: comp.cliente, nro_fact: comp.id, persona: comp.persona,
+        monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
+        forma_pago: 'e-cheq', retencion: null, nro_echeq: nroEcheq || null,
+      })
+      if (reciboError && reciboError.code !== '23505') {
+        throw new Error('Error al crear recibo: ' + reciboError.message)
+      }
+
+      // Mark cobrada
+      await db.updateComprobante(comp.id, {
+        estado: 'cobrada',
+        recibo_id: rId,
+        fecha_cobro: fecha,
+        pago_recibido: true,
+        fecha_pago: fecha,
+      } as any)
+
+      toast(`✓ E-Cheq acreditado — Recibo ${rId}`)
+      onSaved()
+    } catch (e: any) {
+      toast('Error: ' + (e.message || ''))
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title={`Confirmar acreditación — ${comp.id}`} subtitle={comp.cliente} onClose={onClose}
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || loadingN}>
+          {saving ? 'Guardando…' : 'Confirmar acreditación'}
+        </button>
+      </>}>
+      <div className="form-grid">
+        {fechaAcred && (
+          <div className="full" style={{ padding:'10px 12px', background:'var(--info-bg)', borderRadius:'var(--radius-sm)', fontSize:13, color:'var(--info)', marginBottom:4 }}>
+            E-Cheq{nroEcheq ? ` N° ${nroEcheq}` : ''} — fecha de acreditación: <strong>{fechaAcred.split('-').reverse().join('/')}</strong>
+          </div>
+        )}
+        <FG label="Fecha de acreditación *">
+          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
         </FG>
-        <FG label="N° E-Cheq (si aplica)">
-          <input placeholder="—" value={echeq} onChange={e => setEcheq(e.target.value)} />
+        <FG label="N° Recibo *">
+          <input type="number" value={nroRecibo} onChange={e => setNroRecibo(e.target.value)}
+            placeholder={loadingN ? 'Cargando…' : ''} />
+          <span className="calc-hint">Número sugerido basado en el último recibo</span>
         </FG>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Gestionar retenciones ───────────────────────────────────────
+export function GestionarRetencionesModal({ comp, onClose, onSaved }: {
+  comp: Comprobante; onClose: () => void; onSaved: () => void
+}) {
+  const [saving,  setSaving]  = useState(false)
+  const [loading, setLoading] = useState(true)
+  type RowState = { aplica: boolean; recibida: boolean; importe: string; docRef: string; fecha: string }
+  const [rows, setRows] = useState<Record<string, RowState>>(
+    Object.fromEntries(TIPOS_RET.map(t => [t, { aplica: false, recibida: false, importe: '', docRef: '', fecha: '' }]))
+  )
+
+  useEffect(() => {
+    db.getRetenciones(comp.id)
+      .then(rets => {
+        setRows(prev => {
+          const next = { ...prev }
+          rets.forEach((r: Retencion) => {
+            next[r.tipo] = {
+              aplica:   r.aplica,
+              recibida: r.recibida,
+              importe:  r.importe != null ? String(r.importe) : '',
+              docRef:   r.documento_ref || '',
+              fecha:    r.fecha_recepcion || '',
+            }
+          })
+          return next
+        })
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [comp.id])
+
+  function setRow(tipo: string, patch: Partial<RowState>) {
+    setRows(prev => ({ ...prev, [tipo]: { ...prev[tipo], ...patch } }))
+  }
+
+  const previewEstado = calcEstadoComprobante(
+    !!comp.pago_recibido,
+    TIPOS_RET.map(t => ({ aplica: rows[t].aplica, recibida: rows[t].recibida }))
+  )
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const items = TIPOS_RET.map(t => ({
+        tipo: t as TipoRetencion,
+        aplica:           rows[t].aplica,
+        recibida:         rows[t].recibida,
+        importe:          rows[t].importe ? parseFloat(rows[t].importe) : null,
+        documento_ref:    rows[t].docRef || null,
+        fecha_recepcion:  rows[t].fecha   || null,
+      }))
+      await db.upsertRetenciones(comp.id, items)
+      await db.updateComprobante(comp.id, { estado: previewEstado })
+      toast(`✓ Retenciones guardadas — estado: ${previewEstado.replace('_', ' ')}`)
+      onSaved()
+    } catch (e: any) {
+      toast('Error: ' + (e.message || ''))
+    } finally { setSaving(false) }
+  }
+
+  const badgeCls = `badge badge-${estadoColor(previewEstado).replace('badge-', '')}`
+
+  return (
+    <Modal title={`Retenciones — ${comp.id}`} subtitle={comp.cliente} onClose={onClose}
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving || loading}>
+          {saving ? 'Guardando…' : 'Guardar retenciones'}
+        </button>
+      </>}>
+      <div style={{ padding:'16px 22px' }}>
+        {loading ? (
+          <div style={{ textAlign:'center', padding:24, color:'var(--text-tertiary)', fontSize:13 }}>Cargando…</div>
+        ) : (
+          <>
+            <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:12, color:'var(--text-tertiary)' }}>Estado resultante:</span>
+              <span className={badgeCls}>{previewEstado.replace('_', ' ')}</span>
+            </div>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr>
+                  {['Tipo','Aplica','Recibida','Importe','N° cert.','Fecha recep.'].map(h => (
+                    <th key={h} style={{ padding:'4px 8px', textAlign:'left', fontWeight:700, fontSize:10, color:'var(--text-tertiary)', textTransform:'uppercase', letterSpacing:'.05em', borderBottom:'1px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {TIPOS_RET.map(tipo => (
+                  <tr key={tipo} style={{ opacity: rows[tipo].aplica ? 1 : 0.5, borderBottom:'1px solid var(--border)' }}>
+                    <td style={{ padding:'7px 8px', textTransform:'capitalize', fontWeight:600 }}>{tipo}</td>
+                    <td style={{ padding:'7px 8px' }}>
+                      <input type="checkbox" checked={rows[tipo].aplica}
+                        onChange={e => setRow(tipo, { aplica: e.target.checked, recibida: e.target.checked ? rows[tipo].recibida : false })}
+                        style={{ width:15, height:15, cursor:'pointer' }} />
+                    </td>
+                    <td style={{ padding:'7px 8px' }}>
+                      <input type="checkbox" checked={rows[tipo].recibida}
+                        onChange={e => setRow(tipo, { recibida: e.target.checked })}
+                        disabled={!rows[tipo].aplica}
+                        style={{ width:15, height:15, cursor: rows[tipo].aplica ? 'pointer' : 'default' }} />
+                    </td>
+                    <td style={{ padding:'7px 8px' }}>
+                      <input type="number" min="0" step="0.01" placeholder="0.00"
+                        value={rows[tipo].importe} onChange={e => setRow(tipo, { importe: e.target.value })}
+                        disabled={!rows[tipo].aplica}
+                        style={{ width:90, padding:'4px 7px', fontSize:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', fontFamily:'var(--font-mono)', color:'var(--text-primary)' }} />
+                    </td>
+                    <td style={{ padding:'7px 8px' }}>
+                      <input type="text" placeholder="—"
+                        value={rows[tipo].docRef} onChange={e => setRow(tipo, { docRef: e.target.value })}
+                        disabled={!rows[tipo].aplica}
+                        style={{ width:110, padding:'4px 7px', fontSize:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', color:'var(--text-primary)' }} />
+                    </td>
+                    <td style={{ padding:'7px 8px' }}>
+                      <input type="date"
+                        value={rows[tipo].fecha} onChange={e => setRow(tipo, { fecha: e.target.value })}
+                        disabled={!rows[tipo].aplica || !rows[tipo].recibida}
+                        style={{ padding:'4px 7px', fontSize:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', color:'var(--text-primary)' }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
     </Modal>
   )

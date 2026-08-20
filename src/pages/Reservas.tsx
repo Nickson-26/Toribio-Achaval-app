@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { ars, usd, fdate, today } from '@/lib/utils'
 import { Spinner, Modal, FG, toast } from '@/components/ui'
 import { useHideNumbers } from '@/components/HideNumbers'
+import { apiFetch, apiErrorMessage } from '@/lib/apiClient'
 
 type Tab = 'DASHBOARD' | 'EMPRENDIMIENTOS' | 'RESIDENCIAL' | 'COMERCIAL'
 type Operacion = 'all' | 'VENTA' | 'ALQUILER'
@@ -76,13 +77,16 @@ export default function Reservas(_: any) {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const resp = await fetch('/api/reservas/import-excel', { method: 'POST', body: fd })
+      // El servidor exige esta confirmación explícita: la operación reemplaza
+      // TODAS las reservas. Ver src/app/api/reservas/import-excel/route.ts
+      fd.append('confirm', 'REEMPLAZAR')
+      const resp = await apiFetch('/api/reservas/import-excel', { method: 'POST', body: fd })
       const json = await resp.json()
       if (json.ok) {
-        toast(`✓ ${json.inserted} reservas importadas (base reemplazada)`)
+        toast(`✓ ${json.inserted} reservas importadas (reemplazaron ${json.replaced ?? 0})`)
         load()
       } else {
-        toast('Error al importar: ' + (json.error || 'desconocido'))
+        toast('Error al importar: ' + apiErrorMessage(json))
       }
     } catch {
       toast('Error al importar')
@@ -95,13 +99,13 @@ export default function Reservas(_: any) {
   async function exportToSheets() {
     setExporting(true)
     try {
-      const resp = await fetch('/api/reservas/export-sheets', { method: 'POST' })
+      const resp = await apiFetch('/api/reservas/export-sheets', { method: 'POST' })
       const json = await resp.json()
       if (json.url) {
         window.open(json.url, '_blank')
         toast('Sheet creado con ' + json.total + ' reservas')
       } else {
-        toast('Error al exportar: ' + (json.error || 'desconocido'))
+        toast('Error al exportar: ' + apiErrorMessage(json))
       }
     } catch {
       toast('Error al exportar')

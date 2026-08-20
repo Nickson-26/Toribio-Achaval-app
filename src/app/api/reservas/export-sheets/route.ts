@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser, isDenied, actorLabel } from '@/lib/apiAuth'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
@@ -321,10 +322,21 @@ export async function GET(req: NextRequest) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
-  return POST(req)
+  return runExport()
 }
 
 export async function POST(req: NextRequest) {
+  // ── AUTORIZACIÓN ─────────────────────────────────────────────
+  // Exporta TODA la base de reservas a un Google Sheet corporativo.
+  // Requiere sesión válida y cuenta aprobada; el cron entra por secreto.
+  const actor = await requireUser(req, { allowSecrets: ['CRON_SECRET'] })
+  if (isDenied(actor)) return actor
+
+  console.info(`[export-sheets] solicitado por ${actorLabel(actor)}`)
+  return runExport()
+}
+
+async function runExport() {
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

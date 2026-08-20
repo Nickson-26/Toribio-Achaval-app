@@ -1,9 +1,20 @@
 import { NextRequest } from 'next/server'
+import { requireUser, isDenied } from '@/lib/apiAuth'
 
 // Aumentar límite del body para PDFs en base64 (hasta ~4MB)
 export const dynamic = 'force-dynamic'
 
+// Tope del PDF en base64. Sin esto, cualquiera podía mandar payloads enormes
+// y quemar la cuota de la API de Anthropic.
+const MAX_B64_CHARS = 6 * 1024 * 1024 // ~4.5 MB de PDF real
+
 export async function POST(req: NextRequest) {
+  // ── AUTORIZACIÓN ─────────────────────────────────────────────
+  // Consume cuota de la API de Anthropic y alimenta el alta de comprobantes.
+  // Solo quienes pueden crear comprobantes.
+  const actor = await requireUser(req, { roles: ['admin', 'editor'] })
+  if (isDenied(actor)) return actor
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json(
@@ -19,6 +30,13 @@ export async function POST(req: NextRequest) {
     if (!pdfBase64) throw new Error('falta pdfBase64')
   } catch {
     return Response.json({ error: 'Body inválido — se esperaba { pdfBase64: string }' }, { status: 400 })
+  }
+
+  if (typeof pdfBase64 !== 'string' || pdfBase64.length > MAX_B64_CHARS) {
+    return Response.json(
+      { error: 'file_too_large', detail: 'El PDF supera el tamaño máximo permitido (~4 MB)' },
+      { status: 413 }
+    )
   }
 
   const prompt = `Sos un extractor de datos de facturas argentinas (AFIP/ARCA).

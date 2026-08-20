@@ -4,6 +4,7 @@ import { db, Comprobante, TipoRetencion, Retencion, calcEstadoComprobante } from
 import { Modal, FG, toast } from '@/components/ui'
 import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT, estadoColor } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { apiFetch, apiErrorMessage } from '@/lib/apiClient'
 
 const IVA_RATE = 0.21
 
@@ -78,14 +79,14 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
         reader.onerror = reject
         reader.readAsDataURL(file)
       })
-      const res = await fetch('/api/extract-invoice', {
+      const res = await apiFetch('/api/extract-invoice', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ pdfBase64: base64 }),
       })
       if (!res.ok) {
-        const err = await res.json().catch(()=>({error:'Error desconocido'}))
-        toast('Error al extraer datos: ' + (err.error || res.statusText))
+        const err = await res.json().catch(()=>null)
+        toast('Error al extraer datos: ' + apiErrorMessage(err, res.statusText))
         return
       }
       const data = await res.json()

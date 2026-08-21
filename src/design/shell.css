@@ -1,0 +1,267 @@
+/* ============================================================================
+   APP SHELL — sidebar, topbar, área de contenido
+   ============================================================================ */
+
+.ta-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+  background: var(--bg-app);
+  --sidebar-w: 244px;
+}
+.ta-shell.is-collapsed { --sidebar-w: 68px; }
+
+/* ── SIDEBAR ──────────────────────────────────────────────────────────────
+   Flotante: separada del borde y con esquinas redondeadas, para que se lea
+   como una superficie y no como una columna pegada. Clara en tema claro.
+   ────────────────────────────────────────────────────────────────────────── */
+.ta-sidebar {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; padding: var(--space-3);
+  display: flex; flex-direction: column;
+  z-index: var(--z-sidebar);
+}
+.ta-sidebar__inner {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Identidad */
+.ta-brand {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  flex-shrink: 0;
+}
+.ta-brand__mark {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  background: var(--brand); color: var(--on-brand);
+  border-radius: 11px;
+  font-size: 13px; font-weight: var(--weight-strong); letter-spacing: -0.02em;
+}
+.ta-brand__text { min-width: 0; }
+.ta-brand__name {
+  font-size: var(--text-body); font-weight: var(--weight-semibold);
+  color: var(--text-primary); letter-spacing: -0.015em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-brand__sub {
+  font-size: var(--text-micro); color: var(--text-tertiary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.is-collapsed .ta-brand { justify-content: center; padding-inline: 0; }
+.is-collapsed .ta-brand__text { display: none; }
+
+/* Navegación */
+.ta-nav {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-4);
+}
+.ta-nav::-webkit-scrollbar { width: 6px; }
+.ta-nav::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+.ta-nav__group { display: flex; flex-direction: column; gap: 2px; }
+.ta-nav__heading {
+  padding: 0 var(--space-2) var(--space-1);
+  font-size: 10.5px; font-weight: var(--weight-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.is-collapsed .ta-nav__heading { display: none; }
+
+.ta-nav__item {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: 8px var(--space-2);
+  background: transparent; border: none;
+  border-radius: var(--radius-input);
+  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-medium);
+  color: var(--text-secondary); text-align: left; cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  position: relative;
+}
+.ta-nav__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ta-nav__item svg { flex-shrink: 0; opacity: .82; }
+
+/* Activo: fondo suave de marca, sin bloque rojo saturado. */
+.ta-nav__item.is-active {
+  background: var(--brand-soft);
+  color: var(--brand-text);
+  font-weight: var(--weight-label);
+}
+.ta-nav__item.is-active svg { opacity: 1; }
+.ta-nav__item.is-active::before {
+  content: ''; position: absolute; left: -var(--space-3); top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 17px; border-radius: 0 3px 3px 0;
+  background: var(--brand);
+}
+/* En alto contraste el color no alcanza como único diferenciador. */
+[data-theme="accessible"] .ta-nav__item.is-active {
+  outline: 1px solid var(--brand);
+  outline-offset: -1px;
+}
+
+.ta-nav__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-collapsed .ta-nav__label { display: none; }
+.is-collapsed .ta-nav__item { justify-content: center; padding-inline: 0; }
+
+.ta-nav__pill {
+  flex-shrink: 0;
+  min-width: 18px; padding: 1px 5px;
+  background: var(--brand); color: var(--on-brand);
+  border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: var(--weight-strong); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.is-collapsed .ta-nav__pill {
+  position: absolute; top: 3px; right: 6px; min-width: 0;
+  width: 7px; height: 7px; padding: 0; font-size: 0;
+}
+
+/* Pie: usuario */
+.ta-sidebar__footer {
+  flex-shrink: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.ta-userchip {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-2);
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--radius-input);
+  cursor: pointer; text-align: left;
+  transition: background var(--duration-fast) var(--ease);
+}
+.ta-userchip:hover { background: var(--bg-surface-hover); }
+.ta-userchip__avatar {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  background: var(--brand-soft); color: var(--brand-text);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 11px; font-weight: var(--weight-semibold);
+}
+.ta-userchip__body { min-width: 0; flex: 1; }
+.ta-userchip__name {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-label);
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-userchip__role { font-size: var(--text-micro); color: var(--text-tertiary); }
+.is-collapsed .ta-userchip { justify-content: center; }
+.is-collapsed .ta-userchip__body, .is-collapsed .ta-userchip svg { display: none; }
+
+/* ── TOPBAR ───────────────────────────────────────────────────────────────── */
+.ta-main { display: flex; flex-direction: column; min-width: 0; }
+
+.ta-topbar {
+  position: sticky; top: 0; z-index: var(--z-topbar);
+  display: flex; align-items: center; gap: var(--space-4);
+  height: 60px; padding: 0 var(--space-6) 0 var(--space-2);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--border);
+}
+.ta-topbar__title {
+  font-size: 17px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.ta-topbar__search { flex: 1; max-width: 340px; }
+.ta-topbar__actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+
+.ta-theme-group {
+  display: flex; align-items: center; gap: 2px;
+  padding: 2px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+}
+.ta-theme-group .ta-btn--icon { width: 28px; height: 28px; border-radius: 8px; }
+
+.ta-content {
+  flex: 1; min-width: 0;
+  padding: var(--space-6);
+}
+
+/* ── MENÚ DE USUARIO ──────────────────────────────────────────────────────── */
+.ta-menu {
+  position: absolute; z-index: var(--z-dropdown);
+  min-width: 232px; padding: var(--space-2);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lg);
+  animation: ta-pop var(--duration-fast) var(--ease);
+}
+.ta-menu--up   { bottom: calc(100% + 6px); left: 0; right: 0; }
+.ta-menu--down { top: calc(100% + 6px); right: 0; }
+
+.ta-menu__header { padding: var(--space-2) var(--space-2) var(--space-3); }
+.ta-menu__name  { font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--text-primary); }
+.ta-menu__email {
+  margin-top: 1px; font-size: var(--text-micro); color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ta-menu__divider { height: 1px; margin: var(--space-1) 0; background: var(--border); }
+
+.ta-menu__item {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: 8px var(--space-2);
+  background: transparent; border: none; border-radius: var(--radius-sm);
+  font-family: var(--font); font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--text-secondary); text-align: left; cursor: pointer;
+}
+.ta-menu__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ta-menu__item--danger { color: var(--danger); }
+.ta-menu__item--danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
+.ta-sidebar__scrim { display: none; }
+.ta-topbar__burger { display: none; }
+
+@media (max-width: 1023px) {
+  .ta-shell { grid-template-columns: 1fr; }
+  .ta-topbar__burger { display: inline-flex; }
+
+  /* La sidebar pasa a ser un cajón */
+  .ta-sidebar {
+    position: fixed; inset: 0 auto 0 0;
+    width: 264px; padding: var(--space-2);
+    transform: translateX(-104%);
+    transition: transform var(--duration-base) var(--ease);
+  }
+  .ta-shell.is-drawer-open .ta-sidebar { transform: none; }
+  .ta-shell.is-drawer-open .ta-sidebar__scrim {
+    display: block; position: fixed; inset: 0;
+    background: var(--overlay-bg); z-index: calc(var(--z-sidebar) - 1);
+    animation: ta-fade var(--duration-base) var(--ease);
+  }
+  .ta-shell.is-collapsed { --sidebar-w: 0; }
+  .ta-content { padding: var(--space-4); }
+  .ta-topbar { padding-inline: var(--space-3) var(--space-4); }
+}
+
+@media (max-width: 640px) {
+  .ta-topbar { height: 56px; gap: var(--space-2); }
+  .ta-topbar__title { font-size: 15px; }
+  /* La búsqueda se resuelve dentro de cada pantalla en mobile */
+  .ta-topbar__search { display: none; }
+  .ta-content { padding: var(--space-3); }
+}
+
+/* Notebooks 1366: se reduce un poco el ancho de la sidebar y el padding */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .ta-shell { --sidebar-w: 226px; }
+  .ta-content { padding: var(--space-5); }
+}

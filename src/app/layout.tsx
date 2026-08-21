@@ -4,6 +4,7 @@ import './globals.css'
 // corrige los valores de los tres temas, y necesita ganar la cascada.
 import '../design/tokens.css'
 import '../design/components.css'
+import '../design/shell.css'
 import { AuthProvider } from '@/components/AuthProvider'
 import { HideNumbersProvider } from '@/components/HideNumbers'
 

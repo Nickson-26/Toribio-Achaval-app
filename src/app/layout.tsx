@@ -3,6 +3,7 @@ import './globals.css'
 // Se importa DESPUÉS de globals.css a propósito: la capa de tokens completa y
 // corrige los valores de los tres temas, y necesita ganar la cascada.
 import '../design/tokens.css'
+import '../design/components.css'
 import { AuthProvider } from '@/components/AuthProvider'
 import { HideNumbersProvider } from '@/components/HideNumbers'
 

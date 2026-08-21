@@ -41,8 +41,17 @@ export default function Informe(_: any) {
       const cobradas      = facts.filter((f: any) => f.estado === 'cobrada').length
       const pendCount     = facts.filter((f: any) => f.estado === 'pendiente').length
       const montoPend     = facts.filter((f: any) => f.estado === 'pendiente').reduce((s: number, f: any) => s + toNeto(f), 0)
-      const totalNC       = ncs.reduce((s: number, f: any) => s + (f.monto_ars || 0), 0)
-      const netoReal      = totalNetoARS - totalNC
+      // Dos bases distintas, a propósito:
+      //  · totalNC (bruto) para mostrar el importe de las NC y compararlo
+      //    contra la facturación bruta.
+      //  · totalNCNeto para restar de totalNetoARS. Antes se restaba el BRUTO
+      //    de las NC a un total NETO de facturas, mezclando bases imponibles
+      //    y subestimando el ingreso neto real.
+      // brutoARS() además convierte las NC en USD, que antes se contaban como
+      // cero por leer sólo monto_ars.
+      const totalNC       = ncs.reduce((s: number, f: any) => s + brutoARS(f), 0)
+      const totalNCNeto   = ncs.reduce((s: number, f: any) => s + netoARS(f), 0)
+      const netoReal      = totalNetoARS - totalNCNeto
       const pctCobrado    = facts.length ? Math.round((cobradas / facts.length) * 100) : 0
 
       // By unidad
@@ -161,7 +170,7 @@ export default function Informe(_: any) {
   <div class="section-title">1. Resumen Ejecutivo</div>
   <div class="analysis">
     <p>Durante el período comprendido entre ${periodoLabel}, <strong>Toribio P. de Achaval y Cía. S.A.</strong> registró una facturación neta total de <strong>${ars(totalNetoARS)}</strong> en pesos argentinos, con un ingreso bruto de ${ars(totalBrutoARS)} (IVA incluido: ${ars(totalIVA)}). En operaciones denominadas en moneda extranjera, la empresa facturó <strong>${usd(totalUSD)}</strong>.</p>
-    <p>De los ${facts.length} comprobantes emitidos, el <strong>${pctCobrado}%</strong> se encuentra en estado cobrado, con ${pendCount} facturas pendientes por un valor neto equivalente a ${ars(montoPend)}. Descontando las notas de crédito emitidas por ${ars(totalNC)}, el <strong>ingreso neto real del período asciende a ${ars(netoReal)}</strong>.</p>
+    <p>De los ${facts.length} comprobantes emitidos, el <strong>${pctCobrado}%</strong> se encuentra en estado cobrado, con ${pendCount} facturas pendientes por un valor neto equivalente a ${ars(montoPend)}. Descontando las notas de crédito emitidas por ${ars(totalNC)} (${ars(totalNCNeto)} netos), el <strong>ingreso neto real del período asciende a ${ars(netoReal)}</strong>.</p>
     <p>La tendencia de facturación mensual es <strong>${tendencia}</strong>, con la unidad <strong>${unidadLider}</strong> concentrando el ${unidadPct}% de los ingresos netos. El cliente de mayor peso relativo es <strong>${clienteLider}</strong>, que representa el ${clientePct}% de la facturación neta total del período.</p>
   </div>
 </div>

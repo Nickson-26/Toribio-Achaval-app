@@ -145,6 +145,48 @@ test('desdeNeto redondea a 2 decimales', () => {
   assert.equal(r.total, 40333.33)
 })
 
+// ── Informe PDF: bases imponibles de las notas de crédito ───────────────────
+//
+// Bug corregido: `netoReal = totalNetoARS - totalNC` restaba el BRUTO de las
+// NC a un total NETO de facturas. Y `totalNC` leía sólo monto_ars, así que las
+// NC en dólares se contaban como cero.
+
+test('REGRESIÓN: una NC A aporta bases distintas en bruto y en neto', () => {
+  const nc = { tipo: 'NC A', monto_ars: 121000, neto_ars: 100000, iva: 21000 }
+  assert.equal(brutoARS(nc), 121000)   // para mostrar y comparar contra bruto
+  assert.equal(netoARS(nc), 100000)    // para restar de un total neto
+  assert.notEqual(brutoARS(nc), netoARS(nc))
+})
+
+test('REGRESIÓN: una NC en USD ya no vale cero si tiene tipo de cambio', () => {
+  const nc = { tipo: 'NC A', monto_ars: 0, monto_usd: 1210, neto_usd: 1000, tipo_cambio: 1000 }
+  // El código viejo hacía `s + (f.monto_ars || 0)` -> 0
+  assert.equal(brutoARS(nc), 1210000)
+  assert.equal(netoARS(nc), 1000000)
+})
+
+test('una NC en USD sin tipo de cambio sigue aportando 0 (no se inventa un TC)', () => {
+  // Caso real: NC-A-423 y NC-A-424 tienen monto_usd 3.872 y monto_ars 0, pero
+  // NO tienen tipo_cambio. Sin TC no hay forma de convertirlas sin inventar un
+  // dato, así que se mantienen en 0. Es un problema de carga, no de cálculo.
+  const nc = { tipo: 'NC A', monto_ars: 0, monto_usd: 3872, tipo_cambio: null }
+  assert.equal(brutoARS(nc), 0)
+  assert.equal(netoARS(nc), 0)
+})
+
+test('una NC B aporta el mismo valor en bruto y en neto', () => {
+  const nc = { tipo: 'NC B', monto_ars: 3872 }
+  assert.equal(brutoARS(nc), 3872)
+  assert.equal(netoARS(nc), 3872)
+})
+
+test('magnitud del ajuste en netoReal con las NC reales de producción', () => {
+  // Las 7 NC de producción: 44.197.686,94 brutas vs 36.527.686,00 netas.
+  const bruto = 44197686.94, neto = 36527686.00
+  const ajuste = bruto - neto
+  assert.ok(Math.abs(ajuste - 7670000.94) < 1, `esperaba ~7.670.000, dio ${ajuste.toFixed(2)}`)
+})
+
 // ── La NC B que ya existe en producción no cambia ───────────────────────────
 test('la única NC B de producción se interpreta igual que antes', () => {
   // Está guardada sin iva ni neto_ars discriminados, que es lo correcto.

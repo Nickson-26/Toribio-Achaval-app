@@ -1,0 +1,316 @@
+/* ============================================================================
+   TA APP — DESIGN TOKENS
+   ============================================================================
+
+   Se importa DESPUÉS de los bloques de tema de globals.css, así que puede
+   completar lo que ahí falta sin tocar los valores que ya funcionan.
+
+   Por qué existe
+   --------------
+   La arquitectura de theming original es correcta (custom properties en :root
+   + override por [data-theme]) pero estaba INCOMPLETA: light redefinía 16 de
+   37 tokens y accessible 21 de 37. El resto heredaba los valores de dark, y
+   por eso --success, --warn, --danger e --info fallaban contraste sobre fondo
+   blanco.
+
+   Este archivo:
+     1. cierra la cobertura de los tres temas;
+     2. agrega las familias que no existían (espaciado, tipografía, z-index,
+        focus, tonos "soft");
+     3. reemplaza por tokens los colores que estaban hardcodeados por
+        componente y rompían el tema claro.
+
+   Regla: los componentes consumen tokens semánticos. Los temas definen valores.
+   ============================================================================ */
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1. ESCALAS — no dependen del tema
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Espaciado. Antes cada pantalla usaba paddings arbitrarios. */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radios. Botones/inputs medios, cards generosas, superficies flotantes más. */
+  --radius-input:   10px;
+  --radius-button:  10px;
+  --radius-card:    18px;
+  --radius-surface: 22px;
+  --radius-pill:    999px;
+
+  /* Tipografía — escala de producto, no de landing.
+     Se privilegia legibilidad en jornadas largas sobre impacto visual. */
+  --text-page:      27px;   /* título de página */
+  --text-section:   19px;   /* título de sección */
+  --text-card:      15px;   /* título de card */
+  --text-body:      14px;   /* cuerpo */
+  --text-secondary-size: 13px;
+  --text-label:     12.5px;
+  --text-micro:     11.5px;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-label:    560;
+  --weight-semibold: 600;
+  --weight-strong:   650;
+
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+
+  /* Capas. Antes eran 100/200/999 sueltos. */
+  --z-sidebar:  50;
+  --z-topbar:   60;
+  --z-dropdown: 100;
+  --z-overlay:  200;
+  --z-modal:    210;
+  --z-drawer:   210;
+  --z-toast:    300;
+
+  /* Movimiento */
+  --ease:          cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+
+  /* ── Tipografía ──
+     Antes decía 'Inter' y 'JetBrains Mono' sin cargarlas nunca: no había
+     @font-face, ni next/font, ni <link>. La app siempre renderizó con el
+     fallback del sistema, y encima los `font-weight: 750/760` quedaban
+     inertes porque requieren una fuente variable.
+
+     Decisión: stack de sistema declarado con honestidad. En macOS resuelve a
+     SF Pro y en Windows a Segoe UI Variable — ambas diseñadas para interfaz y
+     muy legibles en jornadas largas. Costo de red cero, cero FOUT, y se ve
+     nativa en cada sistema operativo. */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
+          Roboto, system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono',
+               Menlo, Consolas, monospace;
+}
+
+/* Los pesos intermedios requieren fuente variable; sin ella el navegador los
+   redondea. Se normalizan a valores reales. */
+.dash-title    { font-weight: var(--weight-strong) !important; }
+.dash-kpi strong { font-weight: var(--weight-strong) !important; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2. DARK (tema por defecto, :root sin atributo)
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Superficies con nombre de rol, sobre los tokens existentes */
+  --bg-app:            var(--bg-base);
+  --bg-surface:        var(--bg-card);
+  --bg-surface-hover:  var(--bg-hover);
+  --bg-muted:          var(--bg-secondary);
+
+  /* Marca */
+  --brand:        #C8102E;
+  --brand-hover:  #e0122f;
+  --brand-soft:   rgba(200, 16, 46, 0.14);
+  --brand-text:   #ff7088;
+  --on-brand:     #ffffff;
+
+  /* Tonos suaves para badges y avisos. Antes purple/teal/orange estaban
+     hardcodeados y no reaccionaban a ningún tema. */
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --success-text: #4ade80;
+  --warning:      var(--warn);
+  --warning-soft: rgba(245, 158, 11, 0.14);
+  --warning-text: #fbbf24;
+  --danger-soft:  rgba(239, 68, 68, 0.14);
+  --danger-text:  #f87171;
+  --info-soft:    rgba(96, 165, 250, 0.14);
+  --info-text:    #93c5fd;
+  --violet:       #a78bfa;
+  --violet-soft:  rgba(139, 92, 246, 0.16);
+  --violet-text:  #c4b5fd;
+  --neutral-soft: rgba(255, 255, 255, 0.07);
+  --neutral-text: var(--text-secondary);
+
+  /* Foco. Antes el anillo era rojo semitransparente hardcodeado en 5 reglas,
+     invisible en el tema de alto contraste. */
+  --border-focus: var(--brand);
+  --focus-ring:   0 0 0 3px rgba(200, 16, 46, 0.30);
+
+  /* Superficies de vidrio */
+  --glass-bg:     rgba(24, 24, 32, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur:   blur(18px);
+
+  --overlay-bg:   rgba(0, 0, 0, 0.62);
+
+  /* Reemplaza el gradiente verde oscuro al 92% que estaba hardcodeado en
+     .dash-hero-main y .dash-control-panel. En tema claro pintaba verde
+     oscuro sobre fondo blanco. */
+  --hero-gradient: linear-gradient(135deg, rgba(200,16,46,0.10) 0%, rgba(200,16,46,0.04) 34%, transparent 62%);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. LIGHT — referencia principal del nuevo diseño
+   ────────────────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:      #f5f6f9;
+  --bg-primary:   #ffffff;
+  --bg-secondary: #f1f2f6;
+  --bg-tertiary:  #e9ebf1;
+  --bg-card:      #ffffff;
+  --bg-hover:     #f2f3f8;
+  --bg-elevated:  #ffffff;
+
+  /* Texto: se sube el contraste. --text-tertiary daba 2,85:1 sobre blanco
+     (falla AA) y es el token más usado del sistema. */
+  --text-primary:   #16181d;
+  --text-secondary: #55596b;
+  --text-tertiary:  #6e7383;
+  --text-inverse:   #ffffff;
+
+  --border:        rgba(16, 18, 27, 0.08);
+  --border-strong: rgba(16, 18, 27, 0.14);
+  --border-accent: rgba(200, 16, 46, 0.28);
+
+  /* Sombras suaves, casi imperceptibles: la jerarquía la dan el fondo,
+     el borde y el espaciado. */
+  --shadow-sm: 0 1px 2px rgba(16, 18, 27, 0.05);
+  --shadow-md: 0 4px 14px rgba(16, 18, 27, 0.07);
+  --shadow-lg: 0 16px 44px rgba(16, 18, 27, 0.11);
+
+  /* Colores semánticos oscurecidos para pasar AA sobre blanco.
+     Los de dark daban entre 2,15:1 y 3,76:1. */
+  --accent:      #C8102E;
+  --accent-text: #b00c26;
+  --accent-bg:   rgba(200, 16, 46, 0.07);
+  --brand-text:  #b00c26;
+
+  --success:      #16a36a;
+  --success-bg:   rgba(22, 163, 106, 0.09);
+  --success-soft: rgba(22, 163, 106, 0.11);
+  --success-text: #0f7d50;
+
+  --warn:         #b26a00;
+  --warning:      #b26a00;
+  --warn-bg:      rgba(178, 106, 0, 0.09);
+  --warning-soft: rgba(210, 130, 10, 0.13);
+  --warning-text: #92560a;
+
+  --danger:      #d92d20;
+  --danger-bg:   rgba(217, 45, 32, 0.08);
+  --danger-soft: rgba(217, 45, 32, 0.10);
+  --danger-text: #b42318;
+
+  --info:      #2563eb;
+  --info-bg:   rgba(37, 99, 235, 0.08);
+  --info-soft: rgba(37, 99, 235, 0.10);
+  --info-text: #1d4ed8;
+
+  --violet:      #6d40d8;
+  --violet-soft: rgba(109, 64, 216, 0.11);
+  --violet-text: #5b2fc0;
+
+  --neutral-soft: rgba(16, 18, 27, 0.06);
+  --neutral-text: #55596b;
+
+  --focus-ring: 0 0 0 3px rgba(200, 16, 46, 0.22);
+
+  /* Vidrio claro. La transparencia va SOLO en el background: el texto
+     conserva opacidad completa. */
+  --glass-bg:     rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(16, 18, 27, 0.07);
+
+  --overlay-bg: rgba(16, 18, 27, 0.34);
+
+  --hero-gradient: linear-gradient(135deg, rgba(200,16,46,0.055) 0%, rgba(200,16,46,0.02) 36%, transparent 64%);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4. ALTO CONTRASTE — accesibilidad, no estética
+   ────────────────────────────────────────────────────────────────────────── */
+[data-theme="accessible"] {
+  --brand:       #FFD700;
+  --brand-hover: #FFC000;
+  --brand-soft:  rgba(255, 215, 0, 0.20);
+  --brand-text:  #FFD700;
+  --on-brand:    #000000;
+  --text-inverse:#000000;
+
+  --warning:      #FFB800;
+  --success-soft: rgba(0, 255, 136, 0.20);
+  --success-text: #00FF88;
+  --warning-soft: rgba(255, 184, 0, 0.20);
+  --warning-text: #FFB800;
+  --danger-soft:  rgba(255, 107, 107, 0.22);
+  --danger-text:  #FF6B6B;
+  --info-soft:    rgba(102, 204, 255, 0.20);
+  --info-text:    #66CCFF;
+  --violet:       #D9A6FF;
+  --violet-soft:  rgba(217, 166, 255, 0.22);
+  --violet-text:  #D9A6FF;
+  --neutral-soft: rgba(255, 255, 255, 0.14);
+  --neutral-text: #dddddd;
+
+  --success-bg: rgba(0, 255, 136, 0.14);
+  --warn-bg:    rgba(255, 184, 0, 0.14);
+  --danger-bg:  rgba(255, 107, 107, 0.14);
+  --info-bg:    rgba(102, 204, 255, 0.14);
+  --accent-bg:  rgba(255, 215, 0, 0.16);
+
+  /* Anillo de foco amarillo y opaco. El anterior era rojo al 12% sobre
+     negro: invisible. */
+  --border-focus: #FFD700;
+  --focus-ring:   0 0 0 3px #FFD700, 0 0 0 5px #000000;
+
+  /* Sin vidrio: la transparencia degrada la legibilidad. */
+  --glass-bg:     #000000;
+  --glass-border: rgba(255, 255, 255, 0.35);
+  --glass-blur:   none;
+
+  --overlay-bg: rgba(0, 0, 0, 0.88);
+
+  /* Sin gradiente decorativo */
+  --hero-gradient: none;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. FOCO GLOBAL
+   No existía ningún :focus-visible en las 1418 líneas originales, y había 5
+   reglas que hacían `outline: none` — una de ellas sin reemplazo, o sea que
+   eliminaba el indicador de foco sin poner nada en su lugar.
+   ────────────────────────────────────────────────────────────────────────── */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   6. MOVIMIENTO REDUCIDO
+   ────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   7. UTILIDAD DE PRIVACIDAD
+   La usa <Money> para ocultar cifras en pantalla. Es privacidad visual:
+   NO afecta exportaciones (CSV/XLS/PDF conservan los números reales).
+   ────────────────────────────────────────────────────────────────────────── */
+.is-hidden-money {
+  filter: blur(7px);
+  user-select: none;
+  pointer-events: none;
+  transition: filter var(--duration-base) var(--ease);
+}

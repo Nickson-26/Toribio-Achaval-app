@@ -109,6 +109,16 @@
   --bg-surface-hover:  var(--bg-hover);
   --bg-muted:          var(--bg-secondary);
 
+  /* Jerarquía terciaria en dark.
+     El valor original (#56566a) daba 2,56:1 contra el fondo efectivo de la
+     sidebar (--glass-bg al 72% sobre --bg-app = #14141a). Eso está por debajo
+     incluso del 3:1 mínimo para texto de interfaz: se leía como disabled.
+     #84849a da 5,02:1 — cómodo para jornadas largas — y mantiene un escalón
+     visible respecto de --text-secondary (#9898a8, 6,46:1).
+     Es el token más usado del sistema (75 consumidores), así que el cambio se
+     nota en encabezados de grupo, sublíneas de métrica y textos de ayuda. */
+  --text-tertiary: #84849a;
+
   /* Marca */
   --brand:        #C8102E;
   --brand-hover:  #e0122f;

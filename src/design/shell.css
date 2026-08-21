@@ -98,7 +98,7 @@
 }
 .ta-nav__item.is-active svg { opacity: 1; }
 .ta-nav__item.is-active::before {
-  content: ''; position: absolute; left: -var(--space-3); top: 50%;
+  content: ''; position: absolute; left: calc(var(--space-3) * -1); top: 50%;
   transform: translateY(-50%);
   width: 3px; height: 17px; border-radius: 0 3px 3px 0;
   background: var(--brand);
@@ -150,13 +150,20 @@
   border-radius: 50%;
   font-size: 11px; font-weight: var(--weight-semibold);
 }
-.ta-userchip__body { min-width: 0; flex: 1; }
+/* `display: block` es necesario: nombre y rol son <span>, y sin esto quedan
+   inline y se renderizan en la misma línea, superponiéndose. */
+.ta-userchip__body { display: block; min-width: 0; flex: 1; overflow: hidden; }
 .ta-userchip__name {
+  display: block;
   font-size: var(--text-secondary-size); font-weight: var(--weight-label);
   color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ta-userchip__role { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-userchip__role {
+  display: block;
+  font-size: var(--text-micro); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .is-collapsed .ta-userchip { justify-content: center; }
 .is-collapsed .ta-userchip__body, .is-collapsed .ta-userchip svg { display: none; }
 
@@ -172,13 +179,15 @@
   -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border);
 }
+/* Ocupa el espacio libre: la topbar se lee completa sin depender de un
+   buscador que todavía no existe. */
 .ta-topbar__title {
+  flex: 1; min-width: 0;
   font-size: 17px; font-weight: var(--weight-semibold);
   color: var(--text-primary); letter-spacing: -0.02em;
   white-space: nowrap;
 }
-.ta-topbar__search { flex: 1; max-width: 340px; }
-.ta-topbar__actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.ta-topbar__actions { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
 
 .ta-theme-group {
   display: flex; align-items: center; gap: 2px;
@@ -193,6 +202,10 @@
   flex: 1; min-width: 0;
   padding: var(--space-6);
 }
+/* Higiene de flex/grid: sin esto, un hijo con ancho intrínseco grande —una
+   tabla ancha, un toolbar con inputs de ancho fijo— empuja el contenedor y
+   produce scroll horizontal a nivel de página. */
+.ta-main, .ta-content, .ta-shell > * { min-width: 0; }
 
 /* ── MENÚ DE USUARIO ──────────────────────────────────────────────────────── */
 .ta-menu {
@@ -255,8 +268,6 @@
 @media (max-width: 640px) {
   .ta-topbar { height: 56px; gap: var(--space-2); }
   .ta-topbar__title { font-size: 15px; }
-  /* La búsqueda se resuelve dentro de cada pantalla en mobile */
-  .ta-topbar__search { display: none; }
   .ta-content { padding: var(--space-3); }
 }
 

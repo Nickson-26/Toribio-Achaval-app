@@ -250,27 +250,74 @@ export function TipoBadge({ tipo, sm }: { tipo: string; sm?: boolean }) {
 /* ══════════════════════════════════════════════════════════════════════════
    MODAL
    ══════════════════════════════════════════════════════════════════════════ */
-/** Escape + bloqueo de scroll + foco inicial. Compartido por Modal y Drawer. */
+/**
+ * Escape + bloqueo de scroll + foco inicial. Compartido por Modal y Drawer.
+ *
+ * Las tres cosas se montan UNA sola vez, con deps vacías, y `onClose` se lee
+ * de un ref. Si el efecto dependiera de `onClose` —que en casi todos los
+ * call-sites es una arrow nueva en cada render— se re-ejecutaría constantemente:
+ * el cleanup cancelaría el setTimeout del foco inicial antes de que dispare, y
+ * el bloqueo de scroll se pondría y quitaría en loop.
+ */
 function useDismissable(onClose: () => void, panelRef: React.RefObject<HTMLElement>) {
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') closeRef.current() }
     window.addEventListener('keydown', onKey)
+
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+
     const t = setTimeout(() => {
       const el = panelRef.current
       if (!el) return
-      const focusable = el.querySelector<HTMLElement>(
-        'input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
-      )
-      focusable?.focus()
-    }, 40)
+
+      /**
+       * Intenta enfocar y CONFIRMA que el foco se movió.
+       *
+       * No alcanza con llamar a .focus(): si el elemento está oculto por CSS
+       * la llamada falla en silencio. Pasaba de verdad — el primer candidato
+       * del alta de comprobantes es el `input[type=file]` con display:none del
+       * importador de PDF, así que el foco no se movía y el usuario quedaba
+       * con el cursor en ningún lado.
+       */
+      const enfocar = (cand: HTMLElement | null | undefined): boolean => {
+        if (!cand) return false
+        if (cand.offsetParent === null && getComputedStyle(cand).position !== 'fixed') return false
+        cand.focus()
+        return document.activeElement === cand
+      }
+
+      const visibles = (sel: string) => Array.from(el.querySelectorAll<HTMLElement>(sel))
+
+      // 1. El primer campo REAL del cuerpo. Buscando en orden de DOM sin más,
+      //    el foco caería en el botón de cerrar del header —está antes— y
+      //    abrir un formulario dejaría el cursor en la X.
+      for (const c of visibles(
+        '.ta-modal__body input:not([type=hidden]):not([type=file]):not([disabled]):not([readonly]),' +
+        '.ta-modal__body select:not([disabled]),' +
+        '.ta-modal__body textarea:not([disabled])'
+      )) if (enfocar(c)) return
+
+      // 2. Sin campos (un diálogo de confirmación), el foco va a la acción.
+      for (const c of visibles('.ta-modal__footer button:not([disabled])')) if (enfocar(c)) return
+
+      // 3. Último recurso: el panel mismo, para que Escape y el lector de
+      //    pantalla tengan contexto.
+      for (const c of visibles('button:not([disabled])')) if (enfocar(c)) return
+      el.setAttribute('tabindex', '-1')
+      el.focus()
+    }, 60)
+
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
       clearTimeout(t)
     }
-  }, [onClose, panelRef])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }
 
 export function Modal({

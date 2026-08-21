@@ -771,7 +771,9 @@ tbody tr:hover td { background: var(--bg-hover); }
   .nav-links        { display: none; }
 
   /* Page padding */
-  .page-content, .dashboard-shell { padding: 12px !important; }
+  /* El padding del contenido ahora lo maneja .ta-content del AppShell.
+     Dejarlo acá duplicaba el margen en mobile. */
+  .page-content { padding: 12px !important; }
 
   /* Modales */
   .modal {

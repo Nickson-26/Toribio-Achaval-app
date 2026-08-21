@@ -4,6 +4,7 @@ import { db, Comprobante, supabase } from '@/lib/supabase'
 import { ars, usd, fdate, PERSONAS, downloadCSV, PUNTOS_VENTA } from '@/lib/utils'
 import { TipoBadge, EstadoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
 import { NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal, ConfirmarAcreditacionModal, GestionarRetencionesModal } from '@/components/ComprobanteForms'
+import { useRouteParams } from '@/components/NavigationProvider'
 
 type ModalType = 'detail' | 'new' | 'edit' | 'cobrar' | 'acreditacion' | 'retenciones' | 'eliminar' | 'anular' | 'exportar' | null
 type Tab = 'FACT A' | 'FACT B' | 'FACT DE CREDITO' | 'FACT E'
@@ -303,19 +304,25 @@ function ExportarModal({ pendientes, onClose }: { pendientes: Comprobante[]; onC
 
 // ── Main component ──────────────────────────────────────────────────────────
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
+  // Parámetros con los que se abrió esta pantalla.
+  // Permite que una alerta del Home haga
+  //   navigate(DESTINOS.facturasPendientes())
+  // y la tabla ya aparezca filtrada, sin pasar props por page.tsx.
+  const params = useRouteParams('facturas')
+
   const [data,          setData]          = useState<Comprobante[]>([])
   const [loading,       setLoading]       = useState(true)
   const [modal,         setModal]         = useState<ModalType>(null)
   const [selected,      setSelected]      = useState<Comprobante | null>(null)
-  const [search,        setSearch]        = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [search,        setSearch]        = useState(params?.buscar ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(params?.buscar ?? '')
   const [fYear,         setFYear]         = useState('all')
   const [fPers,         setFPers]         = useState('all')
-  const [fEst,          setFEst]          = useState<string[]>([])
+  const [fEst,          setFEst]          = useState<string[]>(params?.estado ?? [])
   const [fMoneda,       setFMoneda]       = useState<'all'|'ars'|'usd'>('all')
   const [fPV,           setFPV]           = useState<'all'|string>('all')
   const [clientes,      setClientes]      = useState<string[]>([])
-  const [tab,           setTab]           = useState<Tab>('FACT A')
+  const [tab,           setTab]           = useState<Tab>(params?.tab ?? 'FACT A')
   const [pdfUploading,  setPdfUploading]  = useState(false)
 
   // Debounce: esperar 300ms antes de buscar
@@ -414,7 +421,7 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
       'FACT DE CREDITO': base.filter(f => f.tipo === 'FACT DE CREDITO').length,
       'FACT E':          base.filter(f => f.tipo === 'FACT E').length,
     }
-  }, [data, fYear, fMoneda, fPV])
+  }, [data, fYear, fMoneda, fPV, fEst])
 
   const tabData = data
     .filter(f => f.tipo === tab)

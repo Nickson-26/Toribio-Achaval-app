@@ -143,8 +143,43 @@ CREATE INDEX IF NOT EXISTS idx_ret_pendientes  ON retenciones(comprobante_id)
 
 ALTER TABLE retenciones ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "retenciones_read"  ON retenciones;
-DROP POLICY IF EXISTS "retenciones_write" ON retenciones;
+-- ─── Purga de policies heredadas ────────────────────────────────────────────
+--
+-- La tabla se creó a mano desde el editor de Supabase, que le dejó una policy
+-- permisiva:
+--     "Allow all"  FOR ALL  TO public  USING (true)
+--
+-- Las policies PERMISSIVE se combinan con OR, así que esa policy habilitaba
+-- todo por sí sola: agregar policies restrictivas al lado NO la neutraliza.
+-- Verificado empíricamente contra producción con la clave anónima:
+--     SELECT anónimo  -> HTTP 200 (permitido)
+--     INSERT anónimo  -> HTTP 409 / 23503, o sea que RLS lo dejó pasar y sólo
+--                        lo detuvo la foreign key
+-- Es decir: cualquiera desde internet podía escribir retenciones y hacer que
+-- la aplicación creyera que "ya llegaron", habilitando el cierre indebido del
+-- circuito de cobro.
+--
+-- En lugar de dropear sólo los nombres conocidos, se purga TODO lo que no sea
+-- una de las dos policies deseadas. Así el estado final queda garantizado sin
+-- depender de conocer de antemano cómo se llamaba cada policy heredada.
+DO $$
+DECLARE
+  p RECORD;
+BEGIN
+  FOR p IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'retenciones'
+      AND policyname NOT IN ('retenciones_read','retenciones_write')
+  LOOP
+    EXECUTE format('DROP POLICY %I ON retenciones', p.policyname);
+    RAISE NOTICE 'retenciones: policy heredada eliminada -> %', p.policyname;
+  END LOOP;
+END $$;
+
+-- Explícito además del barrido, para que quede documentado en el diff.
+DROP POLICY IF EXISTS "Allow all"          ON retenciones;
+DROP POLICY IF EXISTS "retenciones_read"   ON retenciones;
+DROP POLICY IF EXISTS "retenciones_write"  ON retenciones;
 
 -- Lectura: cualquier usuario aprobado.
 CREATE POLICY "retenciones_read" ON retenciones
@@ -156,6 +191,15 @@ CREATE POLICY "retenciones_write" ON retenciones
   FOR ALL TO authenticated
   USING      (public.get_user_role(auth.uid()) IN ('admin','editor'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('admin','editor'));
+
+-- ─── Grants ─────────────────────────────────────────────────────────────────
+-- Defensa en profundidad, igual que hacen comprobantes / recibos / reservas en
+-- supabase_enterprise.sql. Sin el REVOKE, el rol anónimo conserva privilegios
+-- de tabla y el acceso queda gobernado sólo por la evaluación de policies;
+-- con el REVOKE, Postgres corta antes y devuelve 42501 como el resto de las
+-- tablas financieras.
+REVOKE ALL ON retenciones FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON retenciones TO authenticated;
 
 COMMENT ON TABLE retenciones IS
   'Retenciones impositivas por comprobante. Un comprobante con retenciones que aplican y no fueron recibidas queda en estado faltan_retenciones.';
@@ -197,5 +241,44 @@ BEGIN
     RAISE NOTICE '=== RECONCILIACION OK — el schema coincide con lo que espera el codigo ===';
   ELSE
     RAISE WARNING '=== FALTAN: % ===', faltan;
+  END IF;
+END $$;
+
+-- ── Auditoría de RLS sobre retenciones ──────────────────────────────────────
+DO $$
+DECLARE
+  sobrantes TEXT;
+  n_pol INT;
+  rls_on BOOLEAN;
+  anon_priv TEXT;
+BEGIN
+  SELECT relrowsecurity INTO rls_on
+  FROM pg_class WHERE oid = 'public.retenciones'::regclass;
+
+  SELECT count(*), string_agg(policyname, ', ')
+    INTO n_pol, sobrantes
+  FROM pg_policies
+  WHERE schemaname='public' AND tablename='retenciones';
+
+  SELECT string_agg(DISTINCT privilege_type, ', ')
+    INTO anon_priv
+  FROM information_schema.role_table_grants
+  WHERE table_schema='public' AND table_name='retenciones' AND grantee='anon';
+
+  RAISE NOTICE 'retenciones: RLS=% | policies=% (%) | privilegios de anon=%',
+    rls_on, n_pol, coalesce(sobrantes,'ninguna'), coalesce(anon_priv,'NINGUNO');
+
+  IF NOT rls_on THEN
+    RAISE WARNING 'retenciones: RLS NO esta habilitada';
+  END IF;
+  IF anon_priv IS NOT NULL THEN
+    RAISE WARNING 'retenciones: el rol anon todavia conserva privilegios: %', anon_priv;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='retenciones'
+             AND policyname NOT IN ('retenciones_read','retenciones_write')) THEN
+    RAISE WARNING 'retenciones: quedaron policies inesperadas';
+  END IF;
+  IF n_pol = 2 AND rls_on AND anon_priv IS NULL THEN
+    RAISE NOTICE '=== RLS DE RETENCIONES OK — solo read/write, sin acceso anonimo ===';
   END IF;
 END $$;

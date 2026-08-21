@@ -42,11 +42,54 @@ Leer antes de ejecutar en producción. **Yo no la ejecuté.**
 
 `idx_comp_factura_asociada`, `idx_ret_comprobante`, `idx_ret_pendientes` — los tres con `IF NOT EXISTS`.
 
-### RLS
+### RLS de `retenciones` — el bloqueante de seguridad
 
-Habilita RLS en `retenciones` y crea dos políticas: lectura para usuarios aprobados, escritura para admin y editor. Usa `DROP POLICY IF EXISTS` antes de cada `CREATE`, así que es re-ejecutable.
+Habilita RLS, **purga toda policy heredada**, y deja exactamente dos: lectura para usuarios aprobados, escritura para admin y editor. Además hace `REVOKE ALL ... FROM anon`.
 
 **No toca la RLS de ninguna otra tabla.**
+
+#### Por qué "Allow all" rompía todo
+
+Las policies PERMISSIVE de Postgres **se combinan con OR**. Una policy
+
+```sql
+FOR ALL TO public USING (true)
+```
+
+habilita todo por sí sola: agregarle policies restrictivas al lado **no la neutraliza**, porque basta con que *una* policy permita la operación. Y `TO public` en Postgres significa *todos los roles*, incluido `anon`.
+
+#### Verificación empírica contra producción (con la clave anónima)
+
+| Prueba | Resultado | Lectura |
+|---|---|---|
+| `SELECT` anónimo en `retenciones` | `HTTP 200` | Permitido |
+| `INSERT` anónimo en `retenciones` | `HTTP 409` · `23503` | **RLS lo dejó pasar** — sólo lo detuvo la foreign key del `comprobante_id` inválido que se usó a propósito |
+| `SELECT` anónimo en `comprobantes` | `HTTP 401` · `42501` | Bloqueado (así debe ser) |
+| `SELECT` anónimo en `reservas` | `HTTP 401` · `42501` | Bloqueado |
+
+Con un `comprobante_id` válido, cualquiera desde internet podía escribir retenciones y hacer que la aplicación creyera que *"ya llegaron"*, habilitando el cierre indebido del circuito de cobro.
+
+#### Barrido del resto de las tablas
+
+| Tabla | `SELECT` anónimo | Filas que devuelve | `INSERT` anónimo |
+|---|---|---|---|
+| `comprobantes` | `42501` bloqueado | — | — |
+| `recibos` | `42501` bloqueado | — | — |
+| `reservas` | `42501` bloqueado | — | — |
+| **`retenciones`** | **200 permitido** | 0 (tabla vacía) | **`23503` — RLS deja pasar** |
+| `recibo_comprobantes` | 200 permitido | 0 (tabla vacía) | `42501` bloqueado |
+| `usuarios` | 200 permitido | **0 de 4** — RLS filtra | `42501` bloqueado |
+| `audit_log` | 200 permitido | **0 de 885** — RLS filtra | `42501` bloqueado |
+
+**`retenciones` es la única tabla con escritura anónima.** Las otras tres que responden 200 tienen grants abiertos para `anon` pero sus policies filtran la lectura a 0 filas y rechazan la escritura, así que **no hay fuga de datos ni escritura posible en ninguna otra tabla**. Intentar insertar en `usuarios` con `role: admin` devuelve `42501`: la escalada de privilegios por esa vía está cerrada.
+
+#### Cómo se purga
+
+En vez de dropear sólo los nombres conocidos, un bloque `DO` recorre `pg_policies` y elimina **todo lo que no sea** `retenciones_read` o `retenciones_write`. Así el estado final queda garantizado sin depender de conocer de antemano cada nombre heredado. El `DROP POLICY IF EXISTS "Allow all"` está además escrito de forma explícita para que quede visible en el diff.
+
+#### Queda pendiente (no exploitable, fuera de esta migración)
+
+`usuarios`, `audit_log` y `recibo_comprobantes` conservan grants para `anon`. Origen: `supabase_trigger.sql` hizo `GRANT INSERT ON usuarios TO anon` y el `REVOKE` de `supabase_enterprise.sql` no las incluyó. Hoy RLS las cubre, así que **no se tocan acá**: cambiar grants sobre `usuarios` puede afectar el alta de cuentas y merece probarse aparte. Queda registrado como tarea de limpieza.
 
 ---
 
@@ -149,6 +192,36 @@ WHERE conname = 'comprobantes_estado_check';
 -- Esperado: CHECK ((estado = ANY (ARRAY['pendiente','cobrada','anulada',
 --                    'emitida','faltan_retenciones','echeq_pendiente'])))
 ```
+
+### 5.3b Verificar que `"Allow all"` desapareció
+
+```sql
+SELECT policyname, roles, cmd, qual
+FROM pg_policies
+WHERE schemaname='public' AND tablename='retenciones'
+ORDER BY policyname;
+-- Esperado: EXACTAMENTE 2 filas
+--   retenciones_read   {authenticated}  SELECT
+--   retenciones_write  {authenticated}  ALL
+-- NO debe aparecer "Allow all", ni ninguna con roles={public}, ni qual=true
+```
+
+```sql
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema='public' AND table_name='retenciones'
+ORDER BY grantee, privilege_type;
+-- Esperado: NINGUNA fila con grantee='anon'
+```
+
+La migración también imprime esto sola:
+
+```
+NOTICE:  retenciones: RLS=t | policies=2 (retenciones_read, retenciones_write) | privilegios de anon=NINGUNO
+NOTICE:  === RLS DE RETENCIONES OK — solo read/write, sin acceso anonimo ===
+```
+
+Si sale `WARNING: retenciones: el rol anon todavia conserva privilegios: ...`, avisame.
 
 ### 5.4 Verificar `retenciones` y su UNIQUE
 

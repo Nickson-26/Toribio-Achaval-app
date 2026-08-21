@@ -4,6 +4,7 @@ import { db, Recibo, Comprobante } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { ars, usd, fdate, montoARS, PERSONAS, today, downloadCSV, MESES, TODOS_TIPOS, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT } from '@/lib/utils'
 import { TipoBadge, Spinner, Modal, FG, toast } from '@/components/ui'
+import { discriminaIVA, desdeNeto } from '@/lib/fiscal'
 
 // ══════════════════════════════════════════════════════════════
 // RECIBOS
@@ -522,11 +523,20 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
     supabase.from('comprobantes').select('id,tipo,cliente,fecha,monto_ars,neto_ars,persona,estado').in('tipo',['FACT A','FACT B','FACT DE CREDITO','FACT E']).order('numero',{ascending:false}).limit(200).then(({data})=>setFacturas((data||[]) as Comprobante[]))
   },[])
 
+  // El cálculo depende del TIPO. NC B y NC FACT DE CREDITO no discriminan IVA:
+  // el total ingresado es la base. Antes esto aplicaba 21% a los tres tipos.
+  const llevaIVA = discriminaIVA(tipo)
+
   useEffect(()=>{
+    if(!llevaIVA){ setIva(''); return }
     const n=parseFloat(neto)
-    if(!isNaN(n)&&n>0){setIva(String(Math.round(n*0.21*100)/100));setArs(String(Math.round(n*1.21*100)/100))}
+    if(!isNaN(n)&&n>0){const r=desdeNeto(tipo,n);setIva(String(r.iva));setArs(String(r.total))}
     else{setIva('');setArs('')}
-  },[neto])
+  },[neto,tipo,llevaIVA])
+
+  // Al pasar a un tipo sin IVA, el "neto" deja de tener sentido: se limpia para
+  // que el usuario cargue el total directo y no queden restos del cálculo.
+  useEffect(()=>{ if(!llevaIVA){ setNeto(''); setIva('') } },[llevaIVA])
 
   useEffect(()=>{
     const fid=facturaId.trim()
@@ -562,9 +572,16 @@ function NuevoNCModal({onClose,onSaved,clientes}:{onClose:()=>void;onSaved:()=>v
         {cliente&&<FG label="Cliente" full><input readOnly value={cliente} style={{background:'var(--bg-secondary)',opacity:0.8}}/></FG>}
         <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <div/>
-        <FG label="Neto ARS"><input type="number" placeholder="0" value={neto} onChange={e=>setNeto(e.target.value)}/><span className="calc-hint">IVA y total se calculan solos</span></FG>
-        <FG label="IVA (calculado)"><input readOnly value={iva} placeholder="—"/></FG>
-        <FG label="Total ARS (calculado)" full><input readOnly value={arsV} placeholder="—"/></FG>
+        {llevaIVA ? (<>
+          <FG label="Neto ARS"><input type="number" placeholder="0" value={neto} onChange={e=>setNeto(e.target.value)}/><span className="calc-hint">IVA y total se calculan solos</span></FG>
+          <FG label="IVA (calculado)"><input readOnly value={iva} placeholder="—"/></FG>
+          <FG label="Total ARS (calculado)" full><input readOnly value={arsV} placeholder="—"/></FG>
+        </>) : (
+          <FG label="Total ARS" full>
+            <input type="number" placeholder="0" value={arsV} onChange={e=>setArs(e.target.value)}/>
+            <span className="calc-hint">{tipo} no discrimina IVA — se carga el total</span>
+          </FG>
+        )}
         <FG label="Concepto" full><textarea rows={2} value={concepto} onChange={e=>setConcepto(e.target.value)}/></FG>
       </div>
     </Modal>
@@ -580,10 +597,17 @@ function EditarNCModal({comp,onClose,onSaved}:{comp:Comprobante;onClose:()=>void
   const [arsV,setArs]=useState(String(comp.monto_ars||''))
   const [concepto,setConcepto]=useState(comp.concepto||'')
 
+  const llevaIVA = discriminaIVA(comp.tipo)
+  // `tocado` evita el bug anterior: el efecto corría al MONTAR y pisaba iva y
+  // monto_ars con neto*0.21 y neto*1.21 aunque el usuario no tocara nada, así
+  // que abrir y guardar una NC B le inventaba un 21% de IVA.
+  const [tocado,setTocado]=useState(false)
+
   useEffect(()=>{
+    if(!tocado||!llevaIVA) return
     const n=parseFloat(neto)
-    if(!isNaN(n)&&n>0){setIva(String(Math.round(n*0.21*100)/100));setArs(String(Math.round(n*1.21*100)/100))}
-  },[neto])
+    if(!isNaN(n)&&n>0){const r=desdeNeto(comp.tipo,n);setIva(String(r.iva));setArs(String(r.total))}
+  },[neto,tocado,llevaIVA,comp.tipo])
 
   return (
     <Modal title={`Editar ${comp.id}`} onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={()=>onSaved({fecha,cliente:cliente.trim(),persona,neto_ars:neto?parseFloat(neto):null,iva:iva?parseFloat(iva):null,monto_ars:arsV?parseFloat(arsV):null,concepto:concepto.trim()})}>Guardar</button></>}>
@@ -592,9 +616,16 @@ function EditarNCModal({comp,onClose,onSaved}:{comp:Comprobante;onClose:()=>void
         <FG label="Cliente"><input value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
         <FG label="Persona"><select value={persona} onChange={e=>setPersona(e.target.value)}>{PERSONAS.map(p=><option key={p}>{p}</option>)}</select></FG>
         <div/>
-        <FG label="Neto"><input type="number" value={neto} onChange={e=>setNeto(e.target.value)}/></FG>
-        <FG label="IVA (calculado)"><input readOnly value={iva}/></FG>
-        <FG label="Total (calculado)" full><input readOnly value={arsV}/></FG>
+        {llevaIVA ? (<>
+          <FG label="Neto"><input type="number" value={neto} onChange={e=>{setTocado(true);setNeto(e.target.value)}}/></FG>
+          <FG label="IVA (calculado)"><input readOnly value={iva}/></FG>
+          <FG label="Total (calculado)" full><input readOnly value={arsV}/></FG>
+        </>) : (
+          <FG label="Total ARS" full>
+            <input type="number" value={arsV} onChange={e=>setArs(e.target.value)}/>
+            <span className="calc-hint">{comp.tipo} no discrimina IVA — se carga el total</span>
+          </FG>
+        )}
         <FG label="Concepto" full><textarea rows={2} value={concepto} onChange={e=>setConcepto(e.target.value)}/></FG>
       </div>
     </Modal>

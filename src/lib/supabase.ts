@@ -195,7 +195,10 @@ export const db = {
   async getDashboardStats() {
     const { data: comps, error } = await supabase
       .from('comprobantes')
-      .select('id,numero,tipo,persona,cliente,fecha,fecha_cobro,monto_ars,monto_usd,tipo_cambio,neto_ars,estado,punto_venta')
+      // `neto_usd` faltaba: sin él, la rama de netoARS() que usa el neto real
+      // de las facturas en USD era código muerto y el neto se derivaba
+      // dividiendo el total por 1,21.
+      .select('id,numero,tipo,persona,cliente,fecha,fecha_cobro,monto_ars,monto_usd,tipo_cambio,neto_ars,neto_usd,estado,punto_venta')
       .neq('estado', 'anulada')
     if (error) throw new Error(`Error al cargar dashboard: ${error.message}`)
     return { comprobantes: comps || [] }

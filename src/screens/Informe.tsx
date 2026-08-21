@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { db } from '@/lib/supabase'
 import { ars, usd, MESES } from '@/lib/utils'
+import { netoARS, brutoARS } from '@/lib/fiscal'
 import { Spinner, toast } from '@/components/ui'
 
 export default function Informe(_: any) {
@@ -27,8 +28,11 @@ export default function Informe(_: any) {
         return true
       })
 
-      const toARS = (f: any) => f.monto_ars || (f.monto_usd && f.tipo_cambio ? f.monto_usd * f.tipo_cambio : 0)
-      const toNeto = (f: any) => f.neto_ars || (f.neto_usd && f.tipo_cambio ? f.neto_usd * f.tipo_cambio : (f.monto_ars ? f.monto_ars / 1.21 : (f.monto_usd && f.tipo_cambio ? (f.monto_usd * f.tipo_cambio) / 1.21 : 0)))
+      // Interpretación fiscal centralizada en src/lib/fiscal.ts — la misma que
+      // usa el Dashboard. Antes este archivo tenía su propia copia de la
+      // fórmula y le restaba 21% a las Factura B, que no discriminan IVA.
+      const toARS  = brutoARS
+      const toNeto = netoARS
 
       const totalBrutoARS = facts.reduce((s: number, f: any) => s + toARS(f), 0)
       const totalNetoARS  = facts.reduce((s: number, f: any) => s + toNeto(f), 0)

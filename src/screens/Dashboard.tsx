@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { db } from '@/lib/supabase'
 import { ars, usd, fdate, MESES, PERSONAS } from '@/lib/utils'
+import { netoARS, brutoARS } from '@/lib/fiscal'
 import { TipoBadge, EstadoBadge, Spinner } from '@/components/ui'
 import { useHideNumbers } from '@/components/HideNumbers'
 
@@ -47,21 +48,12 @@ export default function Dashboard({ onPendientesChange }: { onPendientesChange?:
     }).finally(() => setLoading(false))
   }, [onPendientesChange])
 
-  const toNeto = (f: any) => {
-    if (f.monto_usd) {
-      if (!f.tipo_cambio) return 0
-      if (f.neto_usd) return Math.round(f.neto_usd * f.tipo_cambio * 100) / 100
-      return Math.round((f.monto_usd * f.tipo_cambio / 1.21) * 100) / 100
-    }
-    if (f.neto_ars) return f.neto_ars
-    if (f.monto_ars) return Math.round((f.monto_ars / 1.21) * 100) / 100
-    return 0
-  }
+  // Interpretación fiscal centralizada en src/lib/fiscal.ts.
+  // Antes esta función no miraba `f.tipo` y le restaba 21% a las Factura B,
+  // que no discriminan IVA: el total facturado ES el neto.
+  const toNeto = netoARS
 
-  const toBruto = (f: any) => {
-    if (f.monto_usd) return f.tipo_cambio ? Math.round(f.monto_usd * f.tipo_cambio * 100) / 100 : 0
-    return f.monto_ars || 0
-  }
+  const toBruto = brutoARS
 
   const filterFacturas = (year: string) => all.filter((c: any) => {
     if (!c.tipo?.startsWith('FACT') || c.estado === 'anulada') return false

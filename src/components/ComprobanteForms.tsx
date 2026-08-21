@@ -4,6 +4,7 @@ import { db, Comprobante, TipoRetencion, Retencion, calcEstadoComprobante } from
 import { Modal, FG, toast } from '@/components/ui'
 import { PERSONAS, TODOS_TIPOS, today, buildComprobanteId, PUNTOS_VENTA, PUNTO_VENTA_DEFAULT, estadoColor } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { apiFetch, apiErrorMessage } from '@/lib/apiClient'
 
 const IVA_RATE = 0.21
 
@@ -78,14 +79,14 @@ export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
         reader.onerror = reject
         reader.readAsDataURL(file)
       })
-      const res = await fetch('/api/extract-invoice', {
+      const res = await apiFetch('/api/extract-invoice', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ pdfBase64: base64 }),
       })
       if (!res.ok) {
-        const err = await res.json().catch(()=>({error:'Error desconocido'}))
-        toast('Error al extraer datos: ' + (err.error || res.statusText))
+        const err = await res.json().catch(()=>null)
+        toast('Error al extraer datos: ' + apiErrorMessage(err, res.statusText))
         return
       }
       const data = await res.json()
@@ -478,31 +479,21 @@ export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
         return
       }
 
-      // Step 1: upsert recibo FIRST (FK constraint requires recibo to exist before linking)
-      if (!existente) {
-        const { error: reciboError } = await supabase.from('recibos').insert({
-          id: rId, fecha,
-          cliente: comp.cliente, nro_fact: comp.id, persona: comp.persona,
-          monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
-          forma_pago: pago, retencion: null, nro_echeq: echeq || null,
-        })
-        if (reciboError && reciboError.code !== '23505') {
-          throw new Error('Error al crear recibo: ' + reciboError.message)
-        }
-      }
+      // Registro atómico: valida que el recibo sea del mismo cliente, resuelve
+      // colisiones de numeración y revierte si el segundo paso falla.
+      const res = await db.registrarCobro({
+        comprobante: comp,
+        fecha,
+        formaPago: pago,
+        reciboId: rId,
+        vincularAExistente: existente,
+        nroEcheq: echeq || null,
+      })
 
-      // Step 2: update comprobante as cobrada
-      await db.updateComprobante(comp.id, {
-        estado: 'cobrada',
-        recibo_id: rId,
-        fecha_cobro: fecha,
-        pago_recibido: true,
-        fecha_pago: fecha,
-        medio_pago: pago,
-      } as any)
-
-      const label = existente ? `vinculada al Recibo ${rId}` : `Recibo ${rId} registrado`
-      toast(`✓ ${label}`)
+      const label = !res.creado
+        ? `vinculada al Recibo ${res.reciboId}`
+        : `Recibo ${res.reciboId} registrado`
+      toast(`✓ ${label}${res.renumerado ? ` (el ${rId} ya estaba ocupado)` : ''}`)
       onSaved()
     } catch (e: any) {
       toast('Error: ' + (e.message || 'No se pudo registrar'))
@@ -648,27 +639,20 @@ export function ConfirmarAcreditacionModal({ comp, onClose, onSaved }: {
       const rId = parseInt(nroRecibo)
       if (!rId) { toast('Ingresá un número de recibo válido'); setSaving(false); return }
 
-      // Create recibo
-      const { error: reciboError } = await supabase.from('recibos').insert({
-        id: rId, fecha,
-        cliente: comp.cliente, nro_fact: comp.id, persona: comp.persona,
-        monto_ars: comp.monto_ars, monto_usd: comp.monto_usd,
-        forma_pago: 'e-cheq', retencion: null, nro_echeq: nroEcheq || null,
+      // Mismo camino atómico que el cobro normal.
+      const res = await db.registrarCobro({
+        comprobante: comp,
+        fecha,
+        formaPago: 'e-cheq',
+        reciboId: rId,
+        vincularAExistente: false,
+        nroEcheq: nroEcheq || null,
       })
-      if (reciboError && reciboError.code !== '23505') {
-        throw new Error('Error al crear recibo: ' + reciboError.message)
-      }
 
-      // Mark cobrada
-      await db.updateComprobante(comp.id, {
-        estado: 'cobrada',
-        recibo_id: rId,
-        fecha_cobro: fecha,
-        pago_recibido: true,
-        fecha_pago: fecha,
-      } as any)
-
-      toast(`✓ E-Cheq acreditado — Recibo ${rId}`)
+      toast(
+        `✓ E-Cheq acreditado — Recibo ${res.reciboId}` +
+        (res.renumerado ? ` (el ${rId} ya estaba ocupado)` : '')
+      )
       onSaved()
     } catch (e: any) {
       toast('Error: ' + (e.message || ''))

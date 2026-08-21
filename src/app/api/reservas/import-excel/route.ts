@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireUser, isDenied, actorLabel } from '@/lib/apiAuth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+// Tamaño máximo del .xlsx aceptado (10 MB).
+const MAX_FILE_BYTES = 10 * 1024 * 1024
+
+// Esta operación REEMPLAZA la tabla `reservas` completa. Para que no pueda
+// dispararse por accidente ni por una request suelta, exige que el llamador
+// mande explícitamente este valor en el form-data.
+const CONFIRM_TOKEN = 'REEMPLAZAR'
 
 const UNIDAD_BY_PREFIX: Record<string, string> = {
   TAR: 'RESIDENCIAL', TCD: 'RESIDENCIAL', TMO: 'RESIDENCIAL', TRO: 'RESIDENCIAL',
@@ -59,6 +68,15 @@ function parseExcelDate(raw: any): string {
 }
 
 export async function POST(req: NextRequest) {
+  // ── AUTORIZACIÓN ─────────────────────────────────────────────
+  // Operación destructiva (reemplaza la tabla `reservas` entera).
+  // Solo admin, o el job interno con RESERVAS_IMPORT_SECRET.
+  const actor = await requireUser(req, {
+    roles: ['admin'],
+    allowSecrets: ['RESERVAS_IMPORT_SECRET'],
+  })
+  if (isDenied(actor)) return actor
+
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -68,6 +86,25 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+
+  if (file.size > MAX_FILE_BYTES) {
+    return NextResponse.json(
+      { error: 'file_too_large', detail: `El archivo supera los ${MAX_FILE_BYTES / 1024 / 1024} MB` },
+      { status: 413 }
+    )
+  }
+
+  // Confirmación explícita: sin esto no se borra nada.
+  const confirm = String(formData.get('confirm') ?? '')
+  if (confirm !== CONFIRM_TOKEN) {
+    return NextResponse.json(
+      {
+        error: 'confirmation_required',
+        detail: 'Esta operación reemplaza TODAS las reservas. Falta el campo de confirmación.',
+      },
+      { status: 400 }
+    )
+  }
 
   const buffer = await file.arrayBuffer()
 
@@ -135,6 +172,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, inserted: 0, errors: 0 })
   }
 
+  // ── RESGUARDO ANTES DE BORRAR ────────────────────────────────
+  // El flujo es "reemplazar la base". Si el insert fallara después del delete
+  // se perderían todas las reservas, así que primero las traemos a memoria
+  // para poder restaurarlas.
+  const { data: backup, error: backupError } = await sb.from('reservas').select('*')
+  if (backupError) {
+    return NextResponse.json(
+      { ok: false, error: 'No se pudo resguardar la tabla antes de reemplazarla: ' + backupError.message },
+      { status: 500 }
+    )
+  }
+
   const { error: delError } = await sb
     .from('reservas')
     .delete()
@@ -153,8 +202,39 @@ export async function POST(req: NextRequest) {
     .select('id')
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    // Restaurar el estado previo. Sin esto, un insert fallido deja la tabla vacía.
+    let restored = 0
+    let restoreError: string | null = null
+    if (backup && backup.length) {
+      const { error: restErr, data: restData } = await sb
+        .from('reservas')
+        .insert(backup)
+        .select('id')
+      if (restErr) restoreError = restErr.message
+      else restored = restData?.length ?? 0
+    }
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error.message,
+        restored,
+        restoreError,
+        detail: restoreError
+          ? `LA IMPORTACIÓN FALLÓ Y LA RESTAURACIÓN TAMBIÉN. Se perdieron ${backup?.length ?? 0} reservas. Restaurar desde backup manualmente.`
+          : `La importación falló. Se restauraron ${restored} reservas al estado previo.`,
+      },
+      { status: 500 }
+    )
   }
 
-  return NextResponse.json({ ok: true, inserted: data?.length ?? records.length, errors: 0 })
+  console.info(
+    `[import-excel] ${actorLabel(actor)} reemplazó ${backup?.length ?? 0} reservas por ${data?.length ?? records.length}`
+  )
+
+  return NextResponse.json({
+    ok: true,
+    inserted: data?.length ?? records.length,
+    replaced: backup?.length ?? 0,
+    errors: 0,
+  })
 }

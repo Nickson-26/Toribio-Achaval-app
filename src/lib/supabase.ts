@@ -204,6 +204,38 @@ export const db = {
     return { comprobantes: comps || [] }
   },
 
+  /**
+   * Datos del Inicio.
+   *
+   * Query propia, separada de `getDashboardStats()`, por dos razones:
+   *   · el Inicio necesita `created_at` (para la actividad reciente) y
+   *     `referencia_pago` (fecha de acreditación de e-cheq), que el dashboard
+   *     no traía;
+   *   · el Inicio ya no renderiza gráficos, así que pide menos columnas y no
+   *     arrastra el costo de los cálculos analíticos.
+   *
+   * Trae también las anuladas: la lista de últimos comprobantes las muestra con
+   * su badge. El filtrado por estado lo hace `lib/home.ts` según cada sección.
+   */
+  async getInicioData(): Promise<{ comprobantes: any[]; recibos: any[] }> {
+    const [comps, recs] = await Promise.all([
+      supabase
+        .from('comprobantes')
+        .select('id,numero,tipo,persona,cliente,fecha,estado,monto_ars,monto_usd,tipo_cambio,neto_ars,neto_usd,created_at,referencia_pago')
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('recibos')
+        .select('id,fecha,cliente,monto_ars,monto_usd,nro_fact,created_at')
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ])
+    if (comps.error) throw new Error(`Error al cargar el inicio: ${comps.error.message}`)
+    // Los recibos son sólo para la actividad reciente: si fallan, el resto de
+    // la pantalla sigue siendo útil.
+    return { comprobantes: comps.data ?? [], recibos: recs.error ? [] : (recs.data ?? []) }
+  },
+
   // ── Recibo vinculado a múltiples facturas ──────────────────────
   async createReciboConFacturas(
     payload: Omit<Recibo, 'created_at' | 'recibo_comprobantes'>,

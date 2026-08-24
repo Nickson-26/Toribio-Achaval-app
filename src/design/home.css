@@ -79,12 +79,15 @@
 .ta-atn__icon--info    { background: var(--info-soft);    color: var(--info-text); }
 .ta-atn__icon--brand   { background: var(--violet-soft);  color: var(--violet-text); }
 
-.ta-atn__body { flex: 1; min-width: 0; }
+.ta-atn__body { display: block; flex: 1; min-width: 0; }
+/* display:block obligatorio: son <span> dentro de un <span>, y sin esto
+   quedan inline y se renderizan en la misma línea. */
 .ta-atn__titulo {
+  display: block;
   font-size: 15px; font-weight: var(--weight-label); color: var(--text-primary);
 }
 .ta-atn__detalle {
-  margin-top: 2px;
+  display: block; margin-top: 2px;
   font-size: var(--text-secondary-size); color: var(--text-secondary);
 }
 
@@ -152,6 +155,12 @@
 /* ── Actividad y últimas facturas ─────────────────────────────────────────── */
 .ta-home__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
 
+/* Higiene de grid/flex. Los hijos de un grid tienen min-width:auto por
+   defecto, así que un texto largo —el título de un evento, el nombre de un
+   cliente— empuja la columna y genera scroll horizontal de página en vez de
+   recortarse con elipsis. */
+.ta-home__cols > *, .ta-sec, .ta-list, .ta-atn, .ta-list__row { min-width: 0; }
+
 .ta-list { display: flex; flex-direction: column; }
 .ta-list__row {
   display: flex; align-items: center; gap: var(--space-3);
@@ -170,13 +179,14 @@
   background: var(--bg-muted); color: var(--text-secondary);
   border-radius: var(--radius-sm);
 }
-.ta-list__main { flex: 1; min-width: 0; }
+.ta-list__main { display: block; flex: 1; min-width: 0; }
 .ta-list__t1 {
+  display: block;
   font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ta-list__t2 {
-  margin-top: 1px;
+  display: block; margin-top: 1px;
   font-size: var(--text-micro); color: var(--text-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

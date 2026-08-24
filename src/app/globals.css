@@ -323,13 +323,13 @@ tbody tr:hover td { background: var(--bg-hover); }
   white-space: nowrap; letter-spacing: 0.02em;
 }
 .badge-blue   { background: var(--info-bg);    color: var(--info); }
-.badge-purple { background: rgba(139,92,246,.10); color: #a78bfa; }
+.badge-purple { background: var(--violet-soft); color: var(--violet-text); }
 .badge-green  { background: var(--success-bg); color: var(--success); }
 .badge-amber  { background: var(--warn-bg);    color: var(--warn); }
 .badge-red    { background: var(--danger-bg);  color: var(--danger); }
-.badge-teal   { background: rgba(20,184,166,.10); color: #2dd4bf; }
+.badge-teal   { background: var(--info-soft);   color: var(--info-text); }
 .badge-gray   { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-strong); }
-.badge-orange { background: rgba(234,88,12,.12); color: #f97316; }
+.badge-orange { background: var(--warning-soft); color: var(--warning-text); }
 
 /* ══════════════════════════════════════════════
    TOOLBAR / FILTERS
@@ -349,8 +349,8 @@ tbody tr:hover td { background: var(--bg-hover); }
 .toolbar input { width: 240px; }
 .toolbar select { width: 180px; }
 .toolbar input:focus, .toolbar select:focus {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(200,16,46,0.12);
+  outline: none; border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
   background: var(--bg-elevated);
 }
 .toolbar input::placeholder { color: var(--text-tertiary); }
@@ -372,8 +372,8 @@ tbody tr:hover td { background: var(--bg-hover); }
 }
 .form-group textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(200,16,46,0.12);
+  outline: none; border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
   background: var(--bg-elevated);
 }
 .form-group input.error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
@@ -386,7 +386,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 ══════════════════════════════════════════════ */
 .overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.65);
+  background: var(--overlay-bg);
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   z-index: 200; padding: 20px;
@@ -502,7 +502,7 @@ tbody tr:hover td { background: var(--bg-hover); }
   border-radius: var(--radius); font-size: 12px; font-family: var(--font);
   transition: all var(--transition);
 }
-.dash-filters select:focus { outline: none; border-color: var(--accent); }
+.dash-filters select:focus { outline: none; border-color: var(--border-focus); box-shadow: var(--focus-ring); }
 .filter-sep { width: 1px; height: 20px; background: var(--border-strong); }
 
 /* ══════════════════════════════════════════════
@@ -572,7 +572,7 @@ tbody tr:hover td { background: var(--bg-hover); }
   font-size: 14px; font-family: var(--font);
   transition: all var(--transition);
 }
-.auth-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,16,46,0.12); background: var(--bg-elevated); }
+.auth-field input:focus { outline: none; border-color: var(--border-focus); box-shadow: var(--focus-ring); background: var(--bg-elevated); }
 
 .auth-error {
   background: var(--danger-bg); border: 1px solid rgba(239,68,68,0.3);
@@ -771,7 +771,9 @@ tbody tr:hover td { background: var(--bg-hover); }
   .nav-links        { display: none; }
 
   /* Page padding */
-  .page-content, .dashboard-shell { padding: 12px !important; }
+  /* El padding del contenido ahora lo maneja .ta-content del AppShell.
+     Dejarlo acá duplicaba el margen en mobile. */
+  .page-content { padding: 12px !important; }
 
   /* Modales */
   .modal {
@@ -889,7 +891,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 .dash-hero-main,
 .dash-control-panel {
   background:
-    linear-gradient(135deg, rgba(8,38,28,0.92) 0%, rgba(12,52,38,0.65) 28%, transparent 58%),
+    var(--hero-gradient),
     linear-gradient(180deg, var(--bg-card), var(--bg-primary));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

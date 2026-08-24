@@ -1,26 +1,19 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ToastProvider } from '@/components/ui'
 import { useAuth } from '@/components/AuthProvider'
 import LoginPage from '@/components/LoginPage'
-import { CambiarPasswordModal } from '@/components/CambiarPassword'
-import { NavigationProvider, useNavigation } from '@/components/NavigationProvider'
-import { TopNav, type Theme } from '@/components/shell/TopNav'
-import { SCREENS } from '@/lib/screens'
+import { NavigationProvider } from '@/components/NavigationProvider'
+import { AppShell } from '@/components/shell/AppShell'
+import type { Theme } from '@/components/shell/Topbar'
+import { Button } from '@/design/primitives'
 
 /**
- * Punto de entrada de la aplicación.
+ * Punto de entrada. Sólo tres responsabilidades:
+ *   1. gates de autenticación,
+ *   2. tema,
+ *   3. montar el shell.
  *
- * Antes: 252 líneas que eran shell + navegación + router + theme + menú de
- * usuario + switcher de módulos, con la navegación duplicada en cinco listas.
- *
- * Ahora sólo hace tres cosas:
- *   1. los gates de autenticación,
- *   2. el theme,
- *   3. montar el shell y resolver la pantalla del destino actual.
- *
- * La navegación vive en `lib/navigation.ts` + `NavigationProvider`.
- * El mapa destino → componente, en `lib/screens.tsx`.
+ * Todo lo demás vive en AppShell / Sidebar / Topbar.
  */
 export default function Home() {
   const { user, loading, signOut } = useAuth()
@@ -33,19 +26,26 @@ export default function Home() {
   }, [theme])
 
   useEffect(() => {
-    const saved = localStorage.getItem('ta-theme') as Theme | null
-    if (saved) setTheme(saved)
+    // El script de layout.tsx ya aplicó el atributo antes de pintar; acá sólo
+    // se sincroniza el estado de React con lo que ya está en el DOM.
+    try {
+      const saved = localStorage.getItem('ta-theme') as Theme | null
+      if (saved) setTheme(saved)
+    } catch { /* noop */ }
   }, [])
 
   function applyTheme(t: Theme) {
     setTheme(t)
-    localStorage.setItem('ta-theme', t)
+    try { localStorage.setItem('ta-theme', t) } catch { /* noop */ }
   }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-base)' }}>
-        <div className="spinner" />
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg-app)',
+      }}>
+        <span className="ta-spinner" role="status" aria-label="Cargando" />
       </div>
     )
   }
@@ -58,10 +58,14 @@ export default function Home() {
         <div className="auth-card">
           <div className="auth-logo">TA</div>
           <h1 className="auth-title">Cuenta pendiente</h1>
-          <p className="auth-subtitle">Tu cuenta está esperando aprobación del administrador.</p>
-          <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={signOut}>
-            Cerrar sesión
-          </button>
+          <p className="auth-subtitle">
+            Tu cuenta está esperando la aprobación de un administrador.
+          </p>
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <Button variant="secondary" onClick={signOut} style={{ width: '100%' }}>
+              Cerrar sesión
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -69,38 +73,7 @@ export default function Home() {
 
   return (
     <NavigationProvider>
-      <Workspace theme={theme} onTheme={applyTheme} />
+      <AppShell theme={theme} onTheme={applyTheme} />
     </NavigationProvider>
-  )
-}
-
-/**
- * Va dentro del NavigationProvider para poder leer el destino actual.
- */
-function Workspace({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
-  const { route } = useNavigation()
-  const [pendientes, setPendientes] = useState(0)
-  const [showPassword, setShowPassword] = useState(false)
-
-  const Screen = SCREENS[route.to]
-
-  return (
-    <div className="app-shell">
-      <TopNav
-        theme={theme}
-        onTheme={onTheme}
-        pendientes={pendientes}
-        onCambiarPassword={() => setShowPassword(true)}
-      />
-
-      <main className="main-content">
-        {/* `key` fuerza el remontaje al cambiar de destino: evita que una
-            pantalla arrastre estado de la anterior. */}
-        <Screen key={route.to} onPendientesChange={setPendientes} />
-      </main>
-
-      {showPassword && <CambiarPasswordModal onClose={() => setShowPassword(false)} />}
-      <ToastProvider />
-    </div>
   )
 }

@@ -66,24 +66,32 @@ export const RUTA_INICIAL: AppRoute = { to: 'inicio' }
 // ── Registro ────────────────────────────────────────────────────────────────
 
 /**
- * Secciones del producto. Hoy gobiernan el switcher de módulos del topnav;
- * en el rediseño serán los grupos de la sidebar.
+ * Grupos de la sidebar.
+ *
+ * Antes esto eran "módulos" con un switcher en el topnav, y Reservas vivía
+ * fuera de la navegación normal como si fuera otra aplicación.
+ *
+ * Decisión de producto de la Fase 1: TA App es UN workspace operativo, no
+ * varias apps ni "modos". El switcher se eliminó y Reservas pasó a ser un
+ * ítem más de la navegación, dentro del grupo Principal.
  */
-export type SeccionId = 'facturacion' | 'reservas'
+export type SeccionId = 'principal' | 'documentos' | 'analisis' | 'administracion'
 
 export type SeccionDef = {
   id: SeccionId
-  label: string
-  /** A dónde va el usuario al entrar a la sección. */
-  inicio: AppRoute
-  /** Acento del módulo. Pasará a ser un design token en la Fase 1. */
-  accent: string
+  /** Encabezado del grupo. `null` = sin encabezado visible. */
+  label: string | null
 }
 
 export const SECCIONES: SeccionDef[] = [
-  { id: 'facturacion', label: 'Facturación', inicio: { to: 'inicio' },    accent: '#C8102E' },
-  { id: 'reservas',    label: 'Reservas',    inicio: { to: 'reservas' },  accent: '#1a6bc8' },
+  { id: 'principal',      label: 'Principal' },
+  { id: 'documentos',     label: 'Documentos' },
+  { id: 'analisis',       label: 'Análisis' },
+  { id: 'administracion', label: 'Administración' },
 ]
+
+/** Destino por defecto al entrar a la aplicación. */
+export const DESTINO_INICIAL: AppRoute = { to: 'inicio' }
 
 export type RouteDef = {
   id: RouteId
@@ -108,15 +116,24 @@ export type RouteDef = {
  * módulos y el dropdown mobile.
  */
 export const RUTAS: Record<RouteId, RouteDef> = {
-  inicio:   { id: 'inicio',   label: 'Dashboard',        titulo: 'Dashboard',            seccion: 'facturacion', enNav: true, icono: 'LayoutDashboard' },
-  facturas: { id: 'facturas', label: 'Facturas',         titulo: 'Facturas',             seccion: 'facturacion', enNav: true, icono: 'FileText' },
-  recibos:  { id: 'recibos',  label: 'Recibos',          titulo: 'Recibos',              seccion: 'facturacion', enNav: true, icono: 'Receipt' },
-  clientes: { id: 'clientes', label: 'Clientes',         titulo: 'Clientes',             seccion: 'facturacion', enNav: true, icono: 'Users' },
-  nc:       { id: 'nc',       label: 'Notas de Crédito', titulo: 'Notas de Crédito',     seccion: 'facturacion', enNav: true, icono: 'FileMinus' },
-  nd:       { id: 'nd',       label: 'Notas de Débito',  titulo: 'Notas de Débito',      seccion: 'facturacion', enNav: true, icono: 'FilePlus' },
-  informe:  { id: 'informe',  label: '↓ Informe PDF',    titulo: 'Informe Financiero',   seccion: 'facturacion', enNav: true, icono: 'FileBarChart', roles: ['admin'] },
-  usuarios: { id: 'usuarios', label: 'Usuarios',         titulo: 'Gestión de Usuarios',  seccion: 'facturacion', enNav: true, icono: 'UserCog',      roles: ['admin'] },
-  reservas: { id: 'reservas', label: 'Reservas',         titulo: 'Reservas',             seccion: 'reservas',    enNav: false, icono: 'Home' },
+  // ── Principal ──
+  inicio:   { id: 'inicio',   label: 'Inicio',           titulo: 'Inicio',              seccion: 'principal',      enNav: true, icono: 'House' },
+  facturas: { id: 'facturas', label: 'Facturación',      titulo: 'Facturación',         seccion: 'principal',      enNav: true, icono: 'FileText' },
+  recibos:  { id: 'recibos',  label: 'Recibos',          titulo: 'Recibos',             seccion: 'principal',      enNav: true, icono: 'ReceiptText' },
+  clientes: { id: 'clientes', label: 'Clientes',         titulo: 'Clientes',            seccion: 'principal',      enNav: true, icono: 'Users' },
+  // Reservas queda integrada acá. Antes vivía fuera de la navegación, detrás
+  // de un switcher de módulos, como si fuera otra aplicación.
+  reservas: { id: 'reservas', label: 'Reservas',         titulo: 'Reservas',            seccion: 'principal',      enNav: true, icono: 'Building2' },
+
+  // ── Documentos ──
+  nc:       { id: 'nc',       label: 'Notas de Crédito', titulo: 'Notas de Crédito',    seccion: 'documentos',     enNav: true, icono: 'FileMinus2' },
+  nd:       { id: 'nd',       label: 'Notas de Débito',  titulo: 'Notas de Débito',     seccion: 'documentos',     enNav: true, icono: 'FilePlus2' },
+
+  // ── Análisis ──
+  informe:  { id: 'informe',  label: 'Reportes',         titulo: 'Reportes',            seccion: 'analisis',       enNav: true, icono: 'ChartNoAxesCombined', roles: ['admin'] },
+
+  // ── Administración ──
+  usuarios: { id: 'usuarios', label: 'Usuarios',         titulo: 'Gestión de usuarios', seccion: 'administracion', enNav: true, icono: 'UserCog', roles: ['admin'] },
 }
 
 // ── Permisos ────────────────────────────────────────────────────────────────
@@ -131,6 +148,17 @@ export function puedeAcceder(ruta: RouteDef, role: UserRole | null | undefined):
 /** Rutas visibles en la navegación de una sección, filtradas por rol. */
 export function rutasDeSeccion(seccion: SeccionId, role: UserRole | null | undefined): RouteDef[] {
   return Object.values(RUTAS).filter(r => r.seccion === seccion && r.enNav && puedeAcceder(r, role))
+}
+
+/**
+ * Grupos de navegación con sus rutas, ya filtrados por rol.
+ * Los grupos que quedan vacíos para ese rol no se devuelven, así la sidebar
+ * no muestra un encabezado sin ítems debajo.
+ */
+export function navegacionPara(role: UserRole | null | undefined): Array<{ seccion: SeccionDef; rutas: RouteDef[] }> {
+  return SECCIONES
+    .map(seccion => ({ seccion, rutas: rutasDeSeccion(seccion.id, role) }))
+    .filter(g => g.rutas.length > 0)
 }
 
 // ── Serialización — la costura para migrar a rutas reales ───────────────────

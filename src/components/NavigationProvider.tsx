@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import {
-  AppRoute, RouteId, RUTAS, RUTA_INICIAL, SeccionId, SECCIONES,
+  AppRoute, RouteId, RUTAS, RUTA_INICIAL, SeccionId,
   routeToPath, puedeAcceder,
 } from '@/lib/navigation'
 import { useAuth } from './AuthProvider'
@@ -31,8 +31,6 @@ type NavigationCtx = {
   /** Volver al destino anterior. */
   back: () => void
   puedeVolver: boolean
-  /** Ir al inicio de una sección. */
-  irASeccion: (s: SeccionId) => void
   /** URL equivalente al destino actual. Útil para deep-links y debugging. */
   path: string
 }
@@ -68,20 +66,14 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     })
   }, [])
 
-  const irASeccion = useCallback((s: SeccionId) => {
-    const sec = SECCIONES.find(x => x.id === s)
-    if (sec) navigate(sec.inicio)
-  }, [navigate])
-
   const value = useMemo<NavigationCtx>(() => ({
     route,
     seccion: RUTAS[route.to as RouteId]?.seccion ?? 'facturacion',
     navigate,
     back,
     puedeVolver: historial.length > 0,
-    irASeccion,
     path: routeToPath(route),
-  }), [route, navigate, back, historial.length, irASeccion])
+  }), [route, navigate, back, historial.length])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

@@ -14,7 +14,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  routeToPath, pathToRoute, rutasDeSeccion, puedeAcceder,
+  routeToPath, pathToRoute, rutasDeSeccion, navegacionPara, puedeAcceder,
   RUTAS, SECCIONES, DESTINOS,
   type AppRoute,
 } from '../src/lib/navigation.ts'
@@ -92,15 +92,46 @@ test('sin rol no se accede a rutas restringidas', () => {
 })
 
 test('rutasDeSeccion filtra por rol', () => {
-  const admin  = rutasDeSeccion('facturacion', 'admin').map(r => r.id)
-  const editor = rutasDeSeccion('facturacion', 'editor').map(r => r.id)
+  // Administración y Análisis quedan vacías para editor y viewer.
+  assert.deepEqual(rutasDeSeccion('administracion', 'admin').map(r => r.id), ['usuarios'])
+  assert.deepEqual(rutasDeSeccion('administracion', 'editor'), [])
+  assert.deepEqual(rutasDeSeccion('administracion', 'viewer'), [])
+  assert.deepEqual(rutasDeSeccion('analisis', 'admin').map(r => r.id), ['informe'])
+  assert.deepEqual(rutasDeSeccion('analisis', 'editor'), [])
 
-  assert.ok(admin.includes('usuarios'))
-  assert.ok(admin.includes('informe'))
-  assert.ok(!editor.includes('usuarios'))
-  assert.ok(!editor.includes('informe'))
-  assert.ok(editor.includes('facturas'))
-  assert.equal(admin.length, editor.length + 2)
+  // Principal es igual para los tres roles.
+  const principal = rutasDeSeccion('principal', 'viewer').map(r => r.id)
+  assert.deepEqual(principal, ['inicio', 'facturas', 'recibos', 'clientes', 'reservas'])
+  assert.deepEqual(rutasDeSeccion('principal', 'admin').map(r => r.id), principal)
+})
+
+test('DECISIÓN DE PRODUCTO: Reservas está en la navegación normal', () => {
+  // Antes vivía fuera de la nav, detrás de un switcher de módulos, como si
+  // fuera otra aplicación. TA App es UN workspace.
+  assert.equal(RUTAS.reservas.enNav, true)
+  assert.equal(RUTAS.reservas.seccion, 'principal')
+  // Y es accesible para cualquier rol, igual que antes.
+  assert.ok(rutasDeSeccion('principal', 'viewer').some(r => r.id === 'reservas'))
+})
+
+test('navegacionPara no devuelve grupos vacíos', () => {
+  for (const role of ['admin', 'editor', 'viewer'] as const) {
+    const grupos = navegacionPara(role)
+    for (const g of grupos) {
+      assert.ok(g.rutas.length > 0, `${role}: el grupo ${g.seccion.id} vino vacío`)
+    }
+  }
+  // admin ve los 4 grupos; editor y viewer sólo Principal y Documentos.
+  assert.equal(navegacionPara('admin').length, 4)
+  assert.equal(navegacionPara('editor').length, 2)
+  assert.equal(navegacionPara('viewer').length, 2)
+  assert.equal(navegacionPara(null).length, 2)
+})
+
+test('las 9 rutas están repartidas en los grupos, sin huérfanas', () => {
+  const enGrupos = navegacionPara('admin').flatMap(g => g.rutas.map(r => r.id))
+  assert.equal(enGrupos.length, Object.keys(RUTAS).length,
+    'hay rutas que no aparecen en ningún grupo de la sidebar')
 })
 
 // ── Consistencia del registro ────────────────────────────────────────────────
@@ -113,12 +144,6 @@ test('toda ruta pertenece a una sección declarada', () => {
   const ids = new Set(SECCIONES.map(s => s.id))
   for (const r of Object.values(RUTAS)) {
     assert.ok(ids.has(r.seccion), `${r.id} apunta a una sección inexistente: ${r.seccion}`)
-  }
-})
-
-test('el inicio de cada sección es una ruta real', () => {
-  for (const s of SECCIONES) {
-    assert.ok(RUTAS[s.inicio.to], `la sección ${s.id} arranca en un destino inexistente`)
   }
 })
 

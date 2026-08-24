@@ -1,0 +1,214 @@
+/* ============================================================================
+   INICIO — home operativo
+   ============================================================================
+   Menos contenedores, más jerarquía. Separadores y whitespace antes que una
+   card por cada línea de texto. Cero gráficos.
+   ============================================================================ */
+
+.ta-home {
+  display: flex; flex-direction: column;
+  gap: var(--space-8);
+  max-width: 1180px;
+}
+
+/* ── Encabezado ───────────────────────────────────────────────────────────── */
+.ta-home__head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-5); flex-wrap: wrap;
+}
+.ta-home__saludo {
+  font-size: 25px; font-weight: var(--weight-strong);
+  color: var(--text-primary); letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+}
+.ta-home__sub {
+  margin-top: 3px;
+  font-size: var(--text-body); color: var(--text-secondary);
+}
+
+/* Filtros: presentes pero secundarios. Sin card, sin encabezado. */
+.ta-home__filtros { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ta-home__filtros .ta-select {
+  height: 34px; width: auto; min-width: 128px;
+  font-size: var(--text-secondary-size);
+  background: var(--bg-surface);
+}
+
+/* ── Secciones ────────────────────────────────────────────────────────────── */
+.ta-sec { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-sec__head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+}
+.ta-sec__title {
+  font-size: var(--text-section); font-weight: var(--weight-semibold);
+  color: var(--text-primary); letter-spacing: -0.015em;
+}
+.ta-sec__link {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font); font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--brand-text);
+  padding: 2px 4px; border-radius: var(--radius-sm);
+}
+.ta-sec__link:hover { background: var(--brand-soft); }
+
+/* ── Para revisar ─────────────────────────────────────────────────────────── */
+.ta-atn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.ta-atn__item {
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 100%; padding: var(--space-4) var(--space-5);
+  background: transparent; border: none; border-top: 1px solid var(--border);
+  cursor: pointer; text-align: left;
+  font-family: var(--font);
+  transition: background var(--duration-fast) var(--ease);
+}
+.ta-atn__item:first-child { border-top: none; }
+.ta-atn__item:hover { background: var(--bg-surface-hover); }
+
+.ta-atn__icon {
+  display: grid; place-items: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: var(--radius-input);
+}
+.ta-atn__icon--warning { background: var(--warning-soft); color: var(--warning-text); }
+.ta-atn__icon--info    { background: var(--info-soft);    color: var(--info-text); }
+.ta-atn__icon--brand   { background: var(--violet-soft);  color: var(--violet-text); }
+
+.ta-atn__body { flex: 1; min-width: 0; }
+.ta-atn__titulo {
+  font-size: 15px; font-weight: var(--weight-label); color: var(--text-primary);
+}
+.ta-atn__detalle {
+  margin-top: 2px;
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+}
+
+/* La señal de antigüedad. Warning diferenciado, nunca error crítico. */
+.ta-atn__flag {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 7px; padding: 3px 9px;
+  background: var(--warning-soft); color: var(--warning-text);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+}
+.ta-atn__flag svg { width: 11px; height: 11px; }
+[data-theme="accessible"] .ta-atn__flag { border: 1px solid currentColor; }
+
+.ta-atn__right { display: flex; align-items: center; gap: var(--space-4); flex-shrink: 0; }
+.ta-atn__monto {
+  font-size: 17px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); font-variant-numeric: tabular-nums;
+  text-align: right; white-space: nowrap;
+}
+.ta-atn__cta {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--text-secondary); white-space: nowrap;
+}
+.ta-atn__item:hover .ta-atn__cta { color: var(--brand-text); }
+.ta-atn__chev { color: var(--text-tertiary); flex-shrink: 0; }
+
+/* ── Acciones rápidas ─────────────────────────────────────────────────────── */
+.ta-qa { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.ta-qa__btn {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  cursor: pointer; text-align: left;
+  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-label);
+  color: var(--text-primary);
+  transition: border-color var(--duration-fast) var(--ease),
+              background var(--duration-fast) var(--ease);
+}
+.ta-qa__btn:hover { border-color: var(--border-focus); background: var(--bg-surface-hover); }
+.ta-qa__ico {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  background: var(--brand-soft); color: var(--brand-text);
+  border-radius: var(--radius-input);
+}
+
+/* ── Resumen ──────────────────────────────────────────────────────────────── */
+.ta-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+.ta-sum__item { min-width: 0; }
+.ta-sum__label {
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.ta-sum__valor {
+  margin-top: 4px;
+  font-size: 24px; font-weight: var(--weight-strong);
+  color: var(--text-primary); letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.ta-sum__nota { margin-top: 3px; font-size: var(--text-micro); color: var(--text-tertiary); }
+
+/* ── Actividad y últimas facturas ─────────────────────────────────────────── */
+.ta-home__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+
+.ta-list { display: flex; flex-direction: column; }
+.ta-list__row {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-3) var(--space-2);
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  cursor: pointer; text-align: left; font-family: var(--font);
+  transition: background var(--duration-fast) var(--ease);
+  border-radius: var(--radius-sm);
+}
+.ta-list__row:last-child { border-bottom: none; }
+.ta-list__row:hover { background: var(--bg-surface-hover); }
+
+.ta-list__ico {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--bg-muted); color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+.ta-list__main { flex: 1; min-width: 0; }
+.ta-list__t1 {
+  font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-list__t2 {
+  margin-top: 1px;
+  font-size: var(--text-micro); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-list__right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.ta-list__monto {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-label);
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ta-list__cuando { font-size: var(--text-micro); color: var(--text-tertiary); white-space: nowrap; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .ta-home__cols { grid-template-columns: 1fr; gap: var(--space-6); }
+}
+@media (max-width: 900px) {
+  .ta-qa { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .ta-home { gap: var(--space-6); }
+  .ta-home__head { flex-direction: column; gap: var(--space-3); }
+  .ta-home__saludo { font-size: 21px; }
+  .ta-home__filtros { width: 100%; }
+  .ta-home__filtros .ta-select { flex: 1; min-width: 0; }
+
+  .ta-sum { grid-template-columns: 1fr; gap: var(--space-4); }
+  .ta-sum__valor { font-size: 21px; }
+
+  .ta-atn__item { align-items: flex-start; gap: var(--space-3); padding: var(--space-4); }
+  /* En mobile el monto va debajo del texto, no en una columna que aprieta */
+  .ta-atn__right { flex-direction: column; align-items: flex-end; gap: 2px; }
+  .ta-atn__monto { font-size: 15px; }
+  .ta-atn__cta { display: none; }
+
+  .ta-qa__btn { flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3); }
+}

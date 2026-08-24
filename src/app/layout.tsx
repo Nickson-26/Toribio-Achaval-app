@@ -5,6 +5,7 @@ import './globals.css'
 import '../design/tokens.css'
 import '../design/components.css'
 import '../design/shell.css'
+import '../design/home.css'
 import { AuthProvider } from '@/components/AuthProvider'
 import { HideNumbersProvider } from '@/components/HideNumbers'
 

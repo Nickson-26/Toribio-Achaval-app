@@ -126,12 +126,14 @@ export function HomeSkeleton() {
       <div className="ta-atn">
         {[0, 1].map(i => (
           <div key={i} className="ta-atn__item" style={{ cursor: 'default' }}>
-            <Skeleton width={36} height={36} radius={10} />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <Skeleton width={170} height={14} />
-              <Skeleton width={110} height={11} />
+            <div className="ta-atn__top">
+              <Skeleton width={36} height={36} radius={10} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <Skeleton width={170} height={14} />
+                <Skeleton width={110} height={11} />
+              </div>
+              <Skeleton width={130} height={18} />
             </div>
-            <Skeleton width={130} height={18} />
           </div>
         ))}
       </div>
@@ -140,7 +142,7 @@ export function HomeSkeleton() {
       </div>
       <div className="ta-sum">
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div key={i} className="ta-sum__item" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Skeleton width={80} height={12} />
             <Skeleton width={165} height={24} />
           </div>

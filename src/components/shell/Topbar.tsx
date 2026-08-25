@@ -9,11 +9,16 @@ import { usePermisos } from '@/design/usePermisos'
 export type Theme = 'dark' | 'light' | 'accessible'
 
 /**
- * Topbar deliberadamente mínima: contexto de página, privacidad de cifras,
- * temas, y la acción primaria. Sin elementos decorativos.
+ * Topbar.
  *
- * La búsqueda global NO se implementa en esta fase (§54 del brief): el
- * espacio queda reservado y cada pantalla mantiene su propio buscador.
+ * Deliberadamente mínima. En escritorio: contexto de página, privacidad de
+ * cifras, temas y la acción primaria.
+ *
+ * En mobile es OTRA composición, no la de escritorio comprimida:
+ *   · el selector de tema desaparece de acá y vive en el menú de usuario —
+ *     tres botones permanentes no justifican su espacio en 390px;
+ *   · el CTA pasa a icono, sin texto;
+ *   · quedan burger · título · ojo · [+], que entran cómodos.
  */
 export function Topbar({
   theme, onTheme, onOpenDrawer,
@@ -27,6 +32,7 @@ export function Topbar({
   const { puedeHacer } = usePermisos()
 
   const titulo = RUTAS[route.to]?.titulo ?? ''
+  const puedeCrear = puedeHacer('comprobante.crear')
 
   return (
     <header className="ta-topbar">
@@ -45,23 +51,47 @@ export function Topbar({
           onClick={toggle}
         />
 
-        <div className="ta-theme-group" role="group" aria-label="Tema de la interfaz">
-          <IconButton icon={Sun}           label="Tema claro"    active={theme === 'light'}      onClick={() => onTheme('light')} size={15} />
-          <IconButton icon={Moon}          label="Tema oscuro"   active={theme === 'dark'}       onClick={() => onTheme('dark')} size={15} />
-          <IconButton icon={Accessibility} label="Alto contraste" active={theme === 'accessible'} onClick={() => onTheme('accessible')} size={15} />
-        </div>
+        {/* Sólo escritorio: en mobile el tema vive en el menú de usuario. */}
+        <ThemeGroup theme={theme} onTheme={onTheme} className="ta-only-desktop" />
 
-        {/* Acción primaria, sólo si el rol puede ejecutarla. Un viewer ya no
-            ve un CTA que RLS le va a rechazar. */}
-        {puedeHacer('comprobante.crear') && (
-          <Button
-            variant="primary" size="sm" icon={Plus}
-            onClick={() => navigate({ to: 'facturas' })}
-          >
-            Nueva factura
-          </Button>
+        {puedeCrear && (
+          <>
+            <Button
+              variant="primary" size="sm" icon={Plus}
+              className="ta-only-desktop"
+              onClick={() => navigate({ to: 'facturas' })}
+            >
+              Nueva factura
+            </Button>
+            {/* Mismo destino, sin texto: en 390px el CTA completo empujaba
+                el título contra el ojo. */}
+            <button
+              className="ta-btn ta-btn--primary ta-topbar__cta-icon"
+              aria-label="Nueva factura"
+              title="Nueva factura"
+              onClick={() => navigate({ to: 'facturas' })}
+            >
+              <Plus size={18} aria-hidden />
+            </button>
+          </>
         )}
       </div>
     </header>
+  )
+}
+
+/**
+ * Selector de tema. Se monta en la topbar (escritorio) y en el menú de
+ * usuario (donde es el único acceso en mobile).
+ */
+export function ThemeGroup({
+  theme, onTheme, className = '',
+}: { theme: Theme; onTheme: (t: Theme) => void; className?: string }) {
+  return (
+    <div className={`ta-theme-group ${className}`} role="group" aria-label="Tema de la interfaz">
+      <IconButton icon={Sun}           label="Tema claro"     active={theme === 'light'}      onClick={() => onTheme('light')} size={15} />
+      <IconButton icon={Moon}          label="Tema oscuro"    active={theme === 'dark'}       onClick={() => onTheme('dark')} size={15} />
+      <IconButton icon={Accessibility} label="Alto contraste" active={theme === 'accessible'} onClick={() => onTheme('accessible')} size={15} />
+    </div>
   )
 }

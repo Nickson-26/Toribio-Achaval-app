@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import {
   House, FileText, ReceiptText, Users, Building2, FileMinus2, FilePlus2,
   ChartNoAxesCombined, UserCog, ChevronsLeft, ChevronsRight, ChevronUp,
-  LockKeyhole, LogOut, type LucideIcon,
+  LockKeyhole, LogOut, X, type LucideIcon,
 } from 'lucide-react'
+import { IconButton } from '@/design/primitives'
+import { ThemeGroup, type Theme } from './Topbar'
 import { useAuth } from '@/components/AuthProvider'
 import { useNavigation } from '@/components/NavigationProvider'
 import { navegacionPara, type AppRoute, type RouteId } from '@/lib/navigation'
@@ -31,12 +33,18 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function Sidebar({
   collapsed, onToggleCollapse, pendientes, onCambiarPassword, onNavigate,
+  theme, onTheme, enDrawer, onCerrarDrawer,
 }: {
   collapsed: boolean
   onToggleCollapse: () => void
   pendientes: number
   onCambiarPassword: () => void
   onNavigate?: () => void
+  theme: Theme
+  onTheme: (t: Theme) => void
+  /** true cuando actúa como cajón en mobile. */
+  enDrawer?: boolean
+  onCerrarDrawer?: () => void
 }) {
   const { user, signOut } = useAuth()
   const { route, navigate } = useNavigation()
@@ -78,6 +86,15 @@ export function Sidebar({
             <div className="ta-brand__name">Toribio Achaval</div>
             <div className="ta-brand__sub">Gestión interna</div>
           </div>
+          {/* Cierre explícito: en mobile el scrim solo no alcanza como
+              mecanismo evidente. */}
+          {enDrawer && (
+            <IconButton
+              icon={X} label="Cerrar menú"
+              className="ta-sidebar__close"
+              onClick={() => onCerrarDrawer?.()}
+            />
+          )}
         </div>
 
         <nav className="ta-nav" aria-label="Navegación principal">
@@ -133,6 +150,13 @@ export function Sidebar({
                   <div className="ta-menu__email">{user.email}</div>
                 </div>
                 <div className="ta-menu__divider" />
+                {/* En mobile este es el único acceso al tema: la topbar de
+                    390px no puede sostener tres botones permanentes. */}
+                <div className="ta-menu__tema">
+                  <span className="ta-menu__tema-label">Tema</span>
+                  <ThemeGroup theme={theme} onTheme={onTheme} />
+                </div>
+                <div className="ta-menu__divider" />
                 <button className="ta-menu__item" role="menuitem"
                         onClick={() => { onCambiarPassword(); setMenuOpen(false) }}>
                   <LockKeyhole size={15} aria-hidden /> Cambiar contraseña
@@ -146,7 +170,7 @@ export function Sidebar({
           </div>
 
           <button
-            className="ta-btn ta-btn--ghost ta-btn--sm"
+            className="ta-btn ta-btn--ghost ta-btn--sm ta-only-desktop"
             style={{ width: '100%', marginTop: 'var(--space-1)', justifyContent: collapsed ? 'center' : 'flex-start' }}
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}

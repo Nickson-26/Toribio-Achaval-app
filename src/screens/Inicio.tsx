@@ -4,9 +4,8 @@ import { db, supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { useNavigation } from '@/components/NavigationProvider'
 import { usePermisos } from '@/design/usePermisos'
-import { ErrorState, Select } from '@/design/primitives'
+import { ErrorState } from '@/design/primitives'
 import { NuevoComprobanteModal } from '@/components/ComprobanteForms'
-import { MESES } from '@/lib/utils'
 import {
   saludo, aplicarFiltros, calcularAtencion, calcularResumen, construirActividad,
   ultimasFacturas, aniosDisponibles, mostrarFiltroAnio, unidadesDisponibles,
@@ -14,6 +13,7 @@ import {
   type FiltrosHome, type AttentionItem, type Evento, type ComprobanteHome, type ReciboHome,
 } from '@/lib/home'
 import { AttentionList } from '@/components/home/AttentionList'
+import { HomeFilters } from '@/components/home/HomeFilters'
 import { QuickActions } from '@/components/home/QuickActions'
 import {
   Section, SectionLink, FinancialSummary, RecentActivity, RecentInvoices, HomeSkeleton,
@@ -104,6 +104,8 @@ export default function Inicio({ onPendientesChange }: { onPendientesChange?: (n
   const abrirEvento = (e: Evento) =>
     navigate(e.tipo === 'recibo' ? { to: 'recibos' } : { to: 'facturas' })
 
+  const set = (p: Partial<FiltrosHome>) => setFiltros(f => ({ ...f, ...p }))
+
   // ── Estados de pantalla ───────────────────────────────────────────────────
   if (cargando) return <HomeSkeleton />
   if (error) {
@@ -116,8 +118,6 @@ export default function Inicio({ onPendientesChange }: { onPendientesChange?: (n
     )
   }
 
-  const set = (p: Partial<FiltrosHome>) => setFiltros(f => ({ ...f, ...p }))
-
   return (
     <div className="ta-home">
       {/* ── Encabezado: humano y simple. No es un hero. ── */}
@@ -127,25 +127,13 @@ export default function Inicio({ onPendientesChange }: { onPendientesChange?: (n
           <p className="ta-home__sub">Esto es lo que requiere tu atención.</p>
         </div>
 
-        <div className="ta-home__filtros">
-          {/* El año sólo aparece cuando hay más de uno en los datos. */}
-          {hayAnios && (
-            <Select value={filtros.anio} onChange={e => set({ anio: e.target.value })} aria-label="Año">
-              <option value="all">Todos los años</option>
-              {anios.map(a => <option key={a} value={a}>{a}</option>)}
-            </Select>
-          )}
-          <Select value={filtros.mes} onChange={e => set({ mes: e.target.value })} aria-label="Mes">
-            <option value="all">Todos los meses</option>
-            {MESES.map((m, i) => (
-              <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>
-            ))}
-          </Select>
-          <Select value={filtros.unidad} onChange={e => set({ unidad: e.target.value })} aria-label="Unidad">
-            <option value="all">Todas las unidades</option>
-            {unidades.map(u => <option key={u} value={u}>{u}</option>)}
-          </Select>
-        </div>
+        <HomeFilters
+          filtros={filtros}
+          onChange={set}
+          anios={anios}
+          unidades={unidades}
+          mostrarAnio={hayAnios}
+        />
       </header>
 
       {/* ── 1. Para revisar ── */}

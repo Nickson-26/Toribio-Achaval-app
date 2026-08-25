@@ -42,6 +42,19 @@ export function AppShell({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme)
 
   // Cerrar el cajón al navegar o al pasar a ancho de escritorio
   useEffect(() => { setDrawerOpen(false) }, [route.to])
+
+  // Escape cierra el cajón, y mientras está abierto el fondo no scrollea.
+  useEffect(() => {
+    if (!drawerOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [drawerOpen])
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
     const onChange = () => { if (mq.matches) setDrawerOpen(false) }
@@ -65,6 +78,10 @@ export function AppShell({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme)
         pendientes={pendientes}
         onCambiarPassword={() => setShowPassword(true)}
         onNavigate={() => setDrawerOpen(false)}
+        theme={theme}
+        onTheme={onTheme}
+        enDrawer={drawerOpen}
+        onCerrarDrawer={() => setDrawerOpen(false)}
       />
       {/* Fondo del cajón en mobile. Sólo visible por CSS bajo 1024px. */}
       <div className="ta-sidebar__scrim" onClick={() => setDrawerOpen(false)} aria-hidden />

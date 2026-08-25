@@ -47,34 +47,48 @@ export function AttentionList({
             onClick={() => onAbrir(item)}
             aria-label={`${item.titulo}. ${item.detalle}. ${item.cta}`}
           >
-            <span className={`ta-atn__icon ta-atn__icon--${item.tono}`} aria-hidden>
-              <Icon size={18} />
+            {/* Fila superior: icono + título + monto.
+                En mobile el monto baja a su propia línea (ver home.css): el
+                título y un importe de nueve dígitos no entran juntos en 390px
+                sin partir las palabras. */}
+            <span className="ta-atn__top">
+              <span className={`ta-atn__icon ta-atn__icon--${item.tono}`} aria-hidden>
+                <Icon size={18} />
+              </span>
+
+              <span className="ta-atn__body">
+                <span className="ta-atn__titulo">{item.titulo}</span>
+                <span className="ta-atn__detalle">{item.detalle}</span>
+              </span>
+
+              <span className="ta-atn__right">
+                {item.monto !== null && (
+                  <Money className="ta-atn__monto">{ars(item.monto)}</Money>
+                )}
+                <span className="ta-atn__cta">{item.cta}</span>
+                <ChevronRight size={16} className="ta-atn__chev" aria-hidden />
+              </span>
             </span>
 
-            <span className="ta-atn__body">
-              <span className="ta-atn__titulo">{item.titulo}</span>
-              <span className="ta-atn__detalle">{item.detalle}</span>
-
-              {/* Antigüedad: señal operativa dentro del mismo item, para no
-                  contar dos veces las mismas facturas. */}
-              {item.destacado && (
-                <span className="ta-atn__flag">
-                  <TriangleAlert aria-hidden />
+            {/* Antigüedad: señal operativa dentro del mismo item, para no
+                contar dos veces las mismas facturas.
+                Es una LÍNEA con icono, no un pill: en 390px un pill con texto
+                y monto se partía en cuatro renglones. */}
+            {item.destacado && (
+              <span className="ta-atn__flag">
+                <TriangleAlert aria-hidden />
+                <span className="ta-atn__flag-txt">
                   {item.destacado.texto}
                   {item.destacado.monto !== null && (
                     <> · <Money>{ars(item.destacado.monto)}</Money></>
                   )}
                 </span>
-              )}
-            </span>
+              </span>
+            )}
 
-            <span className="ta-atn__right">
-              {item.monto !== null && (
-                <Money className="ta-atn__monto">{ars(item.monto)}</Money>
-              )}
-              <span className="ta-atn__cta">{item.cta}</span>
-              <ChevronRight size={16} className="ta-atn__chev" aria-hidden />
-            </span>
+            {/* CTA explícito, sólo en mobile: ahí el chevron a la derecha
+                queda lejos del texto y deja de leerse como acción. */}
+            <span className="ta-atn__cta-mobile">{item.cta} →</span>
           </button>
         )
       })}

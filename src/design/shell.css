@@ -242,33 +242,81 @@
 /* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
 .ta-sidebar__scrim { display: none; }
 .ta-topbar__burger { display: none; }
+.ta-topbar__cta-icon { display: none; }
+.ta-sidebar__close { display: none; }
+.ta-only-mobile { display: none; }
+
+/* Tema dentro del menú de usuario */
+.ta-menu__tema {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); padding: var(--space-2);
+}
+.ta-menu__tema-label {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
 
 @media (max-width: 1023px) {
   .ta-shell { grid-template-columns: 1fr; }
   .ta-topbar__burger { display: inline-flex; }
+  /* La sidebar nunca queda colapsada en mobile: ese estado es de escritorio. */
+  .ta-shell.is-collapsed { --sidebar-w: 0; }
+  .ta-only-desktop { display: none !important; }
+  .ta-only-mobile  { display: inline-flex; }
+  .ta-topbar__cta-icon { display: inline-flex; width: 36px; padding: 0; }
+  .ta-sidebar__close { display: inline-flex; }
 
-  /* La sidebar pasa a ser un cajón */
+  /* ── Cajón de navegación ──
+     Por ENCIMA de la topbar (no debajo), a pantalla completa de alto, con
+     safe-area para el notch, y sin heredar el ancho colapsado. */
   .ta-sidebar {
     position: fixed; inset: 0 auto 0 0;
-    width: 264px; padding: var(--space-2);
-    transform: translateX(-104%);
+    width: min(300px, 86vw);
+    height: 100%; height: 100dvh;
+    padding: 0;
+    z-index: calc(var(--z-topbar) + 10);
+    transform: translateX(-102%);
     transition: transform var(--duration-base) var(--ease);
   }
-  .ta-shell.is-drawer-open .ta-sidebar { transform: none; }
+  .ta-sidebar__inner {
+    border-radius: 0;
+    border: none; border-right: 1px solid var(--border-strong);
+    box-shadow: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-elevated);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  .ta-shell.is-drawer-open .ta-sidebar { transform: none; box-shadow: var(--shadow-lg); }
   .ta-shell.is-drawer-open .ta-sidebar__scrim {
     display: block; position: fixed; inset: 0;
-    background: var(--overlay-bg); z-index: calc(var(--z-sidebar) - 1);
+    background: var(--overlay-bg);
+    z-index: calc(var(--z-topbar) + 5);
     animation: ta-fade var(--duration-base) var(--ease);
   }
-  .ta-shell.is-collapsed { --sidebar-w: 0; }
+
+  /* Targets táctiles cómodos dentro del cajón */
+  .ta-nav { padding: var(--space-3); gap: var(--space-5); }
+  .ta-nav__item { padding: 11px var(--space-3); font-size: 15px; }
+  /* La barra del item activo quedaba cortada contra el borde de la pantalla.
+     Adentro del cajón alcanza con el fondo y el color del texto. */
+  .ta-nav__item.is-active::before { display: none; }
+  .ta-brand { padding: var(--space-4); position: relative; }
+  .ta-sidebar__close { position: absolute; right: var(--space-3); top: 50%; transform: translateY(-50%); }
+
   .ta-content { padding: var(--space-4); }
-  .ta-topbar { padding-inline: var(--space-3) var(--space-4); }
+  .ta-topbar { padding-inline: var(--space-2) var(--space-3); gap: var(--space-2); }
 }
 
 @media (max-width: 640px) {
-  .ta-topbar { height: 56px; gap: var(--space-2); }
-  .ta-topbar__title { font-size: 15px; }
-  .ta-content { padding: var(--space-3); }
+  .ta-topbar {
+    height: 54px;
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(54px + env(safe-area-inset-top, 0px));
+  }
+  .ta-topbar__title { font-size: 16px; }
+  .ta-topbar__actions { gap: 2px; }
+  .ta-content { padding: var(--space-3) var(--space-3) var(--space-8); }
 }
 
 /* Notebooks 1366: se reduce un poco el ancho de la sidebar y el padding */

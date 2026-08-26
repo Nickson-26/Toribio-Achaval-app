@@ -1,0 +1,357 @@
+/* ============================================================================
+   INICIO — home operativo
+   ============================================================================
+   Menos contenedores, más jerarquía. Separadores y whitespace antes que una
+   card por cada línea de texto. Cero gráficos.
+   ============================================================================ */
+
+.ta-home {
+  display: flex; flex-direction: column;
+  gap: var(--space-8);
+  max-width: 1180px;
+}
+
+/* ── Encabezado ───────────────────────────────────────────────────────────── */
+.ta-home__head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-5); flex-wrap: wrap;
+}
+.ta-home__saludo {
+  font-size: 25px; font-weight: var(--weight-strong);
+  color: var(--text-primary); letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+}
+.ta-home__sub {
+  margin-top: 3px;
+  font-size: var(--text-body); color: var(--text-secondary);
+}
+
+/* Filtros: presentes pero secundarios. Sin card, sin encabezado. */
+.ta-home__filtros { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+/* Versión mobile: un botón, no dos selects a ancho completo.
+   El `display` lo maneja `.ta-only-mobile` (shell.css) para que la regla valga
+   en todo el rango táctil, no sólo por debajo de 640px. */
+.ta-home__filtros-btn {
+  align-items: center; gap: 6px;
+  flex-shrink: 0; height: 34px; padding: 0 var(--space-3);
+  background: var(--bg-surface); color: var(--text-secondary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-secondary-size);
+  font-weight: var(--weight-medium); cursor: pointer;
+}
+.ta-home__filtros-btn:active { background: var(--bg-surface-hover); }
+.ta-home__filtros-dot {
+  display: grid; place-items: center;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  background: var(--brand); color: var(--on-brand);
+  border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: var(--weight-strong);
+}
+.ta-home__filtros .ta-select {
+  height: 34px; width: auto; min-width: 128px;
+  font-size: var(--text-secondary-size);
+  background: var(--bg-surface);
+}
+
+/* ── Secciones ────────────────────────────────────────────────────────────── */
+.ta-sec { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-sec__head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+}
+.ta-sec__title {
+  font-size: var(--text-section); font-weight: var(--weight-semibold);
+  color: var(--text-primary); letter-spacing: -0.015em;
+}
+.ta-sec__link {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font); font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--brand-text);
+  padding: 2px 4px; border-radius: var(--radius-sm);
+}
+.ta-sec__link:hover { background: var(--brand-soft); }
+
+/* ── Para revisar ─────────────────────────────────────────────────────────── */
+.ta-atn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.ta-atn__item {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  width: 100%; padding: var(--space-4) var(--space-5);
+  background: transparent; border: none; border-top: 1px solid var(--border);
+  cursor: pointer; text-align: left;
+  font-family: var(--font);
+  transition: background var(--duration-fast) var(--ease);
+}
+.ta-atn__top { display: flex; align-items: center; gap: var(--space-4); width: 100%; }
+.ta-atn__item:first-child { border-top: none; }
+.ta-atn__item:hover { background: var(--bg-surface-hover); }
+
+.ta-atn__icon {
+  display: grid; place-items: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: var(--radius-input);
+}
+.ta-atn__icon--warning { background: var(--warning-soft); color: var(--warning-text); }
+.ta-atn__icon--info    { background: var(--info-soft);    color: var(--info-text); }
+.ta-atn__icon--brand   { background: var(--violet-soft);  color: var(--violet-text); }
+
+.ta-atn__body { display: block; flex: 1; min-width: 0; }
+/* display:block obligatorio: son <span> dentro de un <span>, y sin esto
+   quedan inline y se renderizan en la misma línea. */
+.ta-atn__titulo {
+  display: block;
+  font-size: 15px; font-weight: var(--weight-label); color: var(--text-primary);
+}
+.ta-atn__detalle {
+  display: block; margin-top: 2px;
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+}
+
+/* La señal de antigüedad. Warning diferenciado, nunca error crítico.
+   Línea con icono, no pill: un pill con texto + monto se parte en varios
+   renglones en pantallas angostas. */
+.ta-atn__flag {
+  display: flex; align-items: center; gap: 6px;
+  align-self: flex-start;
+  margin-left: calc(36px + var(--space-4));
+  padding: 4px 10px;
+  background: var(--warning-soft); color: var(--warning-text);
+  border-radius: var(--radius-input);
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  line-height: 1.35;
+}
+.ta-atn__flag svg { width: 12px; height: 12px; flex-shrink: 0; }
+.ta-atn__flag-txt { min-width: 0; }
+[data-theme="accessible"] .ta-atn__flag { border: 1px solid currentColor; }
+
+/* CTA textual, sólo mobile */
+.ta-atn__cta-mobile { display: none; }
+
+.ta-atn__right { display: flex; align-items: center; gap: var(--space-4); flex-shrink: 0; }
+.ta-atn__monto {
+  font-size: 17px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); font-variant-numeric: tabular-nums;
+  text-align: right; white-space: nowrap;
+}
+.ta-atn__cta {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--text-secondary); white-space: nowrap;
+}
+.ta-atn__item:hover .ta-atn__cta { color: var(--brand-text); }
+.ta-atn__chev { color: var(--text-tertiary); flex-shrink: 0; }
+
+/* ── Acciones rápidas ─────────────────────────────────────────────────────── */
+.ta-qa { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.ta-qa__btn {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  cursor: pointer; text-align: left;
+  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-label);
+  color: var(--text-primary);
+  transition: border-color var(--duration-fast) var(--ease),
+              background var(--duration-fast) var(--ease);
+}
+.ta-qa__btn:hover { border-color: var(--border-focus); background: var(--bg-surface-hover); }
+.ta-qa__ico {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  background: var(--brand-soft); color: var(--brand-text);
+  border-radius: var(--radius-input);
+}
+
+/* ── Resumen ──────────────────────────────────────────────────────────────── */
+.ta-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+.ta-sum__item { min-width: 0; }
+.ta-sum__label {
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.ta-sum__valor {
+  margin-top: 4px;
+  font-size: 24px; font-weight: var(--weight-strong);
+  color: var(--text-primary); letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.ta-sum__nota { margin-top: 3px; font-size: var(--text-micro); color: var(--text-tertiary); }
+
+/* ── Actividad y últimas facturas ─────────────────────────────────────────── */
+.ta-home__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+
+/* Higiene de grid/flex. Los hijos de un grid tienen min-width:auto por
+   defecto, así que un texto largo —el título de un evento, el nombre de un
+   cliente— empuja la columna y genera scroll horizontal de página en vez de
+   recortarse con elipsis. */
+.ta-home__cols > *, .ta-sec, .ta-list, .ta-atn, .ta-list__row { min-width: 0; }
+
+.ta-list { display: flex; flex-direction: column; }
+.ta-list__row {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-3) var(--space-2);
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  cursor: pointer; text-align: left; font-family: var(--font);
+  transition: background var(--duration-fast) var(--ease);
+  border-radius: var(--radius-sm);
+}
+.ta-list__row:last-child { border-bottom: none; }
+.ta-list__row:hover { background: var(--bg-surface-hover); }
+
+.ta-list__ico {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--bg-muted); color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+.ta-list__main { display: block; flex: 1; min-width: 0; }
+.ta-list__t1 {
+  display: block;
+  font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-list__t2 {
+  display: block; margin-top: 1px;
+  font-size: var(--text-micro); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-list__right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.ta-list__monto {
+  font-size: var(--text-secondary-size); font-weight: var(--weight-label);
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ta-list__cuando { font-size: var(--text-micro); color: var(--text-tertiary); white-space: nowrap; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .ta-home__cols { grid-template-columns: 1fr; gap: var(--space-6); }
+}
+@media (max-width: 900px) {
+  .ta-qa { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE — composición propia, no la de escritorio comprimida.
+   Densidad de app financiera: menos aire entre secciones, escalas más chicas,
+   todo lo importante dentro del primer recorrido.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .ta-home { gap: var(--space-5); }
+
+  /* Encabezado: saludo y filtros en la misma fila, filtros como botón. */
+  .ta-home__head {
+    flex-direction: row; align-items: flex-start;
+    justify-content: space-between; gap: var(--space-3);
+  }
+  .ta-home__saludo { font-size: 20px; letter-spacing: -0.02em; }
+  .ta-home__sub { font-size: var(--text-secondary-size); margin-top: 2px; }
+
+  .ta-sec { gap: var(--space-2); }
+  .ta-sec__title { font-size: 16px; }
+  /* 19px de alto no es un blanco táctil. */
+  .ta-sec__link { min-height: 34px; padding: 0 var(--space-2); margin-right: calc(var(--space-2) * -1); }
+
+  /* ── Para revisar: vertical ── */
+  .ta-atn { border-radius: var(--radius-input); }
+  .ta-atn__item { padding: var(--space-4) var(--space-4) var(--space-3); gap: var(--space-2); }
+  .ta-atn__top { align-items: flex-start; gap: var(--space-3); }
+  .ta-atn__icon { width: 32px; height: 32px; }
+  .ta-atn__titulo { font-size: var(--text-body); }
+  .ta-atn__detalle { font-size: var(--text-micro); }
+
+  /* El monto baja a su propia línea: junto al título no entra sin partirse. */
+  .ta-atn__right {
+    order: 3; width: 100%;
+    margin-left: calc(32px + var(--space-3));
+    justify-content: flex-start;
+  }
+  .ta-atn__top { flex-wrap: wrap; }
+  .ta-atn__body { flex: 1 1 auto; }
+  .ta-atn__monto { font-size: 19px; letter-spacing: -0.02em; }
+  .ta-atn__cta, .ta-atn__chev { display: none; }
+
+  /* Sin sangría: la sangría alineaba lindo pero costaba 44px, que es
+     exactamente lo que faltaba para que la señal entre en una línea a 375px. */
+  .ta-atn__flag {
+    align-self: stretch; margin-left: 0;
+    padding: 5px 9px; font-size: 11px;
+  }
+
+  .ta-atn__cta-mobile {
+    display: block;
+    margin-left: calc(32px + var(--space-3));
+    font-size: var(--text-secondary-size); font-weight: var(--weight-label);
+    color: var(--brand-text);
+  }
+
+  /* ── Acciones: filas compactas, icono + label en horizontal ── */
+  .ta-qa { gap: var(--space-2); }
+  .ta-qa__btn {
+    flex-direction: row; align-items: center; gap: var(--space-2);
+    /* 46px: cómodo al tacto sin gastar 94px de alto por acción. */
+    min-height: 46px; padding: 0 var(--space-3);
+    border-radius: var(--radius-input);
+    font-size: var(--text-secondary-size);
+  }
+  .ta-qa__ico { width: 26px; height: 26px; border-radius: 8px; }
+  .ta-qa__ico svg { width: 14px; height: 14px; }
+  .ta-qa__btn > span:last-child {
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── Resumen: tres filas, no tres bloques de 24px ──
+     Etiqueta y contexto a la izquierda, importe a la derecha. Una línea por
+     métrica: las tres entran en ~120px en lugar de ~260px. */
+  .ta-sum {
+    grid-template-columns: 1fr; gap: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    overflow: hidden;
+  }
+  .ta-sum__item {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+  .ta-sum__item:first-child { border-top: none; }
+  .ta-sum__label {
+    order: 1; flex-shrink: 0;
+    font-size: var(--text-body); color: var(--text-primary);
+    font-weight: var(--weight-label);
+  }
+  .ta-sum__nota {
+    order: 2; margin-top: 0; min-width: 0;
+    font-size: var(--text-micro);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ta-sum__nota::before { content: '· '; }
+  .ta-sum__valor {
+    order: 3; margin-top: 0; margin-left: auto; flex-shrink: 0;
+    font-size: 16px; white-space: nowrap; text-align: right;
+  }
+
+  /* ── Listas ── */
+  .ta-home__cols { gap: var(--space-5); }
+  .ta-list__row { padding: var(--space-3) var(--space-1); gap: var(--space-2); }
+  .ta-list__ico { display: none; }
+  .ta-list__t1 { font-size: var(--text-secondary-size); }
+  .ta-list__monto { font-size: var(--text-secondary-size); }
+}
+
+/* Pantallas angostas (iPhone SE / 8) */
+@media (max-width: 380px) {
+  .ta-home__saludo { font-size: 19px; }
+  .ta-atn__monto { font-size: 18px; }
+  .ta-qa__btn { padding: 0 var(--space-2); font-size: var(--text-micro); }
+  /* Medio escalón menos para que la nota del resumen no se corte con elipsis:
+     "81% del facturado" es la única lectura de cobranza de esa fila. */
+  .ta-sum__label { font-size: var(--text-secondary-size); }
+  .ta-sum__valor { font-size: 15px; }
+  .ta-sum__nota  { font-size: 10.5px; }
+}

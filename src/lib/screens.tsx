@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import type { RouteId } from './navigation'
 
-import Dashboard from '@/screens/Dashboard'
+import Inicio    from '@/screens/Inicio'
 import Facturas  from '@/screens/Facturas'
 import Usuarios  from '@/screens/Usuarios'
 import Informe   from '@/screens/Informe'
@@ -30,7 +30,7 @@ import { Recibos, Clientes, NotasCredito, NotasDebito } from '@/screens/OtherPag
  * directorio las elimina.
  */
 export const SCREENS: Record<RouteId, ComponentType<any>> = {
-  inicio:   Dashboard,
+  inicio:   Inicio,
   facturas: Facturas,
   recibos:  Recibos,
   clientes: Clientes,

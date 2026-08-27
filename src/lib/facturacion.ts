@@ -555,6 +555,19 @@ export function tipoInicialPara(vista: string): TipoFactura {
     : 'FACT A'
 }
 
+/**
+ * Días desde la emisión. Se muestra en la tarjeta mobile de una pendiente:
+ * "Pendiente · 74 días" dice más que la fecha sola, porque lo que importa de
+ * una factura sin cobrar es cuánto hace que espera.
+ */
+export function diasDesde(iso: string | null | undefined, hoy: Date = new Date()): number | null {
+  if (!iso) return null
+  const d = new Date(iso.slice(0, 10) + 'T00:00:00Z')
+  if (isNaN(d.getTime())) return null
+  const hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate())
+  return Math.max(0, Math.round((hoyUTC - d.getTime()) / 86_400_000))
+}
+
 /** "26/08/2026" -> "26/08" para la lista mobile, donde el año suele sobrar. */
 export function fechaCorta(iso: string | null | undefined): string {
   if (!iso) return '—'

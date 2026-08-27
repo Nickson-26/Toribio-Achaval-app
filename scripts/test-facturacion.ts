@@ -18,7 +18,7 @@ import {
   puntoVentaDe, esARS, esUSD, FILTROS_INICIALES,
   calcularSenales, resumenHoy, pagosDelDia, esperandoRetenciones,
   echeqsPorAcreditar, pendientesDeCobro, pendientesAntiguas,
-  tipoInicialPara, DIAS_ANTIGUEDAD,
+  tipoInicialPara, diasDesde, DIAS_ANTIGUEDAD,
   type FiltrosFacturacion,
 } from '../src/lib/facturacion.ts'
 import { puede } from '../src/design/permissions.ts'
@@ -530,4 +530,18 @@ test('cargar retenciones existe pero NO es la acción primaria', () => {
   const ret = as.find(a => a.id === 'retenciones')
   assert.ok(ret)
   assert.ok(!ret!.primaria)
+})
+
+test('diasDesde cuenta la espera de una pendiente', () => {
+  assert.equal(diasDesde('2026-08-27', HOY), 0)
+  assert.equal(diasDesde('2026-08-20', HOY), 7)
+  assert.equal(diasDesde('2026-06-14', HOY), 74)
+  assert.equal(diasDesde(null, HOY), null)
+  assert.equal(diasDesde('no-es-fecha', HOY), null)
+})
+
+test('diasDesde nunca devuelve negativos', () => {
+  // Una factura con fecha futura es un error de carga, no un motivo para
+  // mostrar "-3 días".
+  assert.equal(diasDesde('2026-12-31', HOY), 0)
 })

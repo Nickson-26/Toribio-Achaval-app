@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useRef } from 'react'
-import { X, Paperclip, FileText, ChevronUp, ChevronDown } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Paperclip, FileText, ChevronUp, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { Money } from '@/components/HideNumbers'
 import { Button, StatusBadge, IconButton } from '@/design/primitives'
 import { estadoDef } from '@/design/status'
@@ -163,29 +163,75 @@ export function FacturaPanel({
           </div>
         </div>
 
-        {/* Un viewer no llega hasta acá con nada: accionesPara() le devuelve
-            una lista vacía y el pie no se monta. */}
+        {/* UNA acción primaria; el resto detrás del menú.
+            Antes competían seis botones —Editar, Cobrar, Anular, Eliminar,
+            Retenciones— y ninguno se leía como el siguiente paso.
+            Un viewer no llega acá con nada: accionesPara() le devuelve una
+            lista vacía y el pie directamente no se monta. */}
         {acciones.length > 0 && (
           <footer className="ta-fpanel__foot">
-            {secundarias.map(a => (
-              <Button
-                key={a.id}
-                variant={a.peligrosa ? 'danger' : 'ghost'}
-                size="sm"
-                onClick={() => onAccion(a.id)}
-              >
-                {a.label}
-              </Button>
-            ))}
-            {primaria && (
+            {secundarias.length > 0 && (
+              <MenuSecundarias acciones={secundarias} onAccion={onAccion} />
+            )}
+            {primaria ? (
               <Button variant="primary" size="sm" onClick={() => onAccion(primaria.id)}>
                 {primaria.label}
               </Button>
+            ) : (
+              // Sin siguiente paso: decirlo es mejor que dejar el pie mudo.
+              <span className="ta-fpanel__cerrado">Circuito completo</span>
             )}
           </footer>
         )}
       </aside>
     </>
+  )
+}
+
+/** Las acciones que no son el siguiente paso. Cerrado por defecto. */
+function MenuSecundarias({
+  acciones, onAccion,
+}: { acciones: { id: AccionId; label: string; peligrosa?: boolean }[]; onAccion: (id: AccionId) => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setAbierto(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [abierto])
+
+  return (
+    <div className="ta-fmenu" ref={ref}>
+      <IconButton
+        icon={MoreHorizontal}
+        label="Más acciones"
+        aria-expanded={abierto}
+        onClick={() => setAbierto(v => !v)}
+      />
+      {abierto && (
+        <div className="ta-fmenu__pop" role="menu">
+          {acciones.map(a => (
+            <button
+              key={a.id}
+              role="menuitem"
+              className={`ta-fmenu__item${a.peligrosa ? ' is-peligro' : ''}`}
+              onClick={() => { setAbierto(false); onAccion(a.id) }}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

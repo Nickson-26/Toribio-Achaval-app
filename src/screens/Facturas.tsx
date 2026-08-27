@@ -5,11 +5,9 @@ import { usePermisos } from '@/design/usePermisos'
 import { useEsMobile } from '@/design/useEsMobile'
 import { useRouteParams } from '@/components/NavigationProvider'
 import { ESTADOS_ORDEN } from '@/design/status'
-import {
-  Button, ConfirmDialog, ErrorState, toast,
-} from '@/design/primitives'
+import { ConfirmDialog, ErrorState, toast } from '@/design/primitives'
 import { Money } from '@/components/HideNumbers'
-import { ars, usd } from '@/lib/utils'
+import { ars } from '@/lib/utils'
 import {
   NuevoComprobanteModal, EditarComprobanteModal, MarcarCobradaModal,
   ConfirmarAcreditacionModal, GestionarRetencionesModal,
@@ -18,34 +16,35 @@ import { ExportarPendientesModal } from '@/components/facturacion/ExportarPendie
 import { FacturasToolbar } from '@/components/facturacion/FacturasToolbar'
 import { FacturasTabla, FacturasLista } from '@/components/facturacion/FacturasVistas'
 import { FacturaPanel } from '@/components/facturacion/FacturaPanel'
+import { Hoy, PorResolver } from '@/components/facturacion/PorResolver'
 import {
-  soloFacturas, aplicarFiltros, ordenar, contarPorTipo, calcularTotales,
+  soloFacturas, aplicarFiltros, ordenar, contarPorTipo,
   opcionesAnio, opcionesUnidad, opcionesPuntoVenta, estadosPresentes,
-  hayFiltros as tieneFiltros, accionesPara,
-  TIPOS_FACTURA, TIPO_LABEL, FILTROS_INICIALES,
-  type FiltrosFacturacion, type TipoFactura, type AccionId,
+  hayFiltros as tieneFiltros, accionesPara, calcularSenales, resumenHoy,
+  tipoInicialPara, FILTROS_INICIALES,
+  type FiltrosFacturacion, type TipoFactura, type AccionId, type Senal,
 } from '@/lib/facturacion'
 
 /**
- * FACTURACIÓN — la pantalla operativa.
+ * FACTURACIÓN
  *
- * Esta pantalla orquesta; no calcula. Filtros, totales, conteos y sobre todo
- * QUÉ ACCIONES existen viven en `lib/facturacion.ts`, que es puro y testeado.
+ * Tres capas, en el orden en que se trabaja:
  *
- * Lo que cambió respecto de la versión anterior:
+ *   HOY          una línea de contexto. Qué pasó recién.
+ *   POR RESOLVER sólo las situaciones que existen hoy. Si no hay e-cheqs
+ *                pendientes, no hay tarjeta de e-cheqs.
+ *   EXPLORAR     las vistas A/B/FCE/E, buscador, filtros y la lista.
  *
- *   · La búsqueda dejó de ir al servidor. Antes buscar recargaba desde la base
- *     mientras los otros filtros trabajaban en memoria — dos universos, y los
- *     conteos no cerraban entre sí. Se carga una vez y todo se filtra sobre
- *     ese mismo conjunto.
- *   · Los permisos existen. La versión anterior no importaba usePermisos: un
- *     viewer veía Editar, Anular y Eliminar. Ahora las acciones salen de
- *     accionesPara(), que ya filtra por rol.
- *   · El detalle es un panel al costado, no un modal que tapa la lista.
- *   · Mobile tiene su propia lista de tarjetas.
+ * La versión anterior era un panel de control: diez controles a la vista,
+ * tres KPI permanentes y una tabla de once columnas. Se veía moderna, pero
+ * seguía obligando a preguntarse "¿qué filtro pongo?" antes de poder trabajar.
+ *
+ * La regla acá es mostrar menos y mostrar lo correcto. Todo lo que se calcula
+ * —las señales, el resumen del día, qué acciones existen— vive en
+ * `lib/facturacion.ts`, que es puro y testeado; esta pantalla orquesta.
  *
  * Lo que NO cambió, a propósito: la lógica fiscal, el alta y la edición de
- * comprobantes, y todo el circuito de cobranza —`db.registrarCobro()`, las
+ * comprobantes, y todo el circuito de cobranza —`db.registrarCobro()` y las
  * ramas de cobrada / faltan retenciones / e-cheq / acreditación—. Se rediseñó
  * cómo se llega a esos formularios, no lo que hacen.
  */
@@ -102,7 +101,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
     () => ordenar(filtradas.filter(c => c.tipo === tab)),
     [filtradas, tab],
   )
-  const totales   = useMemo(() => calcularTotales(delTab), [delTab])
+
+  // Las señales miran el universo completo, no el tab ni los filtros: "tenés
+  // 6 pagos esperando retenciones" no debe cambiar porque estés parado en
+  // Facturas B. Son un recordatorio, no un reporte de lo que estás mirando.
+  const senales   = useMemo(() => calcularSenales(todas), [todas])
+  const hoy       = useMemo(() => resumenHoy(todas), [todas])
 
   const anios     = useMemo(() => opcionesAnio(todas), [todas])
   const unidades  = useMemo(() => opcionesUnidad(todas), [todas])
@@ -216,52 +220,38 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
 
   const conFiltros = tieneFiltros(filtros)
 
+  /** Abrir una señal = filtrar la lista por sus estados y bajar hasta ella. */
+  function abrirSenal(sen: Senal) {
+    set({ ...FILTROS_INICIALES, estados: sen.estados })
+    setAbierta(null)
+    document.querySelector('.ta-explorar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className={`ta-fact${abierta ? ' is-panel' : ''}`}>
       <div className="ta-fact__main">
-        <FacturasToolbar
-          filtros={filtros}
-          onChange={set}
-          estados={estados}
-          anios={anios}
-          unidades={unidades}
-          puntosVenta={pvs}
-          puedeCrear={puedeHacer('comprobante.crear')}
-          onNueva={() => setModal({ tipo: 'nueva' })}
-          onExportar={() => setModal({ tipo: 'exportar' })}
-          pendientes={pendientesTodas.length}
-        />
+        {!cargando && (
+          <header className="ta-fact__contexto">
+            <Hoy r={hoy} />
+            <PorResolver senales={senales} onAbrir={abrirSenal} />
+          </header>
+        )}
 
-        {/* Los tabs cuentan con el resto de los filtros ya aplicados: si
-            filtro por pendientes, "Facturas B" dice cuántas B pendientes hay. */}
-        <div className="ta-ftabs" role="tablist" aria-label="Tipo de comprobante">
-          {TIPOS_FACTURA.map(t => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === t}
-              className={`ta-ftab${tab === t ? ' is-on' : ''}`}
-              onClick={() => { setTab(t); setAbierta(null) }}
-            >
-              {TIPO_LABEL[t]}
-              <span className="ta-ftab__n">{porTipo[t]}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="ta-fkpis">
-          <Kpi label="Facturado" valor={<Money>{ars(totales.ars)}</Money>}
-            nota={`${totales.cantidad} ${totales.cantidad === 1 ? 'comprobante' : 'comprobantes'}`} />
-          <Kpi label="En dólares" valor={<Money>{usd(totales.usd)}</Money>}
-            nota={`${totales.cantidadUSD} ${totales.cantidadUSD === 1 ? 'factura' : 'facturas'}`} />
-          <Kpi
-            label="Por cobrar"
-            valor={<span className={totales.pendientes ? 'ta-fkpi__alerta' : ''}>{totales.pendientes}</span>}
-            nota={totales.faltanRetenciones > 0
-              ? `${totales.faltanRetenciones} con retenciones pendientes`
-              : 'sin pendientes de retención'}
+        <section className="ta-explorar" aria-label="Explorar facturas">
+          <FacturasToolbar
+            filtros={filtros}
+            onChange={set}
+            vista={tab}
+            onVista={t => { setTab(t); setAbierta(null) }}
+            conteos={porTipo}
+            estados={estados}
+            anios={anios}
+            unidades={unidades}
+            puntosVenta={pvs}
+            puedeCrear={puedeHacer('comprobante.crear')}
+            onNueva={() => setModal({ tipo: 'nueva' })}
+            onExportar={() => setModal({ tipo: 'exportar' })}
           />
-        </div>
 
         {/* Se monta UNA de las dos, no las dos con una escondida por CSS:
             son los mismos comprobantes y dejar la otra en el DOM significa
@@ -278,14 +268,13 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
         ) : (
           <FacturasTabla
             facturas={delTab}
-            tipo={tab}
             cargando={cargando}
             seleccionadaId={abierta?.id ?? null}
             onAbrir={setAbierta}
             hayFiltros={conFiltros}
-            compacta={!!abierta}
           />
         )}
+        </section>
       </div>
 
       {abierta && (
@@ -304,7 +293,12 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
 
       {/* ── Formularios reutilizados sin tocar su lógica ── */}
       {modal?.tipo === 'nueva' && (
-        <NuevoComprobanteModal clientes={clientes} onClose={() => setModal(null)} onSaved={trasGuardar} />
+        <NuevoComprobanteModal
+          clientes={clientes}
+          tipoInicial={tipoInicialPara(tab)}
+          onClose={() => setModal(null)}
+          onSaved={trasGuardar}
+        />
       )}
       {modal?.tipo === 'editar' && (
         <EditarComprobanteModal comp={modal.comp} onClose={() => setModal(null)} onSaved={trasGuardar} />
@@ -353,16 +347,6 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           onCancel={() => setModal(null)}
         />
       )}
-    </div>
-  )
-}
-
-function Kpi({ label, valor, nota }: { label: string; valor: React.ReactNode; nota: string }) {
-  return (
-    <div className="ta-fkpi">
-      <span className="ta-fkpi__label">{label}</span>
-      <span className="ta-fkpi__valor">{valor}</span>
-      <span className="ta-fkpi__nota">{nota}</span>
     </div>
   )
 }

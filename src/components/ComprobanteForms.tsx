@@ -19,14 +19,18 @@ async function getNextReciboId(): Promise<number> {
 }
 
 // ── Nueva Factura ──────────────────────────────────────────────
-export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
+export function NuevoComprobanteModal({ onClose, onSaved, clientes, tipoInicial }: {
   onClose: () => void
   onSaved: (c: Comprobante) => void
   clientes: string[]
+  /** Tipo con el que abre el formulario. Lo hereda de la vista en la que
+   *  estaba parado el usuario: si venía de Facturas B, abre en B. Se puede
+   *  cambiar acá adentro; esto es sólo el default. */
+  tipoInicial?: string
 }) {
   const [saving,     setSaving]     = useState(false)
   const [extracting, setExtracting] = useState(false)
-  const [tipo,       setTipo]       = useState('FACT A')
+  const [tipo,       setTipo]       = useState(tipoInicial ?? 'FACT A')
   const [fecha,      setFecha]      = useState(today())
   const [cliente,    setCliente]    = useState('')
   const [persona,    setPersona]    = useState(PERSONAS[0])

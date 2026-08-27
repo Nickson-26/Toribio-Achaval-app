@@ -19,42 +19,146 @@
   }
 }
 
-/* ── Toolbar ──────────────────────────────────────────────────────────────── */
-.ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); }
-.ta-fbar__row {
-  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+/* ══════════════════════════════════════════════════════════════════════════
+   HOY — una línea, no un panel
+   ══════════════════════════════════════════════════════════════════════════ */
+.ta-fact__contexto { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.ta-hoy {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  font-size: var(--text-body);
 }
-.ta-fbar__search { flex: 0 1 300px; min-width: 200px; }
+.ta-hoy__label {
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.ta-hoy__txt { color: var(--text-primary); font-weight: var(--weight-medium); }
+.ta-hoy__txt--quieto { color: var(--text-tertiary); font-weight: 400; }
+.ta-hoy__monto {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums; color: var(--text-secondary);
+  font-size: var(--text-secondary-size);
+}
 
-.ta-fbar__estados { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* ══════════════════════════════════════════════════════════════════════════
+   POR RESOLVER — sólo lo que existe
+   ══════════════════════════════════════════════════════════════════════════ */
+.ta-resolver { display: flex; flex-direction: column; gap: var(--space-2); }
 
-/* Chip de estado en la barra. Sin color propio: el color lo aporta el badge
-   de la fila. Acá lo que importa es si está puesto o no. */
-.ta-fchip {
-  height: 30px; padding: 0 var(--space-3);
-  background: transparent; color: var(--text-secondary);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
-  font-family: var(--font); font-size: var(--text-micro); font-weight: var(--weight-medium);
+.ta-resolver__nada {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--text-secondary-size); color: var(--text-tertiary);
+}
+.ta-resolver__nada svg { color: var(--success); }
+
+/* Superficie cristalizada. La señal es contexto, no dato financiero duro:
+   puede permitirse el vidrio. Los importes de adentro siguen siendo texto
+   sólido a contraste pleno. */
+.ta-senal {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-3) var(--space-4);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  cursor: pointer; text-align: left; font-family: var(--font);
+  transition: border-color var(--duration-fast) var(--ease),
+              transform var(--duration-fast) var(--ease);
+}
+.ta-senal:hover { border-color: var(--border-focus); }
+.ta-senal:active { transform: scale(.995); }
+.ta-senal:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.ta-senal__ico {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: var(--radius-input);
+}
+.ta-senal--warning .ta-senal__ico { background: var(--warning-soft); color: var(--warning-text); }
+.ta-senal--info    .ta-senal__ico { background: var(--info-soft);    color: var(--info-text); }
+.ta-senal--violet  .ta-senal__ico { background: var(--violet-soft);  color: var(--violet-text); }
+
+.ta-senal__cuerpo { display: block; flex: 1; min-width: 0; }
+/* display:block obligatorio: son <span> dentro de <span> y sin esto se
+   renderizan en la misma línea. Ya nos pasó dos veces. */
+.ta-senal__titulo {
+  display: block;
+  font-size: 15px; font-weight: var(--weight-label); color: var(--text-primary);
+}
+.ta-senal__detalle {
+  display: block; margin-top: 1px;
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+}
+/* La aclaración que evita leer "esperando retenciones" como deuda del
+   cliente cuando el dinero ya entró. */
+.ta-senal__nota {
+  display: inline-block; margin-left: 7px;
+  padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--bg-muted); color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--weight-medium);
+}
+
+.ta-senal__derecha { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
+.ta-senal__monto {
+  font-size: 15px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ta-senal__chev { color: var(--text-tertiary); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EXPLORAR
+   ══════════════════════════════════════════════════════════════════════════ */
+.ta-explorar {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  min-width: 0; scroll-margin-top: var(--space-5);
+}
+
+/* Vistas de trabajo, no un select escondido. */
+.ta-vistas {
+  display: flex; gap: 3px; padding: 3px;
+  background: var(--bg-muted);
+  border-radius: var(--radius-pill);
+  width: fit-content; max-width: 100%;
+  overflow-x: auto; scrollbar-width: none;
+}
+.ta-vistas::-webkit-scrollbar { display: none; }
+.ta-vista {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 var(--space-4); flex-shrink: 0;
+  background: none; border: none; border-radius: var(--radius-pill);
   cursor: pointer; white-space: nowrap;
-  transition: background var(--duration-fast) var(--ease),
-              color var(--duration-fast) var(--ease),
-              border-color var(--duration-fast) var(--ease);
+  font-family: var(--font); font-size: var(--text-secondary-size);
+  font-weight: var(--weight-medium); color: var(--text-secondary);
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
-.ta-fchip:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.ta-fchip.is-on {
-  background: var(--brand-soft); color: var(--brand-text); border-color: var(--brand-text);
+.ta-vista:hover { color: var(--text-primary); }
+.ta-vista.is-on {
+  background: var(--bg-surface); color: var(--text-primary);
+  font-weight: var(--weight-semibold); box-shadow: var(--shadow-sm);
 }
-[data-theme="accessible"] .ta-fchip.is-on { outline: 2px solid currentColor; outline-offset: -2px; }
+.ta-vista__n { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.ta-vista.is-on .ta-vista__n { color: var(--brand-text); }
+
+.ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.ta-fbar__row { display: flex; align-items: center; gap: var(--space-2); }
+.ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+.ta-fbar__sep { flex: 1 1 auto; }
+.ta-fbar__nueva { display: none; }
 
 .ta-fbar__filtros {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 var(--space-3); flex-shrink: 0;
-  background: var(--bg-surface); color: var(--text-secondary);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
-  font-family: var(--font); font-size: var(--text-micro); font-weight: var(--weight-medium);
-  cursor: pointer;
+  height: 34px; padding: 0 var(--space-3); flex-shrink: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-secondary-size);
+  font-weight: var(--weight-medium); cursor: pointer;
 }
-.ta-fbar__filtros:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.ta-fbar__filtros:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .ta-fbar__dot {
   display: grid; place-items: center;
   min-width: 16px; height: 16px; padding: 0 4px;
@@ -62,8 +166,6 @@
   border-radius: var(--radius-pill);
   font-size: 10px; font-weight: var(--weight-strong);
 }
-
-.ta-fbar__acciones { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
 
 /* Filtros activos. Sin esto una lista corta es indistinguible de una vacía. */
 .ta-fbar__chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -89,44 +191,6 @@
   transition: opacity var(--duration-fast) var(--ease);
 }
 .ta-fsheet__estado.is-on { opacity: 1; border-color: var(--border-focus); }
-
-/* ── Tabs de tipo ─────────────────────────────────────────────────────────── */
-.ta-ftabs {
-  display: flex; gap: var(--space-1);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto; scrollbar-width: none;
-}
-.ta-ftabs::-webkit-scrollbar { display: none; }
-.ta-ftab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: var(--space-3) var(--space-3); flex-shrink: 0;
-  background: none; border: none; border-bottom: 2px solid transparent;
-  margin-bottom: -1px; cursor: pointer;
-  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-medium);
-  color: var(--text-secondary); white-space: nowrap;
-}
-.ta-ftab:hover { color: var(--text-primary); }
-.ta-ftab.is-on { color: var(--brand-text); border-bottom-color: var(--brand); font-weight: var(--weight-semibold); }
-.ta-ftab__n {
-  background: var(--bg-muted); color: var(--text-tertiary);
-  padding: 1px 6px; border-radius: var(--radius-pill);
-  font-size: 10px; font-weight: var(--weight-strong);
-}
-.ta-ftab.is-on .ta-ftab__n { background: var(--brand-soft); color: var(--brand-text); }
-
-/* ── KPIs ─────────────────────────────────────────────────────────────────── */
-.ta-fkpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
-.ta-fkpi { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ta-fkpi__label {
-  font-size: var(--text-secondary-size); color: var(--text-secondary);
-  font-weight: var(--weight-medium);
-}
-.ta-fkpi__valor {
-  font-size: 22px; font-weight: var(--weight-strong); color: var(--text-primary);
-  letter-spacing: -0.025em; font-variant-numeric: tabular-nums;
-}
-.ta-fkpi__alerta { color: var(--warning-text); }
-.ta-fkpi__nota { font-size: var(--text-micro); color: var(--text-tertiary); }
 
 /* ── Tabla ────────────────────────────────────────────────────────────────── */
 .ta-ftabla-wrap {
@@ -169,14 +233,15 @@
 .ta-ftabla__num { width: 92px; }
 /* Ancho propio: con table-layout:fixed la columna se repartía el sobrante y
    "Faltan retenciones" quedaba cortado en la "s". */
-.ta-ftabla__estado { width: 156px; }
-/* Los importes también necesitan ancho propio: con fixed layout se repartían
-   el sobrante y un total de nueve dígitos quedaba cortado por cinco píxeles.
-   138px = "$ 185.130.000" a 13px tabulares más el padding de celda. */
-.ta-ftabla__importe { width: 138px; }
+.ta-ftabla__estado { width: 160px; }
+.ta-ftabla__fecha { width: 116px; }
+/* Los importes necesitan ancho propio: con fixed layout se repartían el
+   sobrante y un total de nueve dígitos quedaba cortado por cinco píxeles.
+   Con cinco columnas sobra lugar, así que se lo damos holgado. */
+.ta-ftabla__importe { width: 172px; }
 .ta-frow__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 .ta-frow__pv { display: block; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
-.ta-frow__fecha { width: 104px; white-space: nowrap; color: var(--text-secondary); }
+.ta-frow__fecha { white-space: nowrap; color: var(--text-secondary); }
 .ta-frow__cliente { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-frow__unidad {
   width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -276,8 +341,38 @@
 .ta-fpdf__file.is-busy { opacity: .7; cursor: wait; }
 .ta-fpdf__file input { display: none; }
 
+.ta-fpanel__cerrado {
+  font-size: var(--text-secondary-size); color: var(--text-tertiary);
+}
+
+/* Menú de acciones secundarias. Cristalizado: es una superficie contextual,
+   no información financiera. */
+.ta-fmenu { position: relative; }
+.ta-fmenu__pop {
+  position: absolute; bottom: calc(100% + 6px); left: 0;
+  min-width: 190px; padding: 5px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-lg);
+  z-index: 5;
+  animation: ta-fade var(--duration-fast) var(--ease);
+}
+.ta-fmenu__item {
+  display: block; width: 100%;
+  padding: 8px var(--space-3);
+  background: none; border: none; border-radius: var(--radius-sm);
+  cursor: pointer; text-align: left;
+  font-family: var(--font); font-size: var(--text-body); color: var(--text-secondary);
+}
+.ta-fmenu__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ta-fmenu__item.is-peligro { color: var(--danger); }
+.ta-fmenu__item.is-peligro:hover { background: var(--danger-soft); }
+
 .ta-fpanel__foot {
-  display: flex; align-items: center; justify-content: flex-end;
+  display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
@@ -318,6 +413,10 @@
   font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
 }
 .ta-fcard__usd { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-fcard__estado { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+/* Cuánto hace que espera dice más que la fecha: es lo que decide a quién
+   llamás primero. */
+.ta-fcard__dias { font-size: var(--text-micro); color: var(--text-tertiary); }
 
 /* Fuera del botón de detalle a propósito: un botón dentro de otro botón es
    una trampa táctil. */
@@ -354,34 +453,42 @@
 
 @media (max-width: 640px) {
   .ta-fact { gap: var(--space-4); }
-  .ta-fact__main { gap: var(--space-3); }
+  .ta-fact__main { gap: var(--space-4); }
+  .ta-fact__contexto { gap: var(--space-2); }
 
-  /* Buscador y Filtros en una fila de ~34px, no 214px de controles. */
-  .ta-fbar__row { flex-wrap: nowrap; gap: var(--space-2); }
-  .ta-fbar__search { flex: 1 1 auto; min-width: 0; }
-  .ta-fbar__acciones { margin-left: 0; }
-  /* Exportar no compite con buscar en 390px: vive en el menú de la pantalla. */
-  .ta-fbar__acciones .ta-btn { display: none; }
+  /* Hoy: una línea, con el importe abajo si no entra al lado. */
+  .ta-hoy { gap: 6px; font-size: var(--text-secondary-size); }
+  .ta-hoy__monto { margin-left: 0; }
 
-  .ta-ftabs { gap: 0; }
-  .ta-ftab { padding: var(--space-2) var(--space-3); font-size: var(--text-secondary-size); }
-
-  /* KPIs compactos. El importe principal ocupa la fila entera: a 390px un
-     tercio del ancho no alcanza para diez dígitos sin recortarlos, y achicar
-     la tipografía hasta que entre lo vuelve ilegible. Los otros dos son
-     números cortos y sí conviven. */
-  .ta-fkpis {
-    grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-4);
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-input);
-    padding: var(--space-3);
+  /* La señal se apila. A 390px el título y un importe de nueve dígitos no
+     comparten fila: el título se partía en dos y el monto quedaba flotando
+     al medio. El monto baja a su propia línea, alineado con el texto. */
+  .ta-senal { flex-wrap: wrap; align-items: flex-start; padding: var(--space-3); gap: var(--space-3); }
+  .ta-senal__ico { width: 30px; height: 30px; }
+  .ta-senal__cuerpo { flex: 1 1 auto; }
+  .ta-senal__titulo { font-size: var(--text-body); }
+  .ta-senal__detalle { font-size: var(--text-micro); }
+  .ta-senal__nota { margin-left: 0; margin-top: 4px; display: table; }
+  .ta-senal__derecha {
+    /* padding, no margin: un margin sobre width:100% se SUMA al ancho y
+       desbordaba la página 17px. Con border-box el padding entra adentro. */
+    order: 3; width: 100%; box-sizing: border-box;
+    padding-left: calc(30px + var(--space-3));
+    justify-content: flex-start;
   }
-  .ta-fkpi:first-child { grid-column: 1 / -1; }
-  .ta-fkpi__label { font-size: var(--text-micro); }
-  .ta-fkpi__valor { font-size: 17px; letter-spacing: -0.01em; }
-  .ta-fkpi:first-child .ta-fkpi__valor { font-size: 20px; }
-  .ta-fkpi__nota { font-size: 10px; }
+  .ta-senal__monto { font-size: 17px; letter-spacing: -0.02em; }
+  /* El chevron ya no aporta: la tarjeta entera es el blanco táctil. */
+  .ta-senal__chev { display: none; }
+
+  /* Buscador y Filtros en una fila. Sin exportar ni CTA compitiendo: el alta
+     ya vive en la topbar como icono. */
+  .ta-fbar__row { flex-wrap: nowrap; gap: var(--space-2); }
+  .ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: none; }
+  .ta-fbar__sep { display: none; }
+  .ta-fbar__nueva { display: inline-flex; width: 36px; padding: 0; flex-shrink: 0; }
+
+  .ta-vistas { width: 100%; }
+  .ta-vista { padding: 0 var(--space-3); font-size: var(--text-micro); }
 
   /* 30px no es un blanco táctil. */
   .ta-fbar__filtros { height: 36px; }
@@ -395,6 +502,6 @@
 }
 
 @media (max-width: 380px) {
-  .ta-fkpi__valor { font-size: 14px; }
   .ta-fcard__ars { font-size: 16px; }
+  .ta-senal__monto { font-size: var(--text-micro); }
 }

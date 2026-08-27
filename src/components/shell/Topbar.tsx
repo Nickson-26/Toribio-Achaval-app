@@ -32,7 +32,10 @@ export function Topbar({
   const { puedeHacer } = usePermisos()
 
   const titulo = RUTAS[route.to]?.titulo ?? ''
-  const puedeCrear = puedeHacer('comprobante.crear')
+  // Facturación tiene su propio alta, que hereda el tipo de la vista en la
+  // que está parado el usuario. Repetirlo acá sería un segundo botón que hace
+  // casi lo mismo pero peor: sin contexto.
+  const puedeCrear = puedeHacer('comprobante.crear') && route.to !== 'facturas'
 
   return (
     <header className="ta-topbar">

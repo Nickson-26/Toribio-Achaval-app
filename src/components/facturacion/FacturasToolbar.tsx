@@ -1,36 +1,39 @@
 'use client'
 import { useState } from 'react'
-import { SlidersHorizontal, X, Plus } from 'lucide-react'
-import { Button, SearchInput, Select, Field, Modal, StatusBadge } from '@/design/primitives'
+import { SlidersHorizontal, X, Plus, Download } from 'lucide-react'
+import {
+  Button, IconButton, SearchInput, Select, Field, Modal, StatusBadge,
+} from '@/design/primitives'
 import { estadoLabel } from '@/design/status'
 import type { ComprobanteEstado } from '@/lib/supabase'
 import {
   chipsActivos, contarFiltros, hayFiltros, FILTROS_INICIALES,
-  type FiltrosFacturacion, type ChipFiltro,
+  TIPOS_FACTURA, TIPO_LABEL,
+  type FiltrosFacturacion, type ChipFiltro, type TipoFactura,
 } from '@/lib/facturacion'
 
 /**
- * Toolbar de Facturación.
+ * Explorar facturas: vistas, buscador y una puerta a los filtros.
  *
- * La versión anterior tenía diez controles en dos filas —117px en escritorio,
- * 214px en un iPhone, o sea media pantalla antes de ver una sola factura— y
- * dos CTA duplicados: "+ Nueva factura" aparecía acá y en la topbar, y
- * "Excel pendientes" abría el mismo modal que "Exportar pendientes".
+ * Nada más. La versión anterior tenía a la vista los estados como chips, año,
+ * mes, moneda, unidad, punto de venta, exportación y dos CTA — un panel de
+ * control que había que atravesar antes de ver una factura.
  *
- * Ahora hay cuatro cosas: buscar, estados, Filtros, y una sola acción de alta.
- * El resto vive detrás del botón Filtros, que lleva un badge con cuántos hay
- * puestos.
- *
- * Los filtros activos se muestran abajo como chips que se pueden sacar de a
- * uno. Sin eso, una lista corta es indistinguible de una lista vacía: el
- * usuario no ve por qué le faltan filas.
+ * Ahora lo permanente es: en qué tipo estoy, qué busco, y un botón de filtros
+ * con badge. Todo lo demás vive dentro de la hoja. Lo que sí queda visible son
+ * los filtros ACTIVOS, porque sin eso una lista corta es indistinguible de una
+ * vacía y el usuario no ve por qué le faltan filas.
  */
 export function FacturasToolbar({
-  filtros, onChange, estados, anios, unidades, puntosVenta,
-  puedeCrear, onNueva, onExportar, pendientes,
+  filtros, onChange, vista, onVista, conteos,
+  estados, anios, unidades, puntosVenta,
+  puedeCrear, onNueva, onExportar,
 }: {
   filtros: FiltrosFacturacion
   onChange: (p: Partial<FiltrosFacturacion>) => void
+  vista: TipoFactura
+  onVista: (t: TipoFactura) => void
+  conteos: Record<TipoFactura, number>
   estados: ComprobanteEstado[]
   anios: string[]
   unidades: string[]
@@ -38,7 +41,6 @@ export function FacturasToolbar({
   puedeCrear: boolean
   onNueva: () => void
   onExportar: () => void
-  pendientes: number
 }) {
   const [sheet, setSheet] = useState(false)
   const activos = contarFiltros(filtros)
@@ -64,30 +66,31 @@ export function FacturasToolbar({
 
   return (
     <div className="ta-fbar">
+      {/* Las vistas son el contexto de trabajo, no un select escondido: de
+          ellas hereda el tipo la factura que se crea desde acá. */}
+      <div className="ta-vistas" role="tablist" aria-label="Tipo de factura">
+        {TIPOS_FACTURA.map(t => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={vista === t}
+            className={`ta-vista${vista === t ? ' is-on' : ''}`}
+            onClick={() => onVista(t)}
+          >
+            {TIPO_LABEL[t]}
+            <span className="ta-vista__n">{conteos[t]}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="ta-fbar__row">
         <SearchInput
           value={filtros.buscar}
           onChange={v => onChange({ buscar: v })}
-          placeholder="Buscar N° o cliente…"
+          placeholder="Buscar factura o cliente…"
           ariaLabel="Buscar facturas"
           className="ta-fbar__search"
         />
-
-        {/* Los estados son el filtro que más se usa: quedan a la vista en
-            escritorio y se pliegan dentro de la hoja en mobile. */}
-        <div className="ta-fbar__estados ta-only-desktop" role="group" aria-label="Filtrar por estado">
-          {estados.map(e => (
-            <button
-              key={e}
-              type="button"
-              className={`ta-fchip${filtros.estados.includes(e) ? ' is-on' : ''}`}
-              aria-pressed={filtros.estados.includes(e)}
-              onClick={() => toggleEstado(e)}
-            >
-              {estadoLabel(e)}
-            </button>
-          ))}
-        </div>
 
         <button
           type="button"
@@ -100,16 +103,40 @@ export function FacturasToolbar({
           {activos > 0 && <span className="ta-fbar__dot">{activos}</span>}
         </button>
 
-        <div className="ta-fbar__acciones">
-          <Button variant="ghost" size="sm" onClick={onExportar}>
-            Exportar pendientes{pendientes > 0 ? ` (${pendientes})` : ''}
-          </Button>
-          {puedeCrear && (
-            <Button variant="primary" size="sm" icon={Plus} onClick={onNueva} className="ta-only-desktop">
+        <span className="ta-fbar__sep" />
+
+        {/* Exportar es ocasional y de escritorio: bajar un Excel de cobranzas
+            en un teléfono no es un caso real, y esos 40px hacen la diferencia
+            entre ver el placeholder del buscador y no verlo. */}
+        <IconButton
+          icon={Download} label="Exportar pendientes a Excel"
+          onClick={onExportar} className="ta-only-desktop"
+        />
+
+        {/* El alta vive acá y no en la topbar, porque acá sabe de qué tipo:
+            hereda la vista activa. En mobile no hay ancho para el texto, así
+            que es el mismo botón sin label — no desaparece, que sería
+            dejar al usuario sin poder facturar desde el teléfono. */}
+        {puedeCrear && (
+          <>
+            <Button
+              variant="primary" size="sm" icon={Plus}
+              onClick={onNueva}
+              className="ta-only-desktop"
+            >
               Nueva factura
             </Button>
-          )}
-        </div>
+            <button
+              type="button"
+              className="ta-btn ta-btn--primary ta-fbar__nueva"
+              onClick={onNueva}
+              aria-label={`Nueva ${TIPO_LABEL[vista].toLowerCase()}`}
+              title={`Nueva ${TIPO_LABEL[vista].toLowerCase()}`}
+            >
+              <Plus size={18} aria-hidden />
+            </button>
+          </>
+        )}
       </div>
 
       {chips.length > 0 && (
@@ -127,7 +154,7 @@ export function FacturasToolbar({
             </button>
           ))}
           <button type="button" className="ta-fbar__limpiar" onClick={limpiarTodo}>
-            Limpiar todo
+            Limpiar
           </button>
         </div>
       )}
@@ -143,8 +170,6 @@ export function FacturasToolbar({
           </>}
         >
           <div className="ta-fsheet">
-            {/* En la hoja los estados van con su badge real, para que el
-                usuario asocie el filtro con lo que después ve en la lista. */}
             <Field label="Estado">
               <div className="ta-fsheet__estados">
                 {estados.map(e => (

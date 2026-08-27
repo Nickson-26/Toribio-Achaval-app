@@ -7,15 +7,17 @@ import { ars, usd, fdate } from '@/lib/utils'
 import type { Comprobante } from '@/lib/supabase'
 import type { Accion } from '@/design/permissions'
 import {
-  accionPrimaria, muestraDesagregado, fechaCorta, puntoVentaDe,
-  type AccionId,
+  accionPrimaria, fechaCorta, puntoVentaDe, diasDesde, type AccionId,
 } from '@/lib/facturacion'
 
 /**
  * Las dos formas de mirar la misma lista.
  *
- * Escritorio: tabla. Hay ancho para el desagregado fiscal y para comparar
- * filas de un vistazo.
+ * Escritorio: tabla, con cinco columnas. Comprobante, fecha, cliente, importe
+ * y estado — lo que hace falta para EXPLORAR. Neto, IVA, unidad y punto de
+ * venta salieron: son datos de verificación y viven en el detalle, que es
+ * donde se verifican. Una tabla con toda la base adentro no es una lista, es
+ * un volcado.
  *
  * Mobile: tarjetas. NO es la tabla comprimida. Once columnas dentro de un
  * contenedor con scroll horizontal no es una experiencia, es un escondite
@@ -92,23 +94,15 @@ const Vacio = ({ hayFiltros }: { hayFiltros: boolean }) => (
    TABLA — escritorio
    ══════════════════════════════════════════════════════════════════════════ */
 export function FacturasTabla({
-  facturas, tipo, cargando, seleccionadaId, onAbrir, hayFiltros, compacta,
+  facturas, cargando, seleccionadaId, onAbrir, hayFiltros,
 }: {
   facturas: Comprobante[]
-  tipo: string
   cargando: boolean
   seleccionadaId: string | null
   onAbrir: (c: Comprobante) => void
   hayFiltros: boolean
-  /** El panel de detalle está abierto: la tabla tiene ~400px menos. */
-  compacta?: boolean
 }) {
   const { visibles, faltan, centinela, verMas } = useVentana(facturas)
-  // Con el panel abierto se caen neto, IVA y unidad. No es sólo que no
-  // entren: son datos de verificación, y el panel de al lado los está
-  // mostrando desagregados en ese mismo momento. Repetirlos apretados no
-  // agrega nada y hacía que las columnas se pisaran entre sí.
-  const desagregado = muestraDesagregado(tipo) && !compacta
 
   if (cargando) return <SkeletonRows rows={8} />
   if (!facturas.length) return <Vacio hayFiltros={hayFiltros} />
@@ -119,12 +113,9 @@ export function FacturasTabla({
         <thead>
           <tr>
             <th className="ta-ftabla__num">N°</th>
-            <th>Fecha</th>
+            <th className="ta-ftabla__fecha">Fecha</th>
             <th>Cliente</th>
-            {!compacta && <th>Unidad</th>}
-            {desagregado && <th className="ta-num ta-ftabla__importe">Neto</th>}
-            {desagregado && <th className="ta-num ta-ftabla__importe">IVA</th>}
-            <th className="ta-num ta-ftabla__importe">Total</th>
+            <th className="ta-num ta-ftabla__importe">Importe</th>
             <th className="ta-ftabla__estado">Estado</th>
             <th className="ta-frow__chev"><span className="ta-sr">Abrir</span></th>
           </tr>
@@ -148,9 +139,6 @@ export function FacturasTabla({
               </td>
               <td className="ta-frow__fecha">{fdate(c.fecha)}</td>
               <td className="ta-frow__cliente" title={c.cliente}>{c.cliente}</td>
-              {!compacta && <td className="ta-frow__unidad" title={c.persona}>{c.persona}</td>}
-              {desagregado && <td className="ta-num ta-ftabla__importe"><Money>{ars(c.neto_ars)}</Money></td>}
-              {desagregado && <td className="ta-num ta-ftabla__importe"><Money>{ars(c.iva)}</Money></td>}
               <td className="ta-num ta-ftabla__importe ta-frow__total">
                 <Money>{ars(c.monto_ars)}</Money>
                 {c.monto_usd ? <Money className="ta-frow__usd">{usd(c.monto_usd)}</Money> : null}
@@ -188,6 +176,9 @@ export function FacturasLista({
     <div className="ta-flista">
       {visibles.map(c => {
         const primaria = accionPrimaria(c, puedeHacer)
+        // La antigüedad sólo importa cuando la plata no entró todavía: en una
+        // cobrada, "hace 74 días" no le sirve a nadie.
+        const dias = c.estado === 'pendiente' ? diasDesde(c.fecha) : null
         return (
           <article key={c.id} className="ta-fcard">
             <button
@@ -199,7 +190,6 @@ export function FacturasLista({
               <span className="ta-fcard__top">
                 <span className="ta-fcard__n">{c.numero}</span>
                 <span className="ta-fcard__fecha">{fechaCorta(c.fecha)}</span>
-                <StatusBadge estado={c.estado} sm />
               </span>
 
               <span className="ta-fcard__cliente">{c.cliente}</span>
@@ -207,6 +197,13 @@ export function FacturasLista({
               <span className="ta-fcard__montos">
                 <Money className="ta-fcard__ars">{ars(c.monto_ars)}</Money>
                 {c.monto_usd ? <Money className="ta-fcard__usd">{usd(c.monto_usd)}</Money> : null}
+              </span>
+
+              <span className="ta-fcard__estado">
+                <StatusBadge estado={c.estado} sm />
+                {dias !== null && (
+                  <span className="ta-fcard__dias">{dias} {dias === 1 ? 'día' : 'días'}</span>
+                )}
               </span>
             </button>
 

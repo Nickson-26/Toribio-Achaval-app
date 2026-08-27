@@ -16,6 +16,9 @@ import {
   estadosPresentes, chipsActivos, contarFiltros, hayFiltros,
   accionesPara, accionPrimaria, muestraDesagregado, fechaCorta,
   puntoVentaDe, esARS, esUSD, FILTROS_INICIALES,
+  calcularSenales, resumenHoy, pagosDelDia, esperandoRetenciones,
+  echeqsPorAcreditar, pendientesDeCobro, pendientesAntiguas,
+  tipoInicialPara, DIAS_ANTIGUEDAD,
   type FiltrosFacturacion,
 } from '../src/lib/facturacion.ts'
 import { puede } from '../src/design/permissions.ts'
@@ -289,12 +292,13 @@ test('pendiente ofrece Registrar cobro como acción primaria', () => {
   assert.equal(p?.label, 'Registrar cobro')
 })
 
-test('faltan_retenciones ofrece Completar cobro, no Registrar cobro', () => {
-  // El dinero ya entró: pedirle "registrar cobro" otra vez es mentirle
-  // al usuario sobre qué le falta.
+test('faltan_retenciones no vuelve a pedir "registrar cobro"', () => {
+  // El dinero ya entró: pedirle registrar el cobro otra vez es mentirle al
+  // usuario sobre qué le falta. Lo que falta es el recibo — ver el bloque de
+  // señales, donde se afina el label.
   const p = accionPrimaria(f({ estado: 'faltan_retenciones' }), admin)
   assert.equal(p?.id, 'cobrar')
-  assert.equal(p?.label, 'Completar cobro')
+  assert.ok(!/registrar cobro/i.test(p!.label))
 })
 
 test('echeq_pendiente ofrece Confirmar acreditación', () => {
@@ -347,4 +351,183 @@ test('fechaCorta deja día y mes, y tolera nulos', () => {
   assert.equal(fechaCorta('2026-08-26'), '26/08')
   assert.equal(fechaCorta(null), '—')
   assert.equal(fechaCorta(''), '—')
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SEÑALES OPERATIVAS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const HOY = new Date('2026-08-27T12:00:00Z')
+
+// Fixtures con la forma real que tienen los datos en producción.
+const pagada = (over = {}) => f({
+  estado: 'cobrada', pago_recibido: true, recibo_id: 19300,
+  fecha_cobro: '2026-08-20', ...over,
+})
+const conRetencionesPendientes = (over = {}) => f({
+  estado: 'faltan_retenciones', pago_recibido: true, recibo_id: null,
+  fecha_pago: '2026-08-25', medio_pago: 'transferencia', ...over,
+})
+const pendiente = (over = {}) => f({ estado: 'pendiente', pago_recibido: false, ...over })
+
+test('esperandoRetenciones detecta pago recibido sin recibo', () => {
+  const cs = [pagada(), conRetencionesPendientes(), pendiente()]
+  const r = esperandoRetenciones(cs)
+  assert.equal(r.length, 1)
+  assert.equal(r[0].estado, 'faltan_retenciones')
+})
+
+test('esperandoRetenciones se calcula por circuito, no por etiqueta', () => {
+  // La condición es "pago recibido y sin recibo". Si algún día un estado
+  // distinto cae en esa situación, la señal lo tiene que ver igual.
+  const raro = f({ estado: 'emitida', pago_recibido: true, recibo_id: null })
+  assert.equal(esperandoRetenciones([raro]).length, 1)
+})
+
+test('esperandoRetenciones ignora las anuladas', () => {
+  const anulada = f({ estado: 'anulada', pago_recibido: true, recibo_id: null })
+  assert.equal(esperandoRetenciones([anulada]).length, 0)
+})
+
+test('una cobrada con recibo no está esperando nada', () => {
+  assert.equal(esperandoRetenciones([pagada()]).length, 0)
+})
+
+test('pendientesAntiguas usa el umbral de 60 días', () => {
+  assert.equal(DIAS_ANTIGUEDAD, 60)
+  const vieja  = pendiente({ fecha: '2026-05-01' })   // ~118 días
+  const nueva  = pendiente({ fecha: '2026-08-20' })   // 7 días
+  const justo  = pendiente({ fecha: '2026-06-28' })   // 60 días exactos
+  const r = pendientesAntiguas([vieja, nueva, justo], HOY)
+  assert.equal(r.length, 1)
+  assert.equal(r[0].fecha, '2026-05-01')
+})
+
+test('las señales con cero casos NO aparecen', () => {
+  // El requisito explícito: nada de tarjetas diciendo "0".
+  const soloCobradas = [pagada(), pagada()]
+  assert.deepEqual(calcularSenales(soloCobradas, HOY), [])
+})
+
+test('e-cheq no aparece cuando no hay ninguno, y aparece cuando lo hay', () => {
+  assert.equal(calcularSenales([pendiente()], HOY).some(s => s.id === 'echeq'), false)
+  const conEcheq = [f({ estado: 'echeq_pendiente' })]
+  assert.equal(calcularSenales(conEcheq, HOY).some(s => s.id === 'echeq'), true)
+})
+
+test('la señal de e-cheq no promete una fecha de acreditación', () => {
+  // referencia_pago está vacío en toda la base: inventar un "próximo: hoy"
+  // sería peor que no decir nada.
+  const s = calcularSenales([f({ estado: 'echeq_pendiente' })], HOY)
+    .find(x => x.id === 'echeq')!
+  assert.ok(!/próximo|acredita el|\d{2}\/\d{2}/i.test(s.detalle + (s.nota ?? '')))
+})
+
+test('la señal de retenciones aclara que el pago ya entró', () => {
+  const s = calcularSenales([conRetencionesPendientes()], HOY).find(x => x.id === 'retenciones')!
+  assert.equal(s.nota, 'El pago ya entró')
+  assert.ok(/sin recibo/i.test(s.detalle))
+})
+
+test('la señal de pendientes informa la antigüedad sólo si existe', () => {
+  const conViejas = calcularSenales([pendiente({ fecha: '2026-01-10' })], HOY)
+    .find(s => s.id === 'pendientes')!
+  assert.ok(/más de 60 días/.test(conViejas.nota ?? ''))
+
+  const sinViejas = calcularSenales([pendiente({ fecha: '2026-08-25' })], HOY)
+    .find(s => s.id === 'pendientes')!
+  assert.equal(sinViejas.nota, undefined)
+})
+
+test('cada señal sabe con qué estados abrir la lista', () => {
+  const cs = [conRetencionesPendientes(), pendiente(), f({ estado: 'echeq_pendiente' })]
+  const s = calcularSenales(cs, HOY)
+  assert.deepEqual(s.find(x => x.id === 'retenciones')!.estados, ['faltan_retenciones'])
+  assert.deepEqual(s.find(x => x.id === 'pendientes')!.estados, ['pendiente'])
+  assert.deepEqual(s.find(x => x.id === 'echeq')!.estados, ['echeq_pendiente'])
+})
+
+test('las señales van en orden de urgencia operativa', () => {
+  const cs = [pendiente(), f({ estado: 'echeq_pendiente' }), conRetencionesPendientes()]
+  assert.deepEqual(calcularSenales(cs, HOY).map(s => s.id), ['retenciones', 'echeq', 'pendientes'])
+})
+
+test('los montos de las señales suman sólo sus propios casos', () => {
+  const cs = [
+    conRetencionesPendientes({ monto_ars: 1_000_000 }),
+    pendiente({ monto_ars: 500_000 }),
+    pagada({ monto_ars: 9_999_999 }),
+  ]
+  const s = calcularSenales(cs, HOY)
+  assert.equal(s.find(x => x.id === 'retenciones')!.montoARS, 1_000_000)
+  assert.equal(s.find(x => x.id === 'pendientes')!.montoARS, 500_000)
+})
+
+/* ── Hoy ─────────────────────────────────────────────────────────────────── */
+
+test('un pago cuenta hoy si su fecha_cobro es hoy', () => {
+  assert.equal(pagosDelDia([pagada({ fecha_cobro: '2026-08-27' })], '2026-08-27').length, 1)
+})
+
+test('un pago cuenta hoy si su fecha_pago es hoy, aunque no tenga fecha_cobro', () => {
+  // Es el caso real de producción: los 2 pagos de hoy sólo tienen fecha_pago,
+  // porque están en la rama "pagó pero falta el recibo". Mirar un solo campo
+  // los dejaba afuera.
+  const c = conRetencionesPendientes({ fecha_cobro: null, fecha_pago: '2026-08-27' })
+  assert.equal(pagosDelDia([c], '2026-08-27').length, 1)
+})
+
+test('los pagos de hoy no cuentan comprobantes anulados', () => {
+  const c = f({ estado: 'anulada', fecha_cobro: '2026-08-27' })
+  assert.equal(pagosDelDia([c], '2026-08-27').length, 0)
+})
+
+test('resumenHoy separa pagos de facturas emitidas', () => {
+  const cs = [
+    pagada({ fecha_cobro: '2026-08-27' }),
+    f({ fecha: '2026-08-27', estado: 'pendiente' }),
+    pagada({ fecha_cobro: '2026-08-01' }),
+  ]
+  const r = resumenHoy(cs, HOY)
+  assert.equal(r.pagos, 1)
+  assert.equal(r.emitidas, 1)
+  assert.equal(r.hayAlgo, true)
+})
+
+test('resumenHoy avisa cuando no pasó nada, con el contexto de la semana', () => {
+  const cs = [pagada({ fecha_cobro: '2026-08-24' }), pagada({ fecha_cobro: '2026-08-25' })]
+  const r = resumenHoy(cs, HOY)
+  assert.equal(r.pagos, 0)
+  assert.equal(r.hayAlgo, false)
+  assert.equal(r.pagosSemana, 2)
+})
+
+/* ── Tipo contextual al crear ────────────────────────────────────────────── */
+
+test('la factura nueva hereda el tipo de la vista en la que estás', () => {
+  assert.equal(tipoInicialPara('FACT B'), 'FACT B')
+  assert.equal(tipoInicialPara('FACT A'), 'FACT A')
+  assert.equal(tipoInicialPara('FACT DE CREDITO'), 'FACT DE CREDITO')
+  assert.equal(tipoInicialPara('FACT E'), 'FACT E')
+})
+
+test('un tipo desconocido cae en FACT A y no rompe el formulario', () => {
+  assert.equal(tipoInicialPara('CUALQUIER COSA' as any), 'FACT A')
+})
+
+/* ── Acciones, después de la reformulación ───────────────────────────────── */
+
+test('faltan_retenciones ofrece emitir el recibo, que es lo que falta', () => {
+  const p = accionPrimaria(conRetencionesPendientes(), admin)
+  assert.equal(p?.id, 'cobrar')
+  assert.equal(p?.label, 'Emitir recibo')
+})
+
+test('cargar retenciones existe pero NO es la acción primaria', () => {
+  // Hoy GestionarRetencionesModal recalcula el estado sin emitir recibo:
+  // ofrecerla como paso principal llevaría a `cobrada` sin recibo_id.
+  const as = accionesPara(conRetencionesPendientes(), admin)
+  const ret = as.find(a => a.id === 'retenciones')
+  assert.ok(ret)
+  assert.ok(!ret!.primaria)
 })

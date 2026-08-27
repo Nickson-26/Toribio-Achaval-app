@@ -253,6 +253,201 @@ export function contarFiltros(f: FiltrosFacturacion): number {
     (f.moneda !== 'all' ? 1 : 0)
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   SEÑALES OPERATIVAS
+   ══════════════════════════════════════════════════════════════════════════
+   Lo que la pantalla tiene que contarte sin que preguntes.
+
+   Regla de admisión, y es estricta: una señal entra sólo si (a) sale de
+   campos que existen y están cargados, (b) tiene una regla exacta, y (c)
+   lleva a una acción concreta. Si no conduce a hacer algo, no pertenece a
+   Facturación — pertenece a Reportes.
+
+   Y si hoy tiene cero casos, no se muestra. Una tarjeta que dice "0" ocupa
+   el mismo lugar que una que dice algo.
+
+   ── Lo que se verificó contra los datos reales antes de escribir esto ──
+
+   · fecha_cobro   187/264 facturas   · fecha_pago      36/264
+   · pago_recibido 200 true / 64 false · recibo_id      195/264
+   · referencia_pago, importe_pagado, observaciones_pago: 0/264, vacíos en
+     TODA la base. Por eso la señal de e-cheq no promete fecha de
+     acreditación: el campo donde viviría no tiene un solo dato.
+
+   ── Una equivalencia que importa ──
+
+   "pagó pero todavía no tiene recibo" y `faltan_retenciones` son HOY el
+   mismo conjunto, y no por casualidad: registrarCobro() marca
+   pago_recibido=true sin crear recibo exactamente en esa rama, y toda
+   factura `cobrada` sale con recibo_id. Medido: los 6 casos coinciden, 0
+   cobradas sin recibo.
+
+   Se calcula por la condición estructural (pago recibido y sin recibo) y no
+   por el estado, para que si algún día divergen la señal siga apuntando al
+   circuito y no a la etiqueta. Pero se muestra como UNA sola señal: dos
+   tarjetas para las mismas seis facturas es contar dos veces el mismo
+   trabajo, que es el error que ya habíamos corregido en el Inicio.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Días a partir de los cuales una pendiente se marca como antigua. */
+export const DIAS_ANTIGUEDAD = 60
+
+export type SenalId = 'retenciones' | 'echeq' | 'pendientes'
+
+export type Senal = {
+  id: SenalId
+  titulo: string
+  /** Una línea. Lo que hace falta saber para decidir si abrirla. */
+  detalle: string
+  /** Aclaración cuando el estado se puede malinterpretar. */
+  nota?: string
+  casos: number
+  montoARS: number
+  /** Con qué estados se abre la lista al tocarla. */
+  estados: ComprobanteEstado[]
+  tono: 'warning' | 'info' | 'violet'
+}
+
+function sumar(cs: Comprobante[]): number {
+  return cs.reduce((s, c) => s + (c.monto_ars ?? 0), 0)
+}
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+/**
+ * Pago recibido, recibo todavía no emitido.
+ *
+ * El dinero YA entró. Lo que falta son las retenciones para poder cerrar el
+ * circuito. No es deuda del cliente: es trabajo administrativo propio, y por
+ * eso el tono no es el de una pendiente.
+ */
+export function esperandoRetenciones(cs: Comprobante[]): Comprobante[] {
+  return cs.filter(c => c.pago_recibido === true && !c.recibo_id && c.estado !== 'anulada')
+}
+
+export function echeqsPorAcreditar(cs: Comprobante[]): Comprobante[] {
+  return cs.filter(c => c.estado === 'echeq_pendiente')
+}
+
+export function pendientesDeCobro(cs: Comprobante[]): Comprobante[] {
+  return cs.filter(c => c.estado === 'pendiente')
+}
+
+/** Pendientes emitidas hace más de DIAS_ANTIGUEDAD. */
+export function pendientesAntiguas(cs: Comprobante[], hoy: Date = new Date()): Comprobante[] {
+  const corte = new Date(hoy)
+  corte.setDate(corte.getDate() - DIAS_ANTIGUEDAD)
+  const limite = corte.toISOString().slice(0, 10)
+  return pendientesDeCobro(cs).filter(c => (c.fecha ?? '') < limite)
+}
+
+/**
+ * Las señales activas, en orden de urgencia operativa.
+ *
+ * Primero lo que depende de que alguien te mande algo, después lo que
+ * depende de que el cliente pague. Las de cero casos no salen.
+ */
+export function calcularSenales(cs: Comprobante[], hoy: Date = new Date()): Senal[] {
+  const out: Senal[] = []
+
+  const ret = esperandoRetenciones(cs)
+  if (ret.length) {
+    out.push({
+      id: 'retenciones',
+      titulo: 'Esperando retenciones',
+      detalle: `${plural(ret.length, 'pago recibido', 'pagos recibidos')}, sin recibo emitido`,
+      nota: 'El pago ya entró',
+      casos: ret.length,
+      montoARS: sumar(ret),
+      estados: ['faltan_retenciones'],
+      tono: 'info',
+    })
+  }
+
+  const ech = echeqsPorAcreditar(cs)
+  if (ech.length) {
+    out.push({
+      id: 'echeq',
+      titulo: 'E-cheqs por acreditar',
+      // Sin fecha: referencia_pago está vacío en toda la base. Prometer un
+      // "próximo: hoy" que sale de la nada es peor que no decir nada.
+      detalle: plural(ech.length, 'e-cheq registrado', 'e-cheqs registrados'),
+      casos: ech.length,
+      montoARS: sumar(ech),
+      estados: ['echeq_pendiente'],
+      tono: 'violet',
+    })
+  }
+
+  const pend = pendientesDeCobro(cs)
+  if (pend.length) {
+    const viejas = pendientesAntiguas(cs, hoy)
+    out.push({
+      id: 'pendientes',
+      titulo: 'Pendientes de cobro',
+      detalle: plural(pend.length, 'factura', 'facturas'),
+      nota: viejas.length
+        ? `${viejas.length} ${viejas.length === 1 ? 'lleva' : 'llevan'} más de ${DIAS_ANTIGUEDAD} días`
+        : undefined,
+      casos: pend.length,
+      montoARS: sumar(pend),
+      estados: ['pendiente'],
+      tono: 'warning',
+    })
+  }
+
+  return out
+}
+
+/* ── Hoy ─────────────────────────────────────────────────────────────────── */
+
+export type ResumenHoy = {
+  /** Pagos que entraron hoy, con recibo o sin él. */
+  pagos: number
+  montoPagos: number
+  /** Facturas con fecha de hoy. */
+  emitidas: number
+  /** Sin movimientos hoy: cuántos pagos hubo en la última semana. */
+  pagosSemana: number
+  hayAlgo: boolean
+}
+
+const iso = (d: Date) => d.toISOString().slice(0, 10)
+
+/**
+ * Un pago cuenta como "de hoy" si su fecha de cobro o su fecha de pago es hoy.
+ *
+ * Son dos campos porque son dos momentos del circuito: `fecha_cobro` la
+ * escribe el cobro completo, `fecha_pago` la rama en la que el dinero entró
+ * pero el recibo todavía no. Mirar sólo uno deja pagos reales afuera —
+ * medido: hoy hay 2 pagos y los dos están sólo en `fecha_pago`.
+ */
+export function pagosDelDia(cs: Comprobante[], dia: string): Comprobante[] {
+  return cs.filter(c => c.estado !== 'anulada' && (c.fecha_cobro === dia || c.fecha_pago === dia))
+}
+
+export function resumenHoy(cs: Comprobante[], hoy: Date = new Date()): ResumenHoy {
+  const dia = iso(hoy)
+  const pagos = pagosDelDia(cs, dia)
+  const emitidas = cs.filter(c => c.fecha === dia && c.estado !== 'anulada')
+
+  const haceUnaSemana = new Date(hoy)
+  haceUnaSemana.setDate(haceUnaSemana.getDate() - 7)
+  const desde = iso(haceUnaSemana)
+  const pagosSemana = cs.filter(c =>
+    c.estado !== 'anulada' &&
+    ((c.fecha_cobro ?? '') >= desde || (c.fecha_pago ?? '') >= desde),
+  ).length
+
+  return {
+    pagos: pagos.length,
+    montoPagos: sumar(pagos),
+    emitidas: emitidas.length,
+    pagosSemana,
+    hayAlgo: pagos.length > 0 || emitidas.length > 0,
+  }
+}
+
 // ── Acciones ────────────────────────────────────────────────────────────────
 
 export type AccionId =
@@ -284,10 +479,21 @@ export function accionesPara(
   const e = c.estado
 
   // El siguiente paso operativo depende de dónde está parado el comprobante.
+  //
+  // En `faltan_retenciones` lo que falta es el RECIBO, no el cobro: el dinero
+  // ya entró. De ahí el label. Medido en producción: los 6 casos en ese estado
+  // están sin recibo_id, y ninguna `cobrada` está sin recibo — o sea que el
+  // recibo es exactamente lo que cierra el circuito.
+  //
+  // La carga de retenciones queda como acción secundaria, no primaria: hoy
+  // GestionarRetencionesModal recalcula el estado pero NO emite recibo, así
+  // que ofrecerla como paso principal llevaría a `cobrada` sin recibo_id y
+  // rompería esa invariante. Es una decisión de producto con consecuencia
+  // sobre los datos, y está anotada como pregunta abierta.
   if (e === 'pendiente' || e === 'faltan_retenciones') {
     todas.push({
       id: 'cobrar',
-      label: e === 'faltan_retenciones' ? 'Completar cobro' : 'Registrar cobro',
+      label: e === 'faltan_retenciones' ? 'Emitir recibo' : 'Registrar cobro',
       primaria: true,
       permiso: 'comprobante.cobrar',
     })
@@ -300,8 +506,12 @@ export function accionesPara(
   }
   // Las retenciones se gestionan cuando el dinero ya entró.
   if (e === 'cobrada' || e === 'faltan_retenciones') {
-    todas.push({ id: 'retenciones', label: 'Retenciones', permiso: 'comprobante.cobrar' })
+    todas.push({ id: 'retenciones', label: 'Cargar retenciones', permiso: 'comprobante.cobrar' })
   }
+  // Una `cobrada` no tiene siguiente paso: el circuito está cerrado. Falta
+  // poder saltar al recibo desde acá, pero la pantalla de Recibos todavía no
+  // lee parámetros de ruta y hacérselos leer es trabajo de su propia fase.
+  // Mientras tanto el número de recibo se muestra en el detalle.
 
   if (e !== 'anulada') {
     todas.push({ id: 'editar', label: 'Editar', permiso: 'comprobante.editar' })
@@ -328,6 +538,21 @@ export function accionPrimaria(
  */
 export function muestraDesagregado(tipo: string): boolean {
   return tipo !== 'FACT B'
+}
+
+/**
+ * Con qué tipo abre el formulario de alta.
+ *
+ * Si estoy parado en Facturas B y toco "Nueva factura", el formulario tiene
+ * que abrir en B. Volver a elegir algo que la interfaz ya sabe es exactamente
+ * la clase de fricción que sobra.
+ *
+ * El usuario puede cambiarlo dentro del formulario; esto es sólo el default.
+ */
+export function tipoInicialPara(vista: string): TipoFactura {
+  return (TIPOS_FACTURA as readonly string[]).includes(vista)
+    ? (vista as TipoFactura)
+    : 'FACT A'
 }
 
 /** "26/08/2026" -> "26/08" para la lista mobile, donde el año suele sobrar. */

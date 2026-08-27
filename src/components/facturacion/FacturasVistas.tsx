@@ -92,7 +92,7 @@ const Vacio = ({ hayFiltros }: { hayFiltros: boolean }) => (
    TABLA — escritorio
    ══════════════════════════════════════════════════════════════════════════ */
 export function FacturasTabla({
-  facturas, tipo, cargando, seleccionadaId, onAbrir, hayFiltros,
+  facturas, tipo, cargando, seleccionadaId, onAbrir, hayFiltros, compacta,
 }: {
   facturas: Comprobante[]
   tipo: string
@@ -100,9 +100,15 @@ export function FacturasTabla({
   seleccionadaId: string | null
   onAbrir: (c: Comprobante) => void
   hayFiltros: boolean
+  /** El panel de detalle está abierto: la tabla tiene ~400px menos. */
+  compacta?: boolean
 }) {
   const { visibles, faltan, centinela, verMas } = useVentana(facturas)
-  const desagregado = muestraDesagregado(tipo)
+  // Con el panel abierto se caen neto, IVA y unidad. No es sólo que no
+  // entren: son datos de verificación, y el panel de al lado los está
+  // mostrando desagregados en ese mismo momento. Repetirlos apretados no
+  // agrega nada y hacía que las columnas se pisaran entre sí.
+  const desagregado = muestraDesagregado(tipo) && !compacta
 
   if (cargando) return <SkeletonRows rows={8} />
   if (!facturas.length) return <Vacio hayFiltros={hayFiltros} />
@@ -115,12 +121,12 @@ export function FacturasTabla({
             <th className="ta-ftabla__num">N°</th>
             <th>Fecha</th>
             <th>Cliente</th>
-            <th>Unidad</th>
-            {desagregado && <th className="ta-num">Neto</th>}
-            {desagregado && <th className="ta-num">IVA</th>}
-            <th className="ta-num">Total</th>
-            <th>Estado</th>
-            <th><span className="ta-sr">Abrir</span></th>
+            {!compacta && <th>Unidad</th>}
+            {desagregado && <th className="ta-num ta-ftabla__importe">Neto</th>}
+            {desagregado && <th className="ta-num ta-ftabla__importe">IVA</th>}
+            <th className="ta-num ta-ftabla__importe">Total</th>
+            <th className="ta-ftabla__estado">Estado</th>
+            <th className="ta-frow__chev"><span className="ta-sr">Abrir</span></th>
           </tr>
         </thead>
         <tbody>
@@ -142,14 +148,14 @@ export function FacturasTabla({
               </td>
               <td className="ta-frow__fecha">{fdate(c.fecha)}</td>
               <td className="ta-frow__cliente" title={c.cliente}>{c.cliente}</td>
-              <td className="ta-frow__unidad" title={c.persona}>{c.persona}</td>
-              {desagregado && <td className="ta-num"><Money>{ars(c.neto_ars)}</Money></td>}
-              {desagregado && <td className="ta-num"><Money>{ars(c.iva)}</Money></td>}
-              <td className="ta-num ta-frow__total">
+              {!compacta && <td className="ta-frow__unidad" title={c.persona}>{c.persona}</td>}
+              {desagregado && <td className="ta-num ta-ftabla__importe"><Money>{ars(c.neto_ars)}</Money></td>}
+              {desagregado && <td className="ta-num ta-ftabla__importe"><Money>{ars(c.iva)}</Money></td>}
+              <td className="ta-num ta-ftabla__importe ta-frow__total">
                 <Money>{ars(c.monto_ars)}</Money>
                 {c.monto_usd ? <Money className="ta-frow__usd">{usd(c.monto_usd)}</Money> : null}
               </td>
-              <td><StatusBadge estado={c.estado} sm withHint /></td>
+              <td className="ta-ftabla__estado"><StatusBadge estado={c.estado} sm withHint /></td>
               <td className="ta-frow__chev"><ChevronRight size={15} aria-hidden /></td>
             </tr>
           ))}

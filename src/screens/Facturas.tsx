@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { db, type Comprobante } from '@/lib/supabase'
 import { usePermisos } from '@/design/usePermisos'
+import { useEsMobile } from '@/design/useEsMobile'
 import { useRouteParams } from '@/components/NavigationProvider'
 import { ESTADOS_ORDEN } from '@/design/status'
 import {
@@ -57,6 +58,7 @@ type Modal =
 export default function Facturas({ onPendientesChange }: { onPendientesChange?: (n: number) => void }) {
   const params = useRouteParams('facturas')
   const { puedeHacer } = usePermisos()
+  const esMobile = useEsMobile()
 
   const [todas,    setTodas]    = useState<Comprobante[]>([])
   const [cargando, setCargando] = useState(true)
@@ -261,17 +263,10 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
           />
         </div>
 
-        <div className="ta-only-desktop">
-          <FacturasTabla
-            facturas={delTab}
-            tipo={tab}
-            cargando={cargando}
-            seleccionadaId={abierta?.id ?? null}
-            onAbrir={setAbierta}
-            hayFiltros={conFiltros}
-          />
-        </div>
-        <div className="ta-only-mobile-block">
+        {/* Se monta UNA de las dos, no las dos con una escondida por CSS:
+            son los mismos comprobantes y dejar la otra en el DOM significa
+            construir doscientas filas invisibles en cada render. */}
+        {esMobile ? (
           <FacturasLista
             facturas={delTab}
             cargando={cargando}
@@ -280,7 +275,17 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             puedeHacer={puedeHacer}
             hayFiltros={conFiltros}
           />
-        </div>
+        ) : (
+          <FacturasTabla
+            facturas={delTab}
+            tipo={tab}
+            cargando={cargando}
+            seleccionadaId={abierta?.id ?? null}
+            onAbrir={setAbierta}
+            hayFiltros={conFiltros}
+            compacta={!!abierta}
+          />
+        )}
       </div>
 
       {abierta && (

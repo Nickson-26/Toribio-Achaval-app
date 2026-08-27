@@ -68,7 +68,7 @@ export function FacturasToolbar({
         <SearchInput
           value={filtros.buscar}
           onChange={v => onChange({ buscar: v })}
-          placeholder="Buscar N°, cliente o concepto…"
+          placeholder="Buscar N° o cliente…"
           ariaLabel="Buscar facturas"
           className="ta-fbar__search"
         />

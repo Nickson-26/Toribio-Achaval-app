@@ -138,6 +138,7 @@
 .ta-ftabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .ta-ftabla th {
   padding: var(--space-3) var(--space-4);
+  overflow: hidden;
   text-align: left; white-space: nowrap;
   font-size: var(--text-micro); font-weight: var(--weight-label);
   color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em;
@@ -149,6 +150,10 @@
   border-bottom: 1px solid var(--border);
   font-size: var(--text-body); color: var(--text-primary);
   vertical-align: middle;
+  /* Con table-layout:fixed una celda angosta no recorta sola: el texto se
+     desborda encima de la vecina. Se veía "26/08/2026CAPLAN..." y tres
+     importes pisados. */
+  overflow: hidden;
 }
 .ta-ftabla tr:last-child td { border-bottom: none; }
 .ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -162,6 +167,13 @@
 .ta-frow.is-sel .ta-frow__n { color: var(--brand-text); }
 
 .ta-ftabla__num { width: 92px; }
+/* Ancho propio: con table-layout:fixed la columna se repartía el sobrante y
+   "Faltan retenciones" quedaba cortado en la "s". */
+.ta-ftabla__estado { width: 156px; }
+/* Los importes también necesitan ancho propio: con fixed layout se repartían
+   el sobrante y un total de nueve dígitos quedaba cortado por cinco píxeles.
+   138px = "$ 185.130.000" a 13px tabulares más el padding de celda. */
+.ta-ftabla__importe { width: 138px; }
 .ta-frow__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 .ta-frow__pv { display: block; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
 .ta-frow__fecha { width: 104px; white-space: nowrap; color: var(--text-secondary); }
@@ -173,6 +185,7 @@
 .ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); }
 .ta-frow__usd { display: block; font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400; }
 .ta-frow__chev { width: 34px; color: var(--text-tertiary); text-align: right; }
+.ta-ftabla td .ta-badge { max-width: 100%; }
 
 .ta-fmas { display: flex; justify-content: center; padding: var(--space-4); }
 
@@ -221,7 +234,9 @@
   display: flex; flex-direction: column; gap: var(--space-4);
   padding: var(--space-4); flex: 1; min-height: 0;
 }
-.ta-fpanel__estado { display: flex; flex-direction: column; gap: 4px; }
+/* align-items: el badge es un pill, no una barra: en columna se estiraba
+   a todo el ancho del panel. */
+.ta-fpanel__estado { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .ta-fpanel__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
 
 .ta-fdl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
@@ -271,7 +286,6 @@
 }
 
 /* ── Lista mobile ─────────────────────────────────────────────────────────── */
-.ta-only-mobile-block { display: none; }
 .ta-flista { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .ta-fcard {
@@ -321,8 +335,6 @@
    MOBILE — composición propia
    ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 1023px) {
-  .ta-only-mobile-block { display: block; }
-
   /* La hoja de detalle cubre la pantalla: no hay ancho para dos cosas. */
   .ta-fpanel__scrim {
     display: block; position: fixed; inset: 0;
@@ -354,17 +366,26 @@
   .ta-ftabs { gap: 0; }
   .ta-ftab { padding: var(--space-2) var(--space-3); font-size: var(--text-secondary-size); }
 
-  /* KPIs como una tira, no tres bloques de 22px apilados. */
+  /* KPIs compactos. El importe principal ocupa la fila entera: a 390px un
+     tercio del ancho no alcanza para diez dígitos sin recortarlos, y achicar
+     la tipografía hasta que entre lo vuelve ilegible. Los otros dos son
+     números cortos y sí conviven. */
   .ta-fkpis {
-    grid-template-columns: repeat(3, 1fr); gap: var(--space-2);
+    grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-4);
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-input);
     padding: var(--space-3);
   }
+  .ta-fkpi:first-child { grid-column: 1 / -1; }
   .ta-fkpi__label { font-size: var(--text-micro); }
-  .ta-fkpi__valor { font-size: 15px; letter-spacing: -0.01em; }
-  .ta-fkpi__nota { display: none; }
+  .ta-fkpi__valor { font-size: 17px; letter-spacing: -0.01em; }
+  .ta-fkpi:first-child .ta-fkpi__valor { font-size: 20px; }
+  .ta-fkpi__nota { font-size: 10px; }
+
+  /* 30px no es un blanco táctil. */
+  .ta-fbar__filtros { height: 36px; }
+  .ta-fbar__search .ta-input { height: 36px; }
 
   .ta-fpanel__head { padding: var(--space-3) var(--space-4); }
   .ta-fpanel__body { padding: var(--space-4); gap: var(--space-4); }

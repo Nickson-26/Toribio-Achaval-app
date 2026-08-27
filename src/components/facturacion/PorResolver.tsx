@@ -73,11 +73,11 @@ export function PorResolver({
               {/* Dos versiones del mismo dato: en 390px el detalle largo se
                   parte en tres renglones. El matiz de "el pago ya entró" sigue
                   en el aria-label y en el título de la señal. */}
-              <span className="ta-senal__detalle ta-only-desktop-inline">
+              <span className="ta-senal__detalle ta-senal__detalle--largo">
                 {s.detalle}
                 {s.nota && <> · {s.nota}</>}
               </span>
-              <span className="ta-senal__detalle ta-solo-mobile-inline">
+              <span className="ta-senal__detalle ta-senal__detalle--corto">
                 {s.detalleCorto}
               </span>
             </span>

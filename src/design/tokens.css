@@ -148,12 +148,45 @@
   --border-focus: var(--brand);
   --focus-ring:   0 0 0 3px rgba(200, 16, 46, 0.30);
 
-  /* Superficies de vidrio */
-  --glass-bg:     rgba(24, 24, 32, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur:   blur(18px);
+  /* ── Superficies ──
+     El dark original era casi negro plano: #0e0e12 de fondo y #0e0e12 de
+     card, o sea que las superficies no se despegaban del fondo y todo se leía
+     como una sola lámina. Un dark elegante tiene tinte —acá azulado, muy
+     leve— y una escalera real: cuanto más "arriba" está algo, más claro es.
+     Es lo mismo que hace macOS y es lo que da sensación de capas. */
+  --bg-base:      #0a0b0f;
+  --bg-primary:   #111319;
+  --bg-secondary: #16181f;
+  --bg-tertiary:  #1c1f27;
+  --bg-card:      #12141a;
+  --bg-hover:     #191c24;
+  --bg-elevated:  #1a1d25;
 
-  --overlay-bg:   rgba(0, 0, 0, 0.62);
+  /* Bordes muy suaves: la separación la dan el color y la sombra, no una
+     línea marcada. Un borde fuerte es lo que hace ver "ERP". */
+  --border:        rgba(255, 255, 255, 0.055);
+  --border-strong: rgba(255, 255, 255, 0.11);
+
+  /* Sombras difusas y en capas, como las de un objeto real: una de contacto,
+     corta y densa, y una ambiental, larga y tenue. Una sola sombra siempre
+     se ve pegada. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.34), 0 10px 28px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.38), 0 24px 64px rgba(0, 0, 0, 0.44);
+
+  /* ── Vidrio ──
+     saturate() es lo que separa un blur decente de uno gris: sin él, lo que
+     pasa por detrás pierde color y la superficie se ve sucia. Con él, el
+     vidrio "toma" el color de lo que tapa, que es el efecto de iOS. */
+  --glass-bg:     rgba(20, 22, 29, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-blur:   blur(30px) saturate(180%);
+  /* Reflejo delicado en el canto superior. Es un pixel, y es la diferencia
+     entre una superficie translúcida y un rectángulo con opacidad. */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-shadow:    0 2px 8px rgba(0, 0, 0, 0.30), 0 18px 48px rgba(0, 0, 0, 0.40);
+
+  --overlay-bg:   rgba(4, 5, 8, 0.58);
 
   /* Reemplaza el gradiente verde oscuro al 92% que estaba hardcodeado en
      .dash-hero-main y .dash-control-panel. En tema claro pintaba verde
@@ -165,30 +198,36 @@
    3. LIGHT — referencia principal del nuevo diseño
    ────────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg-base:      #f5f6f9;
+  /* Luminoso, no gris administrativo: el fondo lleva una pizca de azul y las
+     superficies son blanco puro, así que la card se despega por luz y no por
+     borde. */
+  --bg-base:      #f4f6fa;
   --bg-primary:   #ffffff;
-  --bg-secondary: #f1f2f6;
-  --bg-tertiary:  #e9ebf1;
+  --bg-secondary: #eff1f6;
+  --bg-tertiary:  #e6e9f0;
   --bg-card:      #ffffff;
-  --bg-hover:     #f2f3f8;
+  --bg-hover:     #f3f5fa;
   --bg-elevated:  #ffffff;
 
   /* Texto: se sube el contraste. --text-tertiary daba 2,85:1 sobre blanco
      (falla AA) y es el token más usado del sistema. */
   --text-primary:   #16181d;
   --text-secondary: #55596b;
-  --text-tertiary:  #6e7383;
+  /* #6e7383 daba 4,37:1 sobre blanco y 4,18:1 sobre --bg-muted: por debajo de
+     AA justo donde más se usa —encabezados de sección en versalitas y el
+     header de la tabla—. #5c6175 da 6,14 y 5,43. Es el token más consumido
+     del sistema, así que el ajuste se nota en toda la app. */
+  --text-tertiary:  #5c6175;
   --text-inverse:   #ffffff;
 
-  --border:        rgba(16, 18, 27, 0.08);
-  --border-strong: rgba(16, 18, 27, 0.14);
+  --border:        rgba(16, 18, 27, 0.06);
+  --border-strong: rgba(16, 18, 27, 0.11);
   --border-accent: rgba(200, 16, 46, 0.28);
 
-  /* Sombras suaves, casi imperceptibles: la jerarquía la dan el fondo,
-     el borde y el espaciado. */
-  --shadow-sm: 0 1px 2px rgba(16, 18, 27, 0.05);
-  --shadow-md: 0 4px 14px rgba(16, 18, 27, 0.07);
-  --shadow-lg: 0 16px 44px rgba(16, 18, 27, 0.11);
+  /* En capas, igual que en dark: contacto corta y ambiental larga. */
+  --shadow-sm: 0 1px 2px rgba(16, 18, 27, 0.045);
+  --shadow-md: 0 1px 3px rgba(16, 18, 27, 0.05), 0 8px 24px rgba(16, 18, 27, 0.055);
+  --shadow-lg: 0 2px 8px rgba(16, 18, 27, 0.06), 0 24px 60px rgba(16, 18, 27, 0.10);
 
   /* Colores semánticos oscurecidos para pasar AA sobre blanco.
      Los de dark daban entre 2,15:1 y 3,76:1. */
@@ -229,10 +268,12 @@
 
   /* Vidrio claro. La transparencia va SOLO en el background: el texto
      conserva opacidad completa. */
-  --glass-bg:     rgba(255, 255, 255, 0.84);
-  --glass-border: rgba(16, 18, 27, 0.07);
+  --glass-bg:     rgba(255, 255, 255, 0.70);
+  --glass-border: rgba(16, 18, 27, 0.055);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-shadow:    0 1px 3px rgba(16, 18, 27, 0.05), 0 16px 44px rgba(16, 18, 27, 0.09);
 
-  --overlay-bg: rgba(16, 18, 27, 0.34);
+  --overlay-bg: rgba(16, 18, 27, 0.26);
 
   --hero-gradient: linear-gradient(135deg, rgba(200,16,46,0.055) 0%, rgba(200,16,46,0.02) 36%, transparent 64%);
 }
@@ -275,6 +316,8 @@
   --focus-ring:   0 0 0 3px #FFD700, 0 0 0 5px #000000;
 
   /* Sin vidrio: la transparencia degrada la legibilidad. */
+  --glass-highlight: none;
+  --glass-shadow:    none;
   --glass-bg:     #000000;
   --glass-border: rgba(255, 255, 255, 0.35);
   --glass-blur:   none;
@@ -323,4 +366,40 @@
   user-select: none;
   pointer-events: none;
   transition: filter var(--duration-base) var(--ease);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. SUPERFICIE DE VIDRIO
+   ──────────────────────────────────────────────────────────────────────────
+   Una sola definición para toda la app. Antes cada componente repetía las
+   cuatro propiedades y ninguno tenía ni el reflejo ni la sombra, así que el
+   "vidrio" era un rectángulo con opacidad.
+
+   Dónde va: navegación, encabezado, controles segmentados, filtros, hojas,
+   paneles, menús y overlays. Dónde NO va: las listas y los números. Un
+   importe tiene que leerse perfecto, y para eso necesita fondo opaco y
+   contraste pleno.
+   ────────────────────────────────────────────────────────────────────────── */
+.ta-glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* Sin blur disponible el vidrio queda transparente y el texto ilegible.
+   Se cae a una superficie sólida. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ta-glass { background: var(--bg-elevated); }
+}
+
+/* Quien pidió menos movimiento no quiere transiciones de 200ms en cada
+   superficie. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

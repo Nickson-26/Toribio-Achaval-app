@@ -5,8 +5,8 @@
    tarjetas + hoja en mobile. La mobile no es la de escritorio comprimida.
    ============================================================================ */
 
-.ta-fact { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.ta-fact__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.ta-fact { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.ta-fact__main { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 
 /* Con el panel abierto la lista se angosta pero NO desaparece: el punto de
    haber dejado el modal era poder seguir viendo dónde estás parado. */
@@ -22,7 +22,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    HOY — una línea, no un panel
    ══════════════════════════════════════════════════════════════════════════ */
-.ta-fact__contexto { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-fact__contexto { display: flex; flex-direction: column; gap: var(--space-5); }
 
 .ta-hoy {
   display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
@@ -48,7 +48,6 @@
    se comían 240px de teléfono. Ahora el peso lo lleva la tipografía y la
    separación es una línea. */
 .ta-resolver { display: flex; flex-direction: column; gap: var(--space-2); }
-.ta-solo-mobile-inline { display: none; }
 .ta-resolver__titulo {
   font-size: var(--text-micro); font-weight: var(--weight-label);
   color: var(--text-tertiary);
@@ -77,10 +76,15 @@
   font-size: var(--text-body); font-weight: var(--weight-label);
   color: var(--text-primary);
 }
+/* Dos versiones del mismo dato. Modificadores del componente y no una
+   utilidad global: `.ta-senal__detalle { display:block }` le ganaba la
+   cascada a cualquier `.ta-solo-mobile { display:none }` declarada antes, y
+   se veían las dos líneas a la vez. */
 .ta-senal__detalle {
   display: block; margin-top: 1px;
   font-size: var(--text-micro); color: var(--text-secondary);
 }
+.ta-senal__detalle--corto { display: none; }
 .ta-senal__monto {
   font-size: var(--text-body); font-weight: var(--weight-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -91,14 +95,20 @@
    EXPLORAR
    ══════════════════════════════════════════════════════════════════════════ */
 .ta-explorar {
-  display: flex; flex-direction: column; gap: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-4);
   min-width: 0; scroll-margin-top: var(--space-5);
 }
 
 /* Vistas de trabajo, no un select escondido. */
 .ta-vistas {
   display: flex; gap: 3px; padding: 3px;
-  background: var(--bg-muted);
+  /* La pista es vidrio; la pastilla activa es sólida y flota encima. Es el
+     mismo truco del segmented de iOS: la profundidad viene de que una capa
+     sea translúcida y la otra no. */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   width: fit-content; max-width: 100%;
   overflow-x: auto; scrollbar-width: none;
@@ -115,8 +125,9 @@
 }
 .ta-vista:hover { color: var(--text-primary); }
 .ta-vista.is-on {
-  background: var(--bg-surface); color: var(--text-primary);
-  font-weight: var(--weight-semibold); box-shadow: var(--shadow-sm);
+  background: var(--bg-elevated); color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+  box-shadow: var(--glass-highlight), var(--shadow-sm);
 }
 .ta-vista__n { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 /* El contador acompaña, no grita: en rojo de marca competía con el CTA. */
@@ -136,6 +147,10 @@
   backdrop-filter: var(--glass-blur);
   color: var(--text-secondary);
   border: 1px solid var(--glass-border); border-radius: var(--radius-pill);
+  box-shadow: var(--glass-highlight);
+  transition: background var(--duration-base) var(--ease),
+              color var(--duration-base) var(--ease),
+              border-color var(--duration-base) var(--ease);
   font-family: var(--font); font-size: var(--text-secondary-size);
   font-weight: var(--weight-medium); cursor: pointer;
 }
@@ -174,10 +189,14 @@
 .ta-fsheet__estado.is-on { opacity: 1; border-color: var(--border-focus); }
 
 /* ── Tabla ────────────────────────────────────────────────────────────────── */
+/* La tabla NO lleva vidrio: son números, y un número necesita fondo opaco y
+   contraste pleno. Lo que sí lleva es una superficie limpia con radio
+   generoso y una sombra de contacto. */
 .ta-ftabla-wrap {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 .ta-ftabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -188,6 +207,8 @@
   font-size: var(--text-micro); font-weight: var(--weight-label);
   color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em;
   border-bottom: 1px solid var(--border);
+  /* Tinte apenas perceptible: transparente se confundía con la primera fila,
+     y un gris sólido volvía a verse como una barra de ERP. */
   background: var(--bg-muted);
 }
 .ta-ftabla td {
@@ -203,7 +224,7 @@
 .ta-ftabla tr:last-child td { border-bottom: none; }
 .ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
 
-.ta-frow { cursor: pointer; transition: background var(--duration-fast) var(--ease); }
+.ta-frow { cursor: pointer; transition: background var(--duration-base) var(--ease); }
 .ta-frow:hover { background: var(--bg-surface-hover); }
 .ta-frow:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 /* La fila abierta queda marcada: sin esto, con el panel al costado se pierde
@@ -243,9 +264,12 @@
 /* ── Panel de detalle ─────────────────────────────────────────────────────── */
 .ta-fpanel {
   display: flex; flex-direction: column;
-  background: var(--bg-surface);
+  /* El panel flota sobre la lista: superficie elevada, radio de superficie y
+     sombra en capas. No es una card más dentro de la página. */
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--glass-highlight), var(--shadow-md);
   overflow: hidden;
 }
 .ta-fpanel__scrim { display: none; }
@@ -263,6 +287,9 @@
   gap: var(--space-3); padding: var(--space-4);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 .ta-fpanel__ident { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .ta-fpanel__tipo {
@@ -331,10 +358,18 @@
 
 .ta-fmontos {
   display: flex; flex-direction: column;
-  background: var(--bg-muted); border-radius: var(--radius-input);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   padding: var(--space-2) var(--space-3);
 }
-.ta-fmontos--cobro { background: var(--success-soft); }
+/* El verde apenas se insinúa. Un panel verde sólido grita "estado OK" con más
+   fuerza que el propio badge, y lo que hay adentro son datos, no una alerta.
+   El color entra por el borde, que es donde alcanza para leerlo como grupo. */
+.ta-fmontos--cobro {
+  background: color-mix(in srgb, var(--success-soft) 45%, transparent);
+  border-color: color-mix(in srgb, var(--success) 22%, transparent);
+}
 .ta-fmontos__row {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--space-3); padding: 5px 0;
@@ -370,8 +405,8 @@
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-input);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   z-index: 5;
   animation: ta-fade var(--duration-fast) var(--ease);
 }
@@ -391,7 +426,9 @@
   gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
-  background: var(--bg-muted);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   flex-shrink: 0;
 }
 
@@ -468,8 +505,8 @@
   .ta-hoy { gap: 6px; font-size: var(--text-secondary-size); }
   .ta-hoy__monto { margin-left: auto; }
 
-  .ta-only-desktop-inline { display: none; }
-  .ta-solo-mobile-inline { display: block; }
+  .ta-senal__detalle--largo { display: none; }
+  .ta-senal__detalle--corto { display: block; }
 
   .ta-senal { padding: 10px 0; gap: var(--space-2); }
   .ta-senal__titulo { font-size: var(--text-secondary-size); }

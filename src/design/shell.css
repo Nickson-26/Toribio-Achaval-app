@@ -24,12 +24,14 @@
 .ta-sidebar__inner {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0;
+  /* Vidrio desde la utilidad común (tokens.css): fondo translúcido, blur con
+     saturación, borde tenue, reflejo en el canto y sombra en capas. */
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   overflow: hidden;
 }
 
@@ -175,9 +177,12 @@
   display: flex; align-items: center; gap: var(--space-4);
   height: 60px; padding: 0 var(--space-6) 0 var(--space-2);
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid var(--border);
+  backdrop-filter: var(--glass-blur);
+  /* Sin borde inferior duro: el canto se marca con un reflejo de un píxel y
+     una sombra muy corta. Una línea sólida parte la pantalla en dos. */
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 1px 12px rgba(0, 0, 0, 0.06);
 }
 /* Ocupa el espacio libre: la topbar se lee completa sin depender de un
    buscador que todavía no existe. */

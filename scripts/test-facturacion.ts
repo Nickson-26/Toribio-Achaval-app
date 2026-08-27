@@ -517,19 +517,51 @@ test('un tipo desconocido cae en FACT A y no rompe el formulario', () => {
 
 /* ── Acciones, después de la reformulación ───────────────────────────────── */
 
-test('faltan_retenciones ofrece emitir el recibo, que es lo que falta', () => {
-  const p = accionPrimaria(conRetencionesPendientes(), admin)
+/* ── Emitir recibo: la acción se ata al dato, no a la etiqueta ──────────────
+   Criterio de producto: si el pago ya entró y todavía no hay recibo, lo
+   principal es emitirlo. Que las retenciones estén pendientes es información
+   del circuito, no el siguiente paso. */
+
+test('faltan_retenciones SIN recibo ofrece Emitir recibo como primaria', () => {
+  const p = accionPrimaria(conRetencionesPendientes({ recibo_id: null }), admin)
   assert.equal(p?.id, 'cobrar')
   assert.equal(p?.label, 'Emitir recibo')
 })
 
-test('cargar retenciones existe pero NO es la acción primaria', () => {
-  // Hoy GestionarRetencionesModal recalcula el estado sin emitir recibo:
-  // ofrecerla como paso principal llevaría a `cobrada` sin recibo_id.
-  const as = accionesPara(conRetencionesPendientes(), admin)
+test('faltan_retenciones CON recibo NO vuelve a ofrecer emitirlo', () => {
+  // Ofrecer "Emitir recibo" sobre algo que ya tiene recibo es invitar a
+  // duplicarlo. La condición es el dato, no el estado.
+  const as = accionesPara(conRetencionesPendientes({ recibo_id: 19310 }), admin)
+  assert.ok(!as.some(a => a.id === 'cobrar'), 'ofreció cobrar teniendo recibo')
+  assert.ok(!as.some(a => /emitir recibo/i.test(a.label)))
+})
+
+test('con el recibo ya emitido, cargar retenciones pasa a ser la primaria', () => {
+  // Es lo único que queda para cerrar, y no puede dejar una `cobrada` sin
+  // recibo porque el recibo ya existe.
+  const p = accionPrimaria(conRetencionesPendientes({ recibo_id: 19310 }), admin)
+  assert.equal(p?.id, 'retenciones')
+})
+
+test('sin recibo, cargar retenciones existe pero es secundaria', () => {
+  const as = accionesPara(conRetencionesPendientes({ recibo_id: null }), admin)
   const ret = as.find(a => a.id === 'retenciones')
-  assert.ok(ret)
-  assert.ok(!ret!.primaria)
+  assert.ok(ret, 'las retenciones tienen que seguir estando disponibles')
+  assert.ok(!ret!.primaria, 'no debe desplazar a Emitir recibo')
+})
+
+test('una pendiente con recibo tampoco ofrece registrar el cobro otra vez', () => {
+  const as = accionesPara(pendiente({ recibo_id: 19311 }), admin)
+  assert.ok(!as.some(a => a.id === 'cobrar'))
+})
+
+test('sigue habiendo a lo sumo una primaria en los casos con recibo', () => {
+  for (const recibo_id of [null, 19310]) {
+    for (const estado of ESTADOS_ORDEN) {
+      const n = accionesPara(f({ estado, recibo_id }), admin).filter(a => a.primaria).length
+      assert.ok(n <= 1, `${n} primarias en ${estado} con recibo_id=${recibo_id}`)
+    }
+  }
 })
 
 test('diasDesde cuenta la espera de una pendiente', () => {

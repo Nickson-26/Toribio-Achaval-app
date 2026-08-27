@@ -498,16 +498,18 @@ export function accionesPara(
   // El siguiente paso operativo depende de dónde está parado el comprobante.
   //
   // En `faltan_retenciones` lo que falta es el RECIBO, no el cobro: el dinero
-  // ya entró. De ahí el label. Medido en producción: los 6 casos en ese estado
-  // están sin recibo_id, y ninguna `cobrada` está sin recibo — o sea que el
-  // recibo es exactamente lo que cierra el circuito.
+  // ya entró. Que las retenciones estén pendientes es información del
+  // circuito —se ve en el estado y en su aclaración— pero no desplaza la
+  // acción principal, que es emitir el recibo.
   //
-  // La carga de retenciones queda como acción secundaria, no primaria: hoy
-  // GestionarRetencionesModal recalcula el estado pero NO emite recibo, así
-  // que ofrecerla como paso principal llevaría a `cobrada` sin recibo_id y
-  // rompería esa invariante. Es una decisión de producto con consecuencia
-  // sobre los datos, y está anotada como pregunta abierta.
-  if (e === 'pendiente' || e === 'faltan_retenciones') {
+  // La condición es que NO tenga recibo, no que esté en cierto estado.
+  // Ofrecer "Emitir recibo" sobre un comprobante que ya lo tiene sería
+  // invitar a duplicarlo. Hoy los dos coinciden —los 6 casos en
+  // `faltan_retenciones` están sin recibo_id— pero atarlo al dato y no a la
+  // etiqueta es lo que hace que siga siendo correcto si algún día divergen.
+  const sinRecibo = !c.recibo_id
+
+  if ((e === 'pendiente' || e === 'faltan_retenciones') && sinRecibo) {
     todas.push({
       id: 'cobrar',
       label: e === 'faltan_retenciones' ? 'Emitir recibo' : 'Registrar cobro',
@@ -522,8 +524,18 @@ export function accionesPara(
     })
   }
   // Las retenciones se gestionan cuando el dinero ya entró.
+  //
+  // Normalmente es una acción secundaria: emitir el recibo es lo que cierra el
+  // circuito. Pero si el recibo YA está emitido y el estado sigue en
+  // `faltan_retenciones`, cargarlas es lo único que queda por hacer, y ahí sí
+  // pasa a ser el siguiente paso.
   if (e === 'cobrada' || e === 'faltan_retenciones') {
-    todas.push({ id: 'retenciones', label: 'Cargar retenciones', permiso: 'comprobante.cobrar' })
+    todas.push({
+      id: 'retenciones',
+      label: 'Cargar retenciones',
+      primaria: e === 'faltan_retenciones' && !sinRecibo,
+      permiso: 'comprobante.cobrar',
+    })
   }
   // Una `cobrada` no tiene siguiente paso: el circuito está cerrado. Falta
   // poder saltar al recibo desde acá, pero la pantalla de Recibos todavía no

@@ -5,10 +5,7 @@ import { Money } from '@/components/HideNumbers'
 import { StatusBadge, EmptyState, SkeletonRows, Button } from '@/design/primitives'
 import { ars, usd, fdate } from '@/lib/utils'
 import type { Comprobante } from '@/lib/supabase'
-import type { Accion } from '@/design/permissions'
-import {
-  accionPrimaria, fechaCorta, puntoVentaDe, diasDesde, type AccionId,
-} from '@/lib/facturacion'
+import { fechaCorta, puntoVentaDe, diasDesde } from '@/lib/facturacion'
 
 /**
  * Las dos formas de mirar la misma lista.
@@ -19,12 +16,9 @@ import {
  * donde se verifican. Una tabla con toda la base adentro no es una lista, es
  * un volcado.
  *
- * Mobile: tarjetas. NO es la tabla comprimida. Once columnas dentro de un
- * contenedor con scroll horizontal no es una experiencia, es un escondite
- * para el overflow: había que arrastrar de costado para leer un importe.
- * La tarjeta prioriza lo que se necesita para decidir —comprobante, fecha,
- * cliente, importe, estado y el siguiente paso— y manda PV, unidad, neto e
- * IVA al detalle, que es donde se verifican.
+ * Mobile: lista de movimientos. NO es la tabla comprimida ni una pila de
+ * tarjetas. Cliente e importe arriba, comprobante, fecha y estado abajo. Todo
+ * lo demás vive en el detalle, que es donde se verifica.
  */
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -156,69 +150,59 @@ export function FacturasTabla({
 
 /* ══════════════════════════════════════════════════════════════════════════
    LISTA — mobile
-   ══════════════════════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════════════════
+   Movimientos, no tarjetas.
+
+   La versión anterior envolvía cada factura en una caja con borde, radio y un
+   botón de acción adentro. Cinco facturas llenaban la pantalla y la lista se
+   leía como un formulario. Ahora son dos renglones separados por una línea:
+
+     CAPLAN ARIEL ROLANDO              $ 6.914.606
+     FACT A 4262 · 26/08                   Cobrada
+
+   La fila entera es el blanco táctil y no hay botones adentro. El listado es
+   para CONSULTAR; operar se hace desde el detalle, que es donde el usuario ya
+   tiene delante lo que necesita para decidir. */
 export function FacturasLista({
-  facturas, cargando, onAbrir, onAccion, puedeHacer, hayFiltros,
+  facturas, cargando, onAbrir, hayFiltros,
 }: {
   facturas: Comprobante[]
   cargando: boolean
   onAbrir: (c: Comprobante) => void
-  onAccion: (c: Comprobante, id: AccionId) => void
-  puedeHacer: (a: Accion) => boolean
   hayFiltros: boolean
 }) {
   const { visibles, faltan, centinela, verMas } = useVentana(facturas)
 
-  if (cargando) return <SkeletonRows rows={6} />
+  if (cargando) return <SkeletonRows rows={7} />
   if (!facturas.length) return <Vacio hayFiltros={hayFiltros} />
 
   return (
     <div className="ta-flista">
       {visibles.map(c => {
-        const primaria = accionPrimaria(c, puedeHacer)
-        // La antigüedad sólo importa cuando la plata no entró todavía: en una
+        // La antigüedad sólo importa mientras la plata no entró: en una
         // cobrada, "hace 74 días" no le sirve a nadie.
         const dias = c.estado === 'pendiente' ? diasDesde(c.fecha) : null
         return (
-          <article key={c.id} className="ta-fcard">
-            <button
-              type="button"
-              className="ta-fcard__main"
-              onClick={() => onAbrir(c)}
-              aria-label={`Abrir factura ${c.numero} de ${c.cliente}`}
-            >
-              <span className="ta-fcard__top">
-                <span className="ta-fcard__n">{c.numero}</span>
-                <span className="ta-fcard__fecha">{fechaCorta(c.fecha)}</span>
+          <button
+            key={c.id}
+            type="button"
+            className="ta-fitem"
+            onClick={() => onAbrir(c)}
+            aria-label={`${c.cliente}, ${c.tipo} ${c.numero}, ${ars(c.monto_ars)}`}
+          >
+            <span className="ta-fitem__l1">
+              <span className="ta-fitem__cliente">{c.cliente}</span>
+              <Money className="ta-fitem__monto">{ars(c.monto_ars)}</Money>
+            </span>
+
+            <span className="ta-fitem__l2">
+              <span className="ta-fitem__meta">
+                {c.tipo} {c.numero} · {fechaCorta(c.fecha)}
+                {dias !== null && ` · ${dias}d`}
               </span>
-
-              <span className="ta-fcard__cliente">{c.cliente}</span>
-
-              <span className="ta-fcard__montos">
-                <Money className="ta-fcard__ars">{ars(c.monto_ars)}</Money>
-                {c.monto_usd ? <Money className="ta-fcard__usd">{usd(c.monto_usd)}</Money> : null}
-              </span>
-
-              <span className="ta-fcard__estado">
-                <StatusBadge estado={c.estado} sm />
-                {dias !== null && (
-                  <span className="ta-fcard__dias">{dias} {dias === 1 ? 'día' : 'días'}</span>
-                )}
-              </span>
-            </button>
-
-            {/* La acción primaria vive fuera del botón de detalle: en una
-                tarjeta táctil, un botón dentro de otro botón es una trampa. */}
-            {primaria && (
-              <button
-                type="button"
-                className="ta-fcard__cta"
-                onClick={() => onAccion(c, primaria.id)}
-              >
-                {primaria.label}
-              </button>
-            )}
-          </article>
+              <StatusBadge estado={c.estado} sm />
+            </span>
+          </button>
         )
       })}
       <Centinela faltan={faltan} refEl={centinela} onVerMas={verMas} />

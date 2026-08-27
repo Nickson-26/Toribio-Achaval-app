@@ -143,34 +143,41 @@ for (const u of users) {
       }
       return {
         tabla: vis('.ta-ftabla'),
-        tarjetas: document.querySelectorAll('.ta-fcard').length,
+        items: document.querySelectorAll('.ta-fitem').length,
         filas: document.querySelectorAll('.ta-frow').length,
         toolbarAlto: Math.round(document.querySelector('.ta-fbar')?.getBoundingClientRect().height ?? 0),
-        tabs: [...document.querySelectorAll('.ta-ftab')].map(e => e.textContent.trim()),
-        kpis: [...document.querySelectorAll('.ta-fkpi__label')].map(e => e.textContent),
+        tabs: [...document.querySelectorAll('.ta-vista')].map(e => e.textContent.trim()),
+        senales: [...document.querySelectorAll('.ta-senal__titulo')].map(e => e.textContent),
+        hoy: document.querySelector('.ta-hoy')?.textContent?.replace(/\s+/g, ' ') ?? null,
+        // El listado es para consultar: ningún botón operativo adentro.
+        ctasEnFilas: document.querySelectorAll('.ta-fitem button').length,
       }
     })
     if (tag === 'desktop') {
       if (!comp.tabla) fallo(ctxName, 'no hay tabla en escritorio')
       else ok(`tabla con ${comp.filas} filas renderizadas`)
-      if (comp.tarjetas > 0) fallo(ctxName, 'se renderizan tarjetas mobile en escritorio')
+      if (comp.items > 0) fallo(ctxName, 'se renderiza la lista mobile en escritorio')
     } else {
       if (comp.tabla) fallo(ctxName, 'la tabla sigue montada en mobile')
-      else if (!comp.tarjetas) fallo(ctxName, 'no hay tarjetas en mobile')
-      else ok(`${comp.tarjetas} tarjetas, sin tabla`)
-      // El objetivo declarado: la toolbar bajaba de 214px a una fila.
-      if (comp.toolbarAlto > 90) fallo(ctxName, `la toolbar mide ${comp.toolbarAlto}px en mobile`)
+      else if (!comp.items) fallo(ctxName, 'no hay lista en mobile')
+      else ok(`${comp.items} filas de lista, sin tabla`)
+      if (comp.toolbarAlto > 110) fallo(ctxName, `la toolbar mide ${comp.toolbarAlto}px en mobile`)
       else ok(`toolbar de ${comp.toolbarAlto}px`)
     }
-    console.log(`    tabs: ${comp.tabs.join(' · ')}`)
-    console.log(`    KPIs: ${comp.kpis.join(' · ')}`)
+    if (comp.ctasEnFilas > 0) {
+      fallo(ctxName, `${comp.ctasEnFilas} botones operativos dentro de las filas del listado`)
+    }
+    console.log(`    vistas: ${comp.tabs.join(' · ')}`)
+    console.log(`    hoy: ${comp.hoy}`)
+    console.log(`    señales: ${comp.senales.join(' · ') || '(ninguna)'}`)
 
     // ── 3. Texto recortado ────────────────────────────────────────────────
     const recortes = await p.evaluate(() => {
       const sel = [
-        '.ta-fkpi__valor', '.ta-fkpi__label', '.ta-ftab',
-        '.ta-fcard__n', '.ta-fcard__ars', '.ta-fcard__cta',
-        '.ta-frow__n', '.ta-frow__total', '.ta-fbar__chip', '.ta-fchip',
+        '.ta-vista', '.ta-hoy', '.ta-resolver__titulo',
+        '.ta-senal__titulo', '.ta-senal__monto',
+        '.ta-fitem__monto', '.ta-fresumen__monto',
+        '.ta-frow__n', '.ta-frow__total', '.ta-fbar__chip',
         // Los badges también se recortan, y un estado a medias ("Faltan
         // retencione") es peor que no mostrarlo.
         '.ta-badge', '.ta-status',
@@ -194,20 +201,21 @@ for (const u of users) {
       const busca = re => txt.filter(t => re.test(t))
       return {
         nuevaFactura: busca(/nueva factura/).length,
-        ctaTarjetas: document.querySelectorAll('.ta-fcard__cta').length,
+        ctaTarjetas: document.querySelectorAll('.ta-fitem button').length,
         // El CTA de la topbar también tiene que respetar el rol.
         ctaTopbar: !!document.querySelector('.ta-topbar__cta-icon, .ta-topbar .ta-btn--primary'),
       }
     })
     if (u.rol === 'viewer') {
-      if (escritura.nuevaFactura > 0) fallo(ctxName, `el viewer ve ${escritura.nuevaFactura} botones "Nueva factura"`)
-      if (escritura.ctaTarjetas > 0)  fallo(ctxName, `el viewer ve ${escritura.ctaTarjetas} CTA de cobro en las tarjetas`)
-      if (escritura.ctaTopbar)        fallo(ctxName, 'el viewer ve el CTA de alta en la topbar')
-      if (!escritura.nuevaFactura && !escritura.ctaTarjetas && !escritura.ctaTopbar)
-        ok('el viewer no ve ninguna acción de escritura')
+      const altas = escritura.nuevaFactura +
+        (await p.locator('.ta-fbar__nueva').count())
+      if (altas > 0) fallo(ctxName, `el viewer ve ${altas} accesos al alta de facturas`)
+      if (escritura.ctaTopbar) fallo(ctxName, 'el viewer ve el CTA de alta en la topbar')
+      if (!altas && !escritura.ctaTopbar) ok('el viewer no ve ninguna acción de escritura')
     } else {
-      if (tag === 'desktop' && !escritura.nuevaFactura) fallo(ctxName, `${u.rol} no ve "Nueva factura"`)
-      else ok(`${u.rol} ve las acciones que le corresponden`)
+      const puedeCrear = escritura.nuevaFactura > 0 || await p.locator('.ta-fbar__nueva').count() > 0
+      if (!puedeCrear) fallo(ctxName, `${u.rol} no tiene forma de crear una factura`)
+      else ok(`${u.rol} puede crear una factura`)
     }
 
     // ── 5. Búsqueda local ─────────────────────────────────────────────────
@@ -264,7 +272,7 @@ for (const u of users) {
     await p.screenshot({ path: path.join(OUT, `${u.rol}_${tag}_lista.png`) })
 
     // ── 7. Detalle ────────────────────────────────────────────────────────
-    const primer = tag === 'desktop' ? '.ta-frow' : '.ta-fcard__main'
+    const primer = tag === 'desktop' ? '.ta-frow' : '.ta-fitem'
     await p.locator(primer).first().click()
     await p.waitForTimeout(800)
     const panel = await p.evaluate(() => {
@@ -280,7 +288,9 @@ for (const u of users) {
         seleccionada: !!document.querySelector('.ta-frow.is-sel'),
         cerrar: !!document.querySelector('[aria-label="Cerrar detalle"]'),
         acciones: [...(pn.querySelector('.ta-fpanel__foot')?.querySelectorAll('button') ?? [])]
-          .map(b => b.textContent.trim()),
+          .map(b => b.textContent.trim() || b.getAttribute('aria-label')),
+        // Progressive disclosure: el detalle contable arranca plegado.
+        contablePlegado: !!pn.querySelector('.ta-fmas-det') && !pn.querySelector('.ta-fmas-det[open]'),
         crudo: (pn.textContent || '').match(/\b[a-z]+_[a-z]+\b/)?.[0] ?? null,
       }
     })
@@ -297,6 +307,12 @@ for (const u of users) {
         ok(`hoja de detalle de ${panel.ancho}px`)
       }
       console.log(`    acciones del panel: ${panel.acciones.join(' · ') || '(ninguna)'}`)
+      if (!panel.contablePlegado) fallo(ctxName, 'el detalle contable no arranca plegado')
+      // Una sola acción primaria: el resto vive en el menú.
+      const primarias = panel.acciones.filter(a => a && !/más acciones/i.test(a))
+      if (primarias.length > 1) {
+        fallo(ctxName, `${primarias.length} acciones compiten en el pie: ${primarias.join(', ')}`)
+      }
       if (u.rol === 'viewer' && panel.acciones.length > 0) {
         fallo(ctxName, `el viewer ve acciones en el detalle: ${panel.acciones.join(', ')}`)
       }
@@ -310,7 +326,7 @@ for (const u of users) {
       // formulario nunca se ejercita y el test pasa sin haber probado nada.
       let cobrar = p.locator('.ta-fpanel__foot button', { hasText: /cobro|acreditación/i }).first()
       if (!await cobrar.count()) {
-        const items = tag === 'desktop' ? '.ta-frow' : '.ta-fcard__main'
+        const items = tag === 'desktop' ? '.ta-frow' : '.ta-fitem'
         const n = Math.min(await p.locator(items).count(), 25)
         for (let i = 1; i < n; i++) {
           // En mobile la hoja tapa la lista —que es lo correcto—, así que hay

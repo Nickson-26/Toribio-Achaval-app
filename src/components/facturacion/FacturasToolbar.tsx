@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useEsMobile } from '@/design/useEsMobile'
 import { SlidersHorizontal, X, Plus, Download } from 'lucide-react'
 import {
   Button, IconButton, SearchInput, Select, Field, Modal, StatusBadge,
@@ -8,7 +9,7 @@ import { estadoLabel } from '@/design/status'
 import type { ComprobanteEstado } from '@/lib/supabase'
 import {
   chipsActivos, contarFiltros, hayFiltros, FILTROS_INICIALES,
-  TIPOS_FACTURA, TIPO_LABEL,
+  TIPOS_FACTURA, TIPO_LABEL, TIPO_CORTO,
   type FiltrosFacturacion, type ChipFiltro, type TipoFactura,
 } from '@/lib/facturacion'
 
@@ -43,6 +44,7 @@ export function FacturasToolbar({
   onExportar: () => void
 }) {
   const [sheet, setSheet] = useState(false)
+  const esMobile = useEsMobile()
   const activos = contarFiltros(filtros)
   const chips = chipsActivos(filtros, estadoLabel)
 
@@ -77,7 +79,10 @@ export function FacturasToolbar({
             className={`ta-vista${vista === t ? ' is-on' : ''}`}
             onClick={() => onVista(t)}
           >
-            {TIPO_LABEL[t]}
+            {/* "Facturas A" en cuatro pestañas no entra en 390px. En mobile
+                queda sólo la letra; el resto se esconde por CSS. */}
+            <span className="ta-vista__label--largo">Facturas&nbsp;</span>
+            {TIPO_CORTO[t]}
             <span className="ta-vista__n">{conteos[t]}</span>
           </button>
         ))}
@@ -87,7 +92,7 @@ export function FacturasToolbar({
         <SearchInput
           value={filtros.buscar}
           onChange={v => onChange({ buscar: v })}
-          placeholder="Buscar factura o cliente…"
+          placeholder={esMobile ? 'Buscar…' : 'Buscar factura o cliente…'}
           ariaLabel="Buscar facturas"
           className="ta-fbar__search"
         />

@@ -261,8 +261,6 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
             facturas={delTab}
             cargando={cargando}
             onAbrir={setAbierta}
-            onAccion={ejecutar}
-            puedeHacer={puedeHacer}
             hayFiltros={conFiltros}
           />
         ) : (

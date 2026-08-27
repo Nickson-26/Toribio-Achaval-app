@@ -42,70 +42,50 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   POR RESOLVER — sólo lo que existe
-   ══════════════════════════════════════════════════════════════════════════ */
+   POR RESOLVER — lista, no tarjetas
+   ══════════════════════════════════════════════════════════════════════════
+   Antes cada señal era una superficie con icono, borde y sombra: dos señales
+   se comían 240px de teléfono. Ahora el peso lo lleva la tipografía y la
+   separación es una línea. */
 .ta-resolver { display: flex; flex-direction: column; gap: var(--space-2); }
-
-.ta-resolver__nada {
-  display: flex; align-items: center; gap: 7px;
-  font-size: var(--text-secondary-size); color: var(--text-tertiary);
+.ta-solo-mobile-inline { display: none; }
+.ta-resolver__titulo {
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .07em;
 }
-.ta-resolver__nada svg { color: var(--success); }
+.ta-resolver__lista { display: flex; flex-direction: column; }
 
-/* Superficie cristalizada. La señal es contexto, no dato financiero duro:
-   puede permitirse el vidrio. Los importes de adentro siguen siendo texto
-   sólido a contraste pleno. */
 .ta-senal {
   display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; padding: var(--space-3) var(--space-4);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-card);
+  width: 100%; padding: var(--space-3) 0;
+  background: none; border: none; border-bottom: 1px solid var(--border);
   cursor: pointer; text-align: left; font-family: var(--font);
-  transition: border-color var(--duration-fast) var(--ease),
-              transform var(--duration-fast) var(--ease);
+  transition: opacity var(--duration-fast) var(--ease);
 }
-.ta-senal:hover { border-color: var(--border-focus); }
-.ta-senal:active { transform: scale(.995); }
-.ta-senal:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.ta-senal:last-child { border-bottom: none; }
+.ta-senal:active { opacity: .6; }
+.ta-senal:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
-.ta-senal__ico {
-  display: grid; place-items: center;
-  width: 34px; height: 34px; flex-shrink: 0;
-  border-radius: var(--radius-input);
-}
-.ta-senal--warning .ta-senal__ico { background: var(--warning-soft); color: var(--warning-text); }
-.ta-senal--info    .ta-senal__ico { background: var(--info-soft);    color: var(--info-text); }
-.ta-senal--violet  .ta-senal__ico { background: var(--violet-soft);  color: var(--violet-text); }
-
+.ta-senal { min-width: 0; }
 .ta-senal__cuerpo { display: block; flex: 1; min-width: 0; }
+.ta-senal__titulo, .ta-senal__detalle { overflow-wrap: anywhere; }
 /* display:block obligatorio: son <span> dentro de <span> y sin esto se
-   renderizan en la misma línea. Ya nos pasó dos veces. */
+   renderizan en la misma línea. Ya nos pasó tres veces. */
 .ta-senal__titulo {
   display: block;
-  font-size: 15px; font-weight: var(--weight-label); color: var(--text-primary);
+  font-size: var(--text-body); font-weight: var(--weight-label);
+  color: var(--text-primary);
 }
 .ta-senal__detalle {
   display: block; margin-top: 1px;
-  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  font-size: var(--text-micro); color: var(--text-secondary);
 }
-/* La aclaración que evita leer "esperando retenciones" como deuda del
-   cliente cuando el dinero ya entró. */
-.ta-senal__nota {
-  display: inline-block; margin-left: 7px;
-  padding: 1px 7px; border-radius: var(--radius-pill);
-  background: var(--bg-muted); color: var(--text-tertiary);
-  font-size: 11px; font-weight: var(--weight-medium);
-}
-
-.ta-senal__derecha { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
 .ta-senal__monto {
-  font-size: 15px; font-weight: var(--weight-semibold);
+  font-size: var(--text-body); font-weight: var(--weight-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.ta-senal__chev { color: var(--text-tertiary); }
+.ta-senal__chev { color: var(--text-tertiary); flex-shrink: 0; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    EXPLORAR
@@ -139,7 +119,8 @@
   font-weight: var(--weight-semibold); box-shadow: var(--shadow-sm);
 }
 .ta-vista__n { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-.ta-vista.is-on .ta-vista__n { color: var(--brand-text); }
+/* El contador acompaña, no grita: en rojo de marca competía con el CTA. */
+.ta-vista.is-on .ta-vista__n { color: var(--text-secondary); }
 
 .ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .ta-fbar__row { display: flex; align-items: center; gap: var(--space-2); }
@@ -301,8 +282,42 @@
 }
 /* align-items: el badge es un pill, no una barra: en columna se estiraba
    a todo el ancho del panel. */
-.ta-fpanel__estado { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.ta-fpanel__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+/* Primera lectura del detalle: quién, cuánto, en qué estado. */
+.ta-fresumen { display: flex; flex-direction: column; gap: 3px; }
+.ta-fresumen__cliente {
+  font-size: 15px; font-weight: var(--weight-medium); color: var(--text-secondary);
+}
+.ta-fresumen__monto {
+  font-size: 26px; font-weight: var(--weight-strong); color: var(--text-primary);
+  letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+}
+.ta-fresumen__alt {
+  font-size: var(--text-secondary-size); color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.ta-fresumen__estado { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; }
+.ta-fresumen__fecha { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-fresumen__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+
+/* El desagregado contable, plegado. Casi nunca decide el siguiente paso. */
+.ta-fmas-det { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-fmas-det__sum {
+  cursor: pointer; list-style: none;
+  padding: var(--space-2) 0;
+  font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  /* Secundario, no de marca: es una puerta opcional, no el siguiente paso. */
+  color: var(--text-secondary);
+}
+.ta-fmas-det__sum:hover { color: var(--text-primary); }
+.ta-fmas-det__sum::-webkit-details-marker { display: none; }
+.ta-fmas-det__sum::before {
+  content: ''; display: inline-block; margin-right: 7px;
+  width: 5px; height: 5px; vertical-align: middle;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg) translate(-1px, -1px);
+  transition: transform var(--duration-fast) var(--ease);
+}
+.ta-fmas-det[open] .ta-fmas-det__sum::before { transform: rotate(45deg) translate(-2px, -2px); }
 
 .ta-fdl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
 .ta-fdl > div { min-width: 0; }
@@ -380,55 +395,46 @@
   flex-shrink: 0;
 }
 
-/* ── Lista mobile ─────────────────────────────────────────────────────────── */
-.ta-flista { display: flex; flex-direction: column; gap: var(--space-2); }
+/* ── Lista mobile: movimientos ─────────────────────────────────────────────
+   Dos renglones y una línea. Sin caja, sin radio, sin botones adentro: el
+   listado es para consultar, y operar se hace desde el detalle. */
+.ta-flista { display: flex; flex-direction: column; min-width: 0; }
 
-.ta-fcard {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-input);
-  overflow: hidden;
-}
-.ta-fcard__main {
+.ta-fitem {
   display: flex; flex-direction: column; gap: 3px;
-  width: 100%; padding: var(--space-3) var(--space-4);
-  background: none; border: none; cursor: pointer; text-align: left;
-  font-family: var(--font);
+  width: 100%; min-width: 0; padding: 13px 2px;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  cursor: pointer; text-align: left; font-family: var(--font);
+  transition: opacity var(--duration-fast) var(--ease);
 }
-.ta-fcard__main:active { background: var(--bg-surface-hover); }
-.ta-fcard__top { display: flex; align-items: center; gap: var(--space-2); }
-.ta-fcard__n {
-  font-size: 15px; font-weight: var(--weight-semibold); color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
+.ta-fitem:last-of-type { border-bottom: none; }
+.ta-fitem:active { opacity: .6; }
+.ta-fitem:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+/* min-width:0 en toda la cadena. Sin esto el nombre de un cliente largo
+   empujaba la fila hasta 416px dentro de un teléfono de 390 y el navegador
+   terminaba ensanchando el viewport entero a 492px. */
+.ta-fitem__l1,
+.ta-fitem__l2 {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  width: 100%; min-width: 0;
 }
-.ta-fcard__fecha { font-size: var(--text-micro); color: var(--text-tertiary); margin-right: auto; }
-.ta-fcard__cliente {
-  display: block;
-  font-size: var(--text-secondary-size); color: var(--text-secondary);
+.ta-fitem__l2 { align-items: center; }
+
+.ta-fitem__cliente {
+  flex: 1; min-width: 0;
+  font-size: 15px; font-weight: var(--weight-medium); color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ta-fcard__montos { display: flex; align-items: baseline; gap: var(--space-2); margin-top: 2px; }
-.ta-fcard__ars {
-  font-size: 17px; font-weight: var(--weight-semibold); color: var(--text-primary);
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+.ta-fitem__monto {
+  font-size: 15px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.ta-fcard__usd { font-size: var(--text-micro); color: var(--text-tertiary); }
-.ta-fcard__estado { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
-/* Cuánto hace que espera dice más que la fecha: es lo que decide a quién
-   llamás primero. */
-.ta-fcard__dias { font-size: var(--text-micro); color: var(--text-tertiary); }
-
-/* Fuera del botón de detalle a propósito: un botón dentro de otro botón es
-   una trampa táctil. */
-.ta-fcard__cta {
-  display: block; width: 100%;
-  padding: 11px var(--space-4);
-  background: var(--brand-soft); color: var(--brand-text);
-  border: none; border-top: 1px solid var(--border);
-  font-family: var(--font); font-size: var(--text-secondary-size);
-  font-weight: var(--weight-label); text-align: left; cursor: pointer;
+.ta-fitem__meta {
+  flex: 1; min-width: 0;
+  font-size: var(--text-micro); color: var(--text-tertiary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ta-fcard__cta:active { background: var(--bg-surface-hover); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE — composición propia
@@ -452,56 +458,66 @@
 }
 
 @media (max-width: 640px) {
+  /* Densidad de app nativa: menos aire entre bloques, escalas moderadas.
+     El objetivo no es achicar todo — es que haya menos cosas para que el
+     texto pueda tener tamaño natural. */
   .ta-fact { gap: var(--space-4); }
   .ta-fact__main { gap: var(--space-4); }
-  .ta-fact__contexto { gap: var(--space-2); }
+  .ta-fact__contexto { gap: var(--space-3); }
 
-  /* Hoy: una línea, con el importe abajo si no entra al lado. */
   .ta-hoy { gap: 6px; font-size: var(--text-secondary-size); }
-  .ta-hoy__monto { margin-left: 0; }
+  .ta-hoy__monto { margin-left: auto; }
 
-  /* La señal se apila. A 390px el título y un importe de nueve dígitos no
-     comparten fila: el título se partía en dos y el monto quedaba flotando
-     al medio. El monto baja a su propia línea, alineado con el texto. */
-  .ta-senal { flex-wrap: wrap; align-items: flex-start; padding: var(--space-3); gap: var(--space-3); }
-  .ta-senal__ico { width: 30px; height: 30px; }
-  .ta-senal__cuerpo { flex: 1 1 auto; }
-  .ta-senal__titulo { font-size: var(--text-body); }
+  .ta-only-desktop-inline { display: none; }
+  .ta-solo-mobile-inline { display: block; }
+
+  .ta-senal { padding: 10px 0; gap: var(--space-2); }
+  .ta-senal__titulo { font-size: var(--text-secondary-size); }
   .ta-senal__detalle { font-size: var(--text-micro); }
-  .ta-senal__nota { margin-left: 0; margin-top: 4px; display: table; }
-  .ta-senal__derecha {
-    /* padding, no margin: un margin sobre width:100% se SUMA al ancho y
-       desbordaba la página 17px. Con border-box el padding entra adentro. */
-    order: 3; width: 100%; box-sizing: border-box;
-    padding-left: calc(30px + var(--space-3));
-    justify-content: flex-start;
-  }
-  .ta-senal__monto { font-size: 17px; letter-spacing: -0.02em; }
-  /* El chevron ya no aporta: la tarjeta entera es el blanco táctil. */
-  .ta-senal__chev { display: none; }
+  .ta-senal__monto { font-size: var(--text-secondary-size); }
+  .ta-resolver__titulo, .ta-hoy__label { font-size: 11px; }
 
-  /* Buscador y Filtros en una fila. Sin exportar ni CTA compitiendo: el alta
-     ya vive en la topbar como icono. */
+  /* Escala de app nativa. El cliente es el ancla de lectura, el importe lo
+     acompaña, y el comprobante y la fecha son metadata. Nada grita. */
+  .ta-fitem { padding: 11px 2px; gap: 2px; }
+  .ta-fitem__cliente { font-size: var(--text-body); }
+  .ta-fitem__monto { font-size: var(--text-body); }
+  .ta-fitem__meta { font-size: 11px; }
+
+  /* Vistas: etiquetas cortas y contador secundario. "Facturas A 207" en
+     cuatro pestañas no entra en 390px sin scroll horizontal. */
+  .ta-vistas { width: 100%; }
+  /* 34px: 30 no es un blanco táctil, y estas pestañas se tocan seguido. */
+  .ta-vista { flex: 1; justify-content: center; padding: 0 var(--space-2); height: 34px; gap: 4px; }
+  .ta-vista__label--largo { display: none; }
+  .ta-vista__n { font-size: 10px; }
+
+  .ta-fbar { gap: var(--space-2); }
   .ta-fbar__row { flex-wrap: nowrap; gap: var(--space-2); }
   .ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: none; }
   .ta-fbar__sep { display: none; }
-  .ta-fbar__nueva { display: inline-flex; width: 36px; padding: 0; flex-shrink: 0; }
-
-  .ta-vistas { width: 100%; }
-  .ta-vista { padding: 0 var(--space-3); font-size: var(--text-micro); }
-
-  /* 30px no es un blanco táctil. */
   .ta-fbar__filtros { height: 36px; }
   .ta-fbar__search .ta-input { height: 36px; }
 
+  /* El alta no compite: mismo tamaño que Filtros y sin el rojo de marca.
+     Sigue estando siempre a la vista, al lado del buscador. */
+  .ta-fbar__nueva {
+    display: inline-flex; width: 36px; height: 36px; padding: 0; flex-shrink: 0;
+    background: var(--bg-surface); color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+  }
+  .ta-fbar__nueva:active { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+  /* Detalle a pantalla completa */
   .ta-fpanel__head { padding: var(--space-3) var(--space-4); }
-  .ta-fpanel__body { padding: var(--space-4); gap: var(--space-4); }
-  .ta-fdl { grid-template-columns: 1fr; gap: var(--space-3); }
-  .ta-fpanel__foot { justify-content: stretch; }
-  .ta-fpanel__foot .ta-btn { flex: 1; justify-content: center; }
+  .ta-fpanel__body { padding: var(--space-4); gap: var(--space-5); }
+  .ta-fresumen__monto { font-size: 28px; }
+  .ta-fdl { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .ta-fpanel__foot { justify-content: space-between; }
+  .ta-fpanel__foot .ta-btn--primary { flex: 1; justify-content: center; }
 }
 
 @media (max-width: 380px) {
-  .ta-fcard__ars { font-size: 16px; }
+  .ta-fitem__cliente, .ta-fitem__monto { font-size: var(--text-body); }
   .ta-senal__monto { font-size: var(--text-micro); }
 }

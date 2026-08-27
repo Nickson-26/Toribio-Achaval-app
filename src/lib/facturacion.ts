@@ -38,6 +38,14 @@ export const TIPO_LABEL: Record<TipoFactura, string> = {
   'FACT E': 'Facturas E',
 }
 
+/** Etiqueta corta, para el selector de vistas en pantallas angostas. */
+export const TIPO_CORTO: Record<TipoFactura, string> = {
+  'FACT A': 'A',
+  'FACT B': 'B',
+  'FACT DE CREDITO': 'FCE',
+  'FACT E': 'E',
+}
+
 export type Moneda = 'all' | 'ars' | 'usd'
 
 export type FiltrosFacturacion = {
@@ -299,6 +307,10 @@ export type Senal = {
   titulo: string
   /** Una línea. Lo que hace falta saber para decidir si abrirla. */
   detalle: string
+  /** Versión de teléfono: lo mismo en la mitad de caracteres. En 390px el
+   *  detalle largo se parte en tres renglones y la señal deja de leerse de un
+   *  vistazo, que es lo único que tenía que hacer. */
+  detalleCorto: string
   /** Aclaración cuando el estado se puede malinterpretar. */
   nota?: string
   casos: number
@@ -356,6 +368,7 @@ export function calcularSenales(cs: Comprobante[], hoy: Date = new Date()): Sena
       id: 'retenciones',
       titulo: 'Esperando retenciones',
       detalle: `${plural(ret.length, 'pago recibido', 'pagos recibidos')}, sin recibo emitido`,
+      detalleCorto: plural(ret.length, 'pago', 'pagos'),
       nota: 'El pago ya entró',
       casos: ret.length,
       montoARS: sumar(ret),
@@ -372,6 +385,7 @@ export function calcularSenales(cs: Comprobante[], hoy: Date = new Date()): Sena
       // Sin fecha: referencia_pago está vacío en toda la base. Prometer un
       // "próximo: hoy" que sale de la nada es peor que no decir nada.
       detalle: plural(ech.length, 'e-cheq registrado', 'e-cheqs registrados'),
+      detalleCorto: plural(ech.length, 'e-cheq', 'e-cheqs'),
       casos: ech.length,
       montoARS: sumar(ech),
       estados: ['echeq_pendiente'],
@@ -386,6 +400,9 @@ export function calcularSenales(cs: Comprobante[], hoy: Date = new Date()): Sena
       id: 'pendientes',
       titulo: 'Pendientes de cobro',
       detalle: plural(pend.length, 'factura', 'facturas'),
+      detalleCorto: viejas.length
+        ? `${pend.length} · ${viejas.length} +${DIAS_ANTIGUEDAD}d`
+        : plural(pend.length, 'factura', 'facturas'),
       nota: viejas.length
         ? `${viejas.length} ${viejas.length === 1 ? 'lleva' : 'llevan'} más de ${DIAS_ANTIGUEDAD} días`
         : undefined,
@@ -553,6 +570,24 @@ export function tipoInicialPara(vista: string): TipoFactura {
   return (TIPOS_FACTURA as readonly string[]).includes(vista)
     ? (vista as TipoFactura)
     : 'FACT A'
+}
+
+/**
+ * Importe abreviado, para lugares donde la precisión no aporta.
+ *
+ * "$66,7 M" en una señal dice lo mismo que "$66.732.770" —la magnitud del
+ * problema— en un tercio del ancho. En la lista y en el detalle el importe va
+ * completo, porque ahí sí se verifica.
+ */
+export function arsCorto(n: number | null | undefined): string {
+  if (n == null) return '—'
+  const abs = Math.abs(n)
+  const signo = n < 0 ? '-' : ''
+  const fmt = (v: number, d: number) =>
+    v.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: d })
+  if (abs >= 1_000_000) return `${signo}$\u202F${fmt(abs / 1_000_000, 1)} M`
+  if (abs >= 1_000)     return `${signo}$\u202F${fmt(abs / 1_000, 0)} mil`
+  return `${signo}$\u202F${fmt(abs, 0)}`
 }
 
 /**

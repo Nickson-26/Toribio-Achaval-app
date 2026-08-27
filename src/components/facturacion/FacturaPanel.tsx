@@ -20,9 +20,12 @@ import { accionesPara, type AccionId } from '@/lib/facturacion'
  * fila abierta resaltada, así que el usuario no pierde el lugar. En mobile,
  * donde no hay ancho para dos cosas a la vez, es una hoja a pantalla completa.
  *
- * Es de consulta y acción, no una segunda pantalla: muestra lo que hace falta
- * para decidir y ofrece los siguientes pasos. Editar y cobrar siguen abriendo
- * sus formularios, que no se tocaron.
+ * Abre con lo que hace falta para decidir —cliente, importe, estado, fecha y
+ * qué pasó con el cobro— y guarda el desagregado contable detrás de un
+ * "Detalle contable" que se despliega. Es progressive disclosure: neto, IVA,
+ * tipo de cambio y punto de venta casi nunca deciden el siguiente paso.
+ *
+ * Editar y cobrar siguen abriendo sus formularios, que no se tocaron.
  */
 export function FacturaPanel({
   comp, onClose, onAccion, puedeHacer,
@@ -91,49 +94,33 @@ export function FacturaPanel({
         </header>
 
         <div className="ta-fpanel__body">
-          <div className="ta-fpanel__estado">
-            <StatusBadge estado={comp.estado} />
-            <span className="ta-fpanel__hint">{estadoDef(comp.estado).hint}</span>
+          {/* Primera lectura: quién, cuánto, en qué estado. Nada más.
+              La versión anterior abría con seis campos y dos bloques de
+              importes: había que leer una ficha contable entera para
+              contestar "¿esta es la que busco?". */}
+          <div className="ta-fresumen">
+            <span className="ta-fresumen__cliente">{comp.cliente}</span>
+            <Money className="ta-fresumen__monto">
+              {enUSD ? usd(comp.monto_usd) : ars(comp.monto_ars)}
+            </Money>
+            {enUSD && comp.monto_ars ? (
+              <Money className="ta-fresumen__alt">{ars(comp.monto_ars)}</Money>
+            ) : null}
+            <span className="ta-fresumen__estado">
+              <StatusBadge estado={comp.estado} sm />
+              <span className="ta-fresumen__fecha">{fdate(comp.fecha)}</span>
+            </span>
+            <span className="ta-fresumen__hint">{estadoDef(comp.estado).hint}</span>
           </div>
 
-          <dl className="ta-fdl">
-            <div><dt>Cliente</dt><dd>{comp.cliente}</dd></div>
-            <div><dt>Fecha</dt><dd>{fdate(comp.fecha)}</dd></div>
-            <div><dt>Unidad</dt><dd>{comp.persona}</dd></div>
-            <div><dt>Punto de venta</dt><dd>{comp.punto_venta || '0002'}</dd></div>
-            {comp.concepto && (
-              <div className="ta-fdl__full"><dt>Concepto</dt><dd>{comp.concepto}</dd></div>
-            )}
-          </dl>
-
-          {/* Importes. En una factura en dólares el desagregado se muestra en
-              dólares y el peso queda como conversión, que es como se leen. */}
-          <div className="ta-fmontos">
-            {enUSD ? (
-              <>
-                {comp.neto_ars && tc ? (
-                  <Fila label="Neto"><Money>{usd(comp.neto_ars / tc)}</Money></Fila>
-                ) : null}
-                {comp.iva && tc ? (
-                  <Fila label="IVA 21%"><Money>{usd(comp.iva / tc)}</Money></Fila>
-                ) : null}
-                <Fila label="Total USD" fuerte><Money>{usd(comp.monto_usd)}</Money></Fila>
-                {comp.monto_ars ? <Fila label="Total ARS"><Money>{ars(comp.monto_ars)}</Money></Fila> : null}
-                {tc ? <Fila label="Tipo de cambio"><span className="ta-mono">${tc}</span></Fila> : null}
-              </>
-            ) : (
-              <>
-                {comp.neto_ars ? <Fila label="Neto"><Money>{ars(comp.neto_ars)}</Money></Fila> : null}
-                {comp.iva ? <Fila label="IVA 21%"><Money>{ars(comp.iva)}</Money></Fila> : null}
-                <Fila label="Total" fuerte><Money>{ars(comp.monto_ars)}</Money></Fila>
-              </>
-            )}
-          </div>
-
-          {(comp.recibo_id || comp.fecha_cobro || comp.referencia_pago) && (
+          {/* Lo que pasó con el cobro va antes que el desagregado fiscal:
+              responde "¿qué falta?", que es la pregunta operativa. */}
+          {(comp.recibo_id || comp.fecha_cobro || comp.fecha_pago || comp.referencia_pago) && (
             <div className="ta-fmontos ta-fmontos--cobro">
               {comp.recibo_id ? <Fila label="Recibo"><span>N° {comp.recibo_id}</span></Fila> : null}
               {comp.fecha_cobro ? <Fila label="Fecha de cobro"><span>{fdate(comp.fecha_cobro)}</span></Fila> : null}
+              {!comp.fecha_cobro && comp.fecha_pago
+                ? <Fila label="Pago recibido"><span>{fdate(comp.fecha_pago)}</span></Fila> : null}
               {comp.medio_pago ? <Fila label="Medio de pago"><span>{comp.medio_pago}</span></Fila> : null}
               {comp.estado === 'echeq_pendiente' && comp.referencia_pago ? (
                 <Fila label="Acredita">
@@ -143,24 +130,55 @@ export function FacturaPanel({
             </div>
           )}
 
-          <div className="ta-fpdf">
-            <span className="ta-fpdf__label">Comprobante AFIP</span>
-            {comp.pdf_url ? (
-              <div className="ta-fpdf__acciones">
-                <Button variant="secondary" size="sm" icon={FileText} onClick={onVerPDF}>Ver PDF</Button>
-                {puedeAdjuntar && (
-                  <AdjuntarPDF subiendo={pdfSubiendo} onChange={onSubirPDF} label="Reemplazar" />
-                )}
-              </div>
-            ) : puedeAdjuntar ? (
-              <div className="ta-fpdf__acciones">
+          {/* Progressive disclosure: el detalle contable se abre si se pide.
+              Casi nunca hace falta para decidir el siguiente paso. */}
+          <details className="ta-fmas-det">
+            <summary className="ta-fmas-det__sum">Detalle contable</summary>
+
+            <div className="ta-fmontos">
+              {enUSD ? (
+                <>
+                  {comp.neto_ars && tc ? (
+                    <Fila label="Neto"><Money>{usd(comp.neto_ars / tc)}</Money></Fila>
+                  ) : null}
+                  {comp.iva && tc ? (
+                    <Fila label="IVA 21%"><Money>{usd(comp.iva / tc)}</Money></Fila>
+                  ) : null}
+                  {comp.monto_ars ? <Fila label="Total ARS"><Money>{ars(comp.monto_ars)}</Money></Fila> : null}
+                  {tc ? <Fila label="Tipo de cambio"><span className="ta-mono">${tc}</span></Fila> : null}
+                </>
+              ) : (
+                <>
+                  {comp.neto_ars ? <Fila label="Neto"><Money>{ars(comp.neto_ars)}</Money></Fila> : null}
+                  {comp.iva ? <Fila label="IVA 21%"><Money>{ars(comp.iva)}</Money></Fila> : null}
+                </>
+              )}
+            </div>
+
+            <dl className="ta-fdl">
+              <div><dt>Unidad</dt><dd>{comp.persona}</dd></div>
+              <div><dt>Punto de venta</dt><dd>{comp.punto_venta || '0002'}</dd></div>
+              {comp.concepto && (
+                <div className="ta-fdl__full"><dt>Concepto</dt><dd>{comp.concepto}</dd></div>
+              )}
+            </dl>
+
+            <div className="ta-fpdf">
+              <span className="ta-fpdf__label">Comprobante AFIP</span>
+              {comp.pdf_url ? (
+                <div className="ta-fpdf__acciones">
+                  <Button variant="secondary" size="sm" icon={FileText} onClick={onVerPDF}>Ver PDF</Button>
+                  {puedeAdjuntar && (
+                    <AdjuntarPDF subiendo={pdfSubiendo} onChange={onSubirPDF} label="Reemplazar" />
+                  )}
+                </div>
+              ) : puedeAdjuntar ? (
                 <AdjuntarPDF subiendo={pdfSubiendo} onChange={onSubirPDF} label="Adjuntar PDF" />
-                <span className="ta-fpdf__hint">Todavía sin adjuntar</span>
-              </div>
-            ) : (
-              <span className="ta-fpdf__hint">Sin PDF adjunto</span>
-            )}
-          </div>
+              ) : (
+                <span className="ta-fpdf__hint">Sin PDF adjunto</span>
+              )}
+            </div>
+          </details>
         </div>
 
         {/* UNA acción primaria; el resto detrás del menú.
@@ -200,12 +218,19 @@ function MenuSecundarias({
     const fuera = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setAbierto(false)
     }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    // Capture + stopPropagation: si no, el mismo Escape cerraba el menú Y el
+    // panel de atrás, y el usuario perdía la factura que estaba mirando por
+    // haber abierto un menú. Escape cierra una capa por vez.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setAbierto(false)
+    }
     document.addEventListener('mousedown', fuera)
-    document.addEventListener('keydown', esc)
+    document.addEventListener('keydown', esc, true)
     return () => {
       document.removeEventListener('mousedown', fuera)
-      document.removeEventListener('keydown', esc)
+      document.removeEventListener('keydown', esc, true)
     }
   }, [abierto])
 

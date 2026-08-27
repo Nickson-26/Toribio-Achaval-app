@@ -18,7 +18,7 @@ import {
   puntoVentaDe, esARS, esUSD, FILTROS_INICIALES,
   calcularSenales, resumenHoy, pagosDelDia, esperandoRetenciones,
   echeqsPorAcreditar, pendientesDeCobro, pendientesAntiguas,
-  tipoInicialPara, diasDesde, DIAS_ANTIGUEDAD,
+  tipoInicialPara, diasDesde, arsCorto, DIAS_ANTIGUEDAD,
   type FiltrosFacturacion,
 } from '../src/lib/facturacion.ts'
 import { puede } from '../src/design/permissions.ts'
@@ -544,4 +544,36 @@ test('diasDesde nunca devuelve negativos', () => {
   // Una factura con fecha futura es un error de carga, no un motivo para
   // mostrar "-3 días".
   assert.equal(diasDesde('2026-12-31', HOY), 0)
+})
+
+test('arsCorto abrevia sin perder la magnitud', () => {
+  assert.match(arsCorto(66_732_770), /66,7 M/)
+  assert.match(arsCorto(180_249_128), /180,2 M/)
+  assert.match(arsCorto(1_000_000), /1 M/)
+  assert.match(arsCorto(508_200), /508 mil/)
+  assert.match(arsCorto(950), /950/)
+  assert.equal(arsCorto(null), '—')
+})
+
+test('arsCorto conserva el signo', () => {
+  assert.match(arsCorto(-2_500_000), /^-/)
+})
+
+test('cada señal trae una versión corta para el teléfono', () => {
+  const cs = [conRetencionesPendientes(), pendiente({ fecha: '2026-01-10' }), f({ estado: 'echeq_pendiente' })]
+  for (const s of calcularSenales(cs, HOY)) {
+    assert.ok(s.detalleCorto.length > 0, `${s.id} sin detalleCorto`)
+    // Se compara contra lo que realmente se renderiza en escritorio, que es
+    // detalle + nota: la nota es justamente lo que hace largo el renglón.
+    const largo = s.detalle + (s.nota ? ` · ${s.nota}` : '')
+    assert.ok(
+      s.detalleCorto.length < largo.length,
+      `el detalle corto de ${s.id} no es más corto: "${s.detalleCorto}" vs "${largo}"`,
+    )
+  }
+})
+
+test('la versión corta de pendientes conserva la antigüedad', () => {
+  const s = calcularSenales([pendiente({ fecha: '2026-01-10' })], HOY).find(x => x.id === 'pendientes')!
+  assert.match(s.detalleCorto, /\+60d/)
 })

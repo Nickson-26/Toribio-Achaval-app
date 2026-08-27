@@ -418,10 +418,13 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
 const TIPOS_RET = ['ganancias', 'iva', 'iibb', 'suss'] as const
 type RetCfg = { aplica: boolean; importe: string; docRef: string }
 
-export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
-  comp: Comprobante; nextReciboId: number
+export function MarcarCobradaModal({ comp, onClose, onSaved }: {
+  comp: Comprobante
   onClose: () => void; onSaved: () => void
 }) {
+  // `nextReciboId` era una prop muerta: la pantalla pasaba 19200 hardcodeado y
+  // este componente lo ignoraba, porque el número real lo pide abajo con
+  // getNextReciboId(). Se elimina la prop; el comportamiento no cambia.
   const [saving,    setSaving]    = useState(false)
   const [fecha,     setFecha]     = useState(today())
   const [nroRecibo, setNroRecibo] = useState('')

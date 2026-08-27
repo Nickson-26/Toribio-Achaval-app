@@ -1,0 +1,379 @@
+/* ============================================================================
+   FACTURACIÓN
+   ============================================================================
+   Dos composiciones sobre los mismos datos: tabla + panel en escritorio,
+   tarjetas + hoja en mobile. La mobile no es la de escritorio comprimida.
+   ============================================================================ */
+
+.ta-fact { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.ta-fact__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+/* Con el panel abierto la lista se angosta pero NO desaparece: el punto de
+   haber dejado el modal era poder seguir viendo dónde estás parado. */
+@media (min-width: 1200px) {
+  .ta-fact.is-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: var(--space-5);
+    align-items: start;
+  }
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+.ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-fbar__row {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+}
+.ta-fbar__search { flex: 0 1 300px; min-width: 200px; }
+
+.ta-fbar__estados { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Chip de estado en la barra. Sin color propio: el color lo aporta el badge
+   de la fila. Acá lo que importa es si está puesto o no. */
+.ta-fchip {
+  height: 30px; padding: 0 var(--space-3);
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-micro); font-weight: var(--weight-medium);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease);
+}
+.ta-fchip:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ta-fchip.is-on {
+  background: var(--brand-soft); color: var(--brand-text); border-color: var(--brand-text);
+}
+[data-theme="accessible"] .ta-fchip.is-on { outline: 2px solid currentColor; outline-offset: -2px; }
+
+.ta-fbar__filtros {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 var(--space-3); flex-shrink: 0;
+  background: var(--bg-surface); color: var(--text-secondary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-micro); font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.ta-fbar__filtros:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.ta-fbar__dot {
+  display: grid; place-items: center;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--brand); color: var(--on-brand);
+  border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: var(--weight-strong);
+}
+
+.ta-fbar__acciones { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+
+/* Filtros activos. Sin esto una lista corta es indistinguible de una vacía. */
+.ta-fbar__chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ta-fbar__chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--bg-muted); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-micro); cursor: pointer;
+}
+.ta-fbar__chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.ta-fbar__chip svg { opacity: .65; }
+.ta-fbar__limpiar {
+  background: none; border: none; cursor: pointer; padding: 0 var(--space-2);
+  font-family: var(--font); font-size: var(--text-micro); color: var(--brand-text);
+}
+
+.ta-fsheet { display: flex; flex-direction: column; gap: var(--space-4); }
+.ta-fsheet__estados { display: flex; flex-wrap: wrap; gap: 6px; }
+.ta-fsheet__estado {
+  background: none; border: 1px solid transparent; border-radius: var(--radius-pill);
+  padding: 2px; cursor: pointer; opacity: .5;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+.ta-fsheet__estado.is-on { opacity: 1; border-color: var(--border-focus); }
+
+/* ── Tabs de tipo ─────────────────────────────────────────────────────────── */
+.ta-ftabs {
+  display: flex; gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.ta-ftabs::-webkit-scrollbar { display: none; }
+.ta-ftab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: var(--space-3) var(--space-3); flex-shrink: 0;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; cursor: pointer;
+  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-medium);
+  color: var(--text-secondary); white-space: nowrap;
+}
+.ta-ftab:hover { color: var(--text-primary); }
+.ta-ftab.is-on { color: var(--brand-text); border-bottom-color: var(--brand); font-weight: var(--weight-semibold); }
+.ta-ftab__n {
+  background: var(--bg-muted); color: var(--text-tertiary);
+  padding: 1px 6px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: var(--weight-strong);
+}
+.ta-ftab.is-on .ta-ftab__n { background: var(--brand-soft); color: var(--brand-text); }
+
+/* ── KPIs ─────────────────────────────────────────────────────────────────── */
+.ta-fkpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.ta-fkpi { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ta-fkpi__label {
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.ta-fkpi__valor {
+  font-size: 22px; font-weight: var(--weight-strong); color: var(--text-primary);
+  letter-spacing: -0.025em; font-variant-numeric: tabular-nums;
+}
+.ta-fkpi__alerta { color: var(--warning-text); }
+.ta-fkpi__nota { font-size: var(--text-micro); color: var(--text-tertiary); }
+
+/* ── Tabla ────────────────────────────────────────────────────────────────── */
+.ta-ftabla-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.ta-ftabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ta-ftabla th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left; white-space: nowrap;
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+}
+.ta-ftabla td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-body); color: var(--text-primary);
+  vertical-align: middle;
+}
+.ta-ftabla tr:last-child td { border-bottom: none; }
+.ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.ta-frow { cursor: pointer; transition: background var(--duration-fast) var(--ease); }
+.ta-frow:hover { background: var(--bg-surface-hover); }
+.ta-frow:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+/* La fila abierta queda marcada: sin esto, con el panel al costado se pierde
+   de vista cuál se está mirando. */
+.ta-frow.is-sel { background: var(--brand-soft); }
+.ta-frow.is-sel .ta-frow__n { color: var(--brand-text); }
+
+.ta-ftabla__num { width: 92px; }
+.ta-frow__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.ta-frow__pv { display: block; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.ta-frow__fecha { width: 104px; white-space: nowrap; color: var(--text-secondary); }
+.ta-frow__cliente { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-frow__unidad {
+  width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-secondary-size); color: var(--text-tertiary);
+}
+.ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); }
+.ta-frow__usd { display: block; font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400; }
+.ta-frow__chev { width: 34px; color: var(--text-tertiary); text-align: right; }
+
+.ta-fmas { display: flex; justify-content: center; padding: var(--space-4); }
+
+.ta-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ── Panel de detalle ─────────────────────────────────────────────────────── */
+.ta-fpanel {
+  display: flex; flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.ta-fpanel__scrim { display: none; }
+
+@media (min-width: 1200px) {
+  .ta-fpanel {
+    position: sticky; top: var(--space-5);
+    max-height: calc(100dvh - var(--topbar-h, 60px) - var(--space-8));
+  }
+  .ta-fpanel__body { overflow-y: auto; }
+}
+
+.ta-fpanel__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ta-fpanel__ident { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ta-fpanel__tipo {
+  font-size: var(--text-micro); color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .06em; font-weight: var(--weight-label);
+}
+.ta-fpanel__n {
+  font-size: 17px; font-weight: var(--weight-semibold); color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ta-fpanel__nav { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+.ta-fpanel__flechas { display: inline-flex; gap: 2px; }
+
+.ta-fpanel__body {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4); flex: 1; min-height: 0;
+}
+.ta-fpanel__estado { display: flex; flex-direction: column; gap: 4px; }
+.ta-fpanel__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+
+.ta-fdl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
+.ta-fdl > div { min-width: 0; }
+.ta-fdl__full { grid-column: 1 / -1; }
+.ta-fdl dt {
+  font-size: var(--text-micro); color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .05em; font-weight: var(--weight-label);
+  margin-bottom: 2px;
+}
+.ta-fdl dd { margin: 0; font-size: var(--text-body); color: var(--text-primary); overflow-wrap: anywhere; }
+
+.ta-fmontos {
+  display: flex; flex-direction: column;
+  background: var(--bg-muted); border-radius: var(--radius-input);
+  padding: var(--space-2) var(--space-3);
+}
+.ta-fmontos--cobro { background: var(--success-soft); }
+.ta-fmontos__row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-3); padding: 5px 0;
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+}
+.ta-fmontos__v { font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; }
+.ta-fmontos__row.is-fuerte { font-weight: var(--weight-semibold); font-size: var(--text-body); }
+.ta-fmontos__row.is-fuerte .ta-fmontos__v { font-size: 16px; font-weight: var(--weight-semibold); }
+.ta-mono { font-family: var(--font-mono); }
+
+.ta-fpdf { display: flex; flex-direction: column; gap: var(--space-2); }
+.ta-fpdf__label {
+  font-size: var(--text-micro); color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .05em; font-weight: var(--weight-label);
+}
+.ta-fpdf__acciones { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ta-fpdf__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-fpdf__file { cursor: pointer; }
+.ta-fpdf__file.is-busy { opacity: .7; cursor: wait; }
+.ta-fpdf__file input { display: none; }
+
+.ta-fpanel__foot {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-muted);
+  flex-shrink: 0;
+}
+
+/* ── Lista mobile ─────────────────────────────────────────────────────────── */
+.ta-only-mobile-block { display: none; }
+.ta-flista { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.ta-fcard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  overflow: hidden;
+}
+.ta-fcard__main {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; padding: var(--space-3) var(--space-4);
+  background: none; border: none; cursor: pointer; text-align: left;
+  font-family: var(--font);
+}
+.ta-fcard__main:active { background: var(--bg-surface-hover); }
+.ta-fcard__top { display: flex; align-items: center; gap: var(--space-2); }
+.ta-fcard__n {
+  font-size: 15px; font-weight: var(--weight-semibold); color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ta-fcard__fecha { font-size: var(--text-micro); color: var(--text-tertiary); margin-right: auto; }
+.ta-fcard__cliente {
+  display: block;
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ta-fcard__montos { display: flex; align-items: baseline; gap: var(--space-2); margin-top: 2px; }
+.ta-fcard__ars {
+  font-size: 17px; font-weight: var(--weight-semibold); color: var(--text-primary);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.ta-fcard__usd { font-size: var(--text-micro); color: var(--text-tertiary); }
+
+/* Fuera del botón de detalle a propósito: un botón dentro de otro botón es
+   una trampa táctil. */
+.ta-fcard__cta {
+  display: block; width: 100%;
+  padding: 11px var(--space-4);
+  background: var(--brand-soft); color: var(--brand-text);
+  border: none; border-top: 1px solid var(--border);
+  font-family: var(--font); font-size: var(--text-secondary-size);
+  font-weight: var(--weight-label); text-align: left; cursor: pointer;
+}
+.ta-fcard__cta:active { background: var(--bg-surface-hover); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE — composición propia
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .ta-only-mobile-block { display: block; }
+
+  /* La hoja de detalle cubre la pantalla: no hay ancho para dos cosas. */
+  .ta-fpanel__scrim {
+    display: block; position: fixed; inset: 0;
+    background: var(--overlay-bg);
+    z-index: calc(var(--z-topbar) + 15);
+  }
+  .ta-fpanel {
+    position: fixed; inset: 0; z-index: calc(var(--z-topbar) + 20);
+    border: none; border-radius: 0;
+    height: 100%; height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--bg-elevated);
+  }
+  .ta-fpanel__body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .ta-fpanel__foot { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (max-width: 640px) {
+  .ta-fact { gap: var(--space-4); }
+  .ta-fact__main { gap: var(--space-3); }
+
+  /* Buscador y Filtros en una fila de ~34px, no 214px de controles. */
+  .ta-fbar__row { flex-wrap: nowrap; gap: var(--space-2); }
+  .ta-fbar__search { flex: 1 1 auto; min-width: 0; }
+  .ta-fbar__acciones { margin-left: 0; }
+  /* Exportar no compite con buscar en 390px: vive en el menú de la pantalla. */
+  .ta-fbar__acciones .ta-btn { display: none; }
+
+  .ta-ftabs { gap: 0; }
+  .ta-ftab { padding: var(--space-2) var(--space-3); font-size: var(--text-secondary-size); }
+
+  /* KPIs como una tira, no tres bloques de 22px apilados. */
+  .ta-fkpis {
+    grid-template-columns: repeat(3, 1fr); gap: var(--space-2);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    padding: var(--space-3);
+  }
+  .ta-fkpi__label { font-size: var(--text-micro); }
+  .ta-fkpi__valor { font-size: 15px; letter-spacing: -0.01em; }
+  .ta-fkpi__nota { display: none; }
+
+  .ta-fpanel__head { padding: var(--space-3) var(--space-4); }
+  .ta-fpanel__body { padding: var(--space-4); gap: var(--space-4); }
+  .ta-fdl { grid-template-columns: 1fr; gap: var(--space-3); }
+  .ta-fpanel__foot { justify-content: stretch; }
+  .ta-fpanel__foot .ta-btn { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 380px) {
+  .ta-fkpi__valor { font-size: 14px; }
+  .ta-fcard__ars { font-size: 16px; }
+}

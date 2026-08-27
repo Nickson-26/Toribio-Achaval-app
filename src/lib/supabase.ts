@@ -144,12 +144,32 @@ export const db = {
     return data as Comprobante
   },
 
+  /**
+   * ANULAR: el comprobante sigue existiendo, marcado como anulado.
+   * Es lo que se usa en el 99% de los casos.
+   *
+   * Ojo con el nombre: `deleteComprobante` no borra. Se conserva porque lo
+   * llaman varias pantallas y renombrarlo es un cambio aparte.
+   */
   async deleteComprobante(id: string) {
     const { error } = await supabase
       .from('comprobantes')
       .update({ estado: 'anulada' as ComprobanteEstado, cliente: 'ANULADO' })
       .eq('id', id)
     if (error) throw new Error(`Error al anular comprobante: ${error.message}`)
+  },
+
+  /**
+   * ELIMINAR de verdad: borra la fila. Permanente.
+   *
+   * Vivía como `supabase.from('comprobantes').delete()` suelto dentro de
+   * Facturas.tsx — la única escritura de esa pantalla que esquivaba esta capa.
+   * Mover no cambia nada: misma tabla, misma condición, mismos permisos
+   * (RLS sigue siendo la autoridad), mismo texto de error.
+   */
+  async eliminarComprobante(id: string) {
+    const { error } = await supabase.from('comprobantes').delete().eq('id', id)
+    if (error) throw new Error(`Error al eliminar: ${error.message}`)
   },
 
   async getRecibos(search?: string) {

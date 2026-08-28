@@ -70,7 +70,17 @@ export function FacturasToolbar({
     <div className="ta-fbar">
       {/* Las vistas son el contexto de trabajo, no un select escondido: de
           ellas hereda el tipo la factura que se crea desde acá. */}
-      <div className="ta-vistas" role="tablist" aria-label="Tipo de factura">
+      {/* Un solo control, no cuatro botones: la cápsula es un elemento único
+          que se desplaza. --i lleva el índice activo y --n la cantidad, así
+          el CSS calcula la posición sin medir nada en JS. */}
+      <div
+        className="ta-vistas" role="tablist" aria-label="Tipo de factura"
+        style={{
+          ['--n' as string]: TIPOS_FACTURA.length,
+          ['--i' as string]: TIPOS_FACTURA.indexOf(vista),
+        }}
+      >
+        <span className="ta-vistas__capsula" aria-hidden />
         {TIPOS_FACTURA.map(t => (
           <button
             key={t}

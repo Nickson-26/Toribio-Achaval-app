@@ -1,5 +1,5 @@
 'use client'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ArrowDownLeft } from 'lucide-react'
 import { Money } from '@/components/HideNumbers'
 import { arsCorto, type Senal, type ResumenHoy } from '@/lib/facturacion'
 
@@ -27,6 +27,11 @@ export function Hoy({ r }: { r: ResumenHoy }) {
 
   return (
     <p className="ta-hoy">
+      {/* El indicador cyan dice "esto está pasando ahora", que es distinto de
+          "este es otro KPI". Es un punto, no una card. */}
+      <span className="ta-hoy__pin" aria-hidden>
+        <ArrowDownLeft size={13} />
+      </span>
       <span className="ta-hoy__label">Hoy</span>
       {r.hayAlgo ? (
         <>
@@ -64,10 +69,14 @@ export function PorResolver({
           <button
             key={s.id}
             type="button"
-            className="ta-senal"
+            className={`ta-senal ta-senal--${s.tono}`}
             onClick={() => onAbrir(s)}
             aria-label={`${s.titulo}: ${s.detalle}${s.nota ? `. ${s.nota}` : ''}`}
           >
+            {/* Un punto del color de la situación. Con dos o tres señales
+                alcanza para reconocerlas sin leer. */}
+            <span className="ta-senal__pin" aria-hidden />
+
             <span className="ta-senal__cuerpo">
               <span className="ta-senal__titulo">{s.titulo}</span>
               {/* Dos versiones del mismo dato: en 390px el detalle largo se

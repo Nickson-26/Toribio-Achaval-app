@@ -25,8 +25,19 @@
 .ta-fact__contexto { display: flex; flex-direction: column; gap: var(--space-5); }
 
 .ta-hoy {
-  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   font-size: var(--text-body);
+}
+/* Indicador de entrada de dinero. Cyan porque la plata YA ingresó, que es el
+   mismo criterio semántico que usa la señal de retenciones. Con halo, para
+   que se lea como algo vivo y no como un icono decorativo. */
+.ta-hoy__pin {
+  display: grid; place-items: center;
+  width: 24px; height: 24px; flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--info-soft); color: var(--info-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 22%, transparent),
+              var(--glow-info);
 }
 .ta-hoy__label {
   font-size: var(--text-micro); font-weight: var(--weight-label);
@@ -37,8 +48,8 @@
 .ta-hoy__txt--quieto { color: var(--text-tertiary); font-weight: 400; }
 .ta-hoy__monto {
   margin-left: auto;
-  font-variant-numeric: tabular-nums; color: var(--text-secondary);
-  font-size: var(--text-secondary-size);
+  font-variant-numeric: tabular-nums; color: var(--text-primary);
+  font-size: 15px; font-weight: var(--weight-semibold);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -57,14 +68,46 @@
 
 .ta-senal {
   display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; padding: var(--space-3) 0;
-  background: none; border: none; border-bottom: 1px solid var(--border);
+  width: 100%; padding: var(--space-3) var(--space-3);
+  margin-inline: calc(var(--space-3) * -1);
+  width: calc(100% + var(--space-3) * 2);
+  background: none; border: none;
+  border-radius: var(--radius-input);
   cursor: pointer; text-align: left; font-family: var(--font);
-  transition: opacity var(--duration-fast) var(--ease);
+  position: relative;
+  transition: background var(--duration-hover) var(--ease);
 }
-.ta-senal:last-child { border-bottom: none; }
-.ta-senal:active { opacity: .6; }
+/* Divisor propio, para que el hover pueda pintar la fila entera sin comerse
+   la línea. */
+.ta-senal::after {
+  content: ''; position: absolute; left: var(--space-3); right: var(--space-3); bottom: 0;
+  height: 1px; background: var(--border);
+}
+.ta-senal:last-child::after { display: none; }
+/* Hover: la fila se tiñe con el color de SU situación. El color acá informa.
+   Sólo en dispositivos con puntero: en táctil el hover se queda "pegado"
+   después de tocar y la señal parece seleccionada cuando no lo está. */
+@media (hover: hover) {
+  .ta-senal--warning:hover { background: var(--tint-warn); }
+  .ta-senal--info:hover    { background: var(--tint-info); }
+  .ta-senal--violet:hover  { background: var(--tint-brand); }
+}
+.ta-senal:active { transform: scale(.995); }
 .ta-senal:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+/* Punto de color: distinguir la situación antes de leerla. */
+.ta-senal__pin {
+  width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%;
+}
+.ta-senal--warning .ta-senal__pin {
+  background: var(--warning); box-shadow: 0 0 10px color-mix(in srgb, var(--warning) 55%, transparent);
+}
+.ta-senal--info .ta-senal__pin {
+  background: var(--info); box-shadow: 0 0 10px color-mix(in srgb, var(--info) 55%, transparent);
+}
+.ta-senal--violet .ta-senal__pin {
+  background: var(--violet); box-shadow: 0 0 10px color-mix(in srgb, var(--violet) 55%, transparent);
+}
 
 .ta-senal { min-width: 0; }
 .ta-senal__cuerpo { display: block; flex: 1; min-width: 0; }
@@ -100,42 +143,54 @@
 }
 
 /* Vistas de trabajo, no un select escondido. */
+/* ── Control segmentado ──
+   UN control, no cuatro botones: la cápsula es un único elemento que se
+   desplaza. Las celdas son de ancho igual para que la posición se calcule
+   con --i / --n y no haya que medir nada en JavaScript. */
 .ta-vistas {
-  display: flex; gap: 3px; padding: 3px;
-  /* La pista es vidrio; la pastilla activa es sólida y flota encima. Es el
-     mismo truco del segmented de iOS: la profundidad viene de que una capa
-     sea translúcida y la otra no. */
+  position: relative;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 3px;
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  width: fit-content; max-width: 100%;
-  overflow-x: auto; scrollbar-width: none;
+  box-shadow: var(--glass-highlight), inset 0 1px 3px rgba(2, 4, 10, 0.10);
+  width: fit-content; min-width: 340px; max-width: 100%;
 }
-.ta-vistas::-webkit-scrollbar { display: none; }
+.ta-vistas__capsula {
+  position: absolute; top: 3px; bottom: 3px; left: 3px;
+  width: calc((100% - 6px) / var(--n, 4));
+  transform: translateX(calc(var(--i, 0) * 100%));
+  border-radius: var(--radius-pill);
+  background: linear-gradient(var(--tint-brand), var(--tint-brand)), var(--bg-elevated);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 0 0 1px rgba(200, 16, 46, 0.16),
+    var(--elev-1);
+  transition: transform var(--duration-base) var(--ease);
+  pointer-events: none;
+}
 .ta-vista {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 32px; padding: 0 var(--space-4); flex-shrink: 0;
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 var(--space-3);
   background: none; border: none; border-radius: var(--radius-pill);
   cursor: pointer; white-space: nowrap;
   font-family: var(--font); font-size: var(--text-secondary-size);
   font-weight: var(--weight-medium); color: var(--text-secondary);
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  transition: color var(--duration-hover) var(--ease);
 }
 .ta-vista:hover { color: var(--text-primary); }
-.ta-vista.is-on {
-  background: var(--bg-elevated); color: var(--text-primary);
-  font-weight: var(--weight-semibold);
-  box-shadow: var(--glass-highlight), var(--shadow-sm);
-}
+.ta-vista.is-on { color: var(--text-primary); font-weight: var(--weight-semibold); }
+.ta-vista:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 .ta-vista__n { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-/* El contador acompaña, no grita: en rojo de marca competía con el CTA. */
-.ta-vista.is-on .ta-vista__n { color: var(--text-secondary); }
+.ta-vista.is-on .ta-vista__n { color: var(--brand-text); }
 
 .ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .ta-fbar__row { display: flex; align-items: center; gap: var(--space-2); }
-.ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+.ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: 440px; }
 .ta-fbar__sep { flex: 1 1 auto; }
 .ta-fbar__nueva { display: none; }
 
@@ -224,12 +279,25 @@
 .ta-ftabla tr:last-child td { border-bottom: none; }
 .ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
 
-.ta-frow { cursor: pointer; transition: background var(--duration-base) var(--ease); }
-.ta-frow:hover { background: var(--bg-surface-hover); }
+.ta-frow {
+  cursor: pointer;
+  transition: background var(--duration-hover) var(--ease);
+}
+/* Hover teñido de marca en vez de un gris: el color de la casa aparece
+   incluso al pasar por encima de una fila. */
+@media (hover: hover) {
+  .ta-frow:hover { background: var(--tint-brand); }
+  .ta-frow:hover .ta-frow__chev { opacity: 1; }
+}
 .ta-frow:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 /* La fila abierta queda marcada: sin esto, con el panel al costado se pierde
    de vista cuál se está mirando. */
-.ta-frow.is-sel { background: var(--brand-soft); }
+/* Seleccionada: material, no un bloque. Barra de marca a la izquierda para
+   que el vínculo con el panel abierto sea inequívoco. */
+.ta-frow.is-sel {
+  background: linear-gradient(var(--tint-brand), var(--tint-brand)), var(--brand-soft);
+  box-shadow: inset 3px 0 0 var(--brand), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
 .ta-frow.is-sel .ta-frow__n { color: var(--brand-text); }
 
 .ta-ftabla__num { width: 92px; }
@@ -251,7 +319,13 @@
 }
 .ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); }
 .ta-frow__usd { display: block; font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400; }
-.ta-frow__chev { width: 34px; color: var(--text-tertiary); text-align: right; }
+/* El chevron casi no está hasta que la fila se toca. */
+.ta-frow__chev {
+  width: 34px; text-align: right;
+  color: var(--text-tertiary); opacity: .35;
+  transition: opacity var(--duration-hover) var(--ease);
+}
+.ta-frow.is-sel .ta-frow__chev { opacity: 1; }
 .ta-ftabla td .ta-badge { max-width: 100%; }
 
 .ta-fmas { display: flex; justify-content: center; padding: var(--space-4); }
@@ -262,15 +336,24 @@
 }
 
 /* ── Panel de detalle ─────────────────────────────────────────────────────── */
+/* ── Panel de detalle ──
+   Una CAPA que aparece sobre la aplicación, no otra columna sólida: vidrio,
+   sombra ambiental y una entrada corta desde la derecha. Es el mejor ejemplo
+   del material en toda la pantalla. */
 .ta-fpanel {
   display: flex; flex-direction: column;
-  /* El panel flota sobre la lista: superficie elevada, radio de superficie y
-     sombra en capas. No es una card más dentro de la página. */
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  background: linear-gradient(var(--glass-bg), var(--glass-bg)), var(--bg-elevated);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-surface);
-  box-shadow: var(--glass-highlight), var(--shadow-md);
+  box-shadow: var(--glass-highlight), var(--elev-3);
   overflow: hidden;
+  animation: ta-panel-in var(--duration-panel) var(--ease-out);
+}
+@keyframes ta-panel-in {
+  from { opacity: 0; transform: translateX(14px) }
+  to   { opacity: 1; transform: translateX(0) }
 }
 .ta-fpanel__scrim { display: none; }
 
@@ -406,9 +489,14 @@
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
-  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  box-shadow: var(--glass-highlight), var(--elev-3);
   z-index: 5;
-  animation: ta-fade var(--duration-fast) var(--ease);
+  transform-origin: bottom left;
+  animation: ta-pop-menu var(--duration-base) var(--ease-out);
+}
+@keyframes ta-pop-menu {
+  from { opacity: 0; transform: translateY(6px) scale(.96) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
 }
 .ta-fmenu__item {
   display: block; width: 100%;
@@ -425,10 +513,13 @@
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
+  /* El pie marca un poco más el material que el cuerpo: es donde vive la
+     acción. */
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
 }
 
@@ -445,7 +536,7 @@
   transition: opacity var(--duration-fast) var(--ease);
 }
 .ta-fitem:last-of-type { border-bottom: none; }
-.ta-fitem:active { opacity: .6; }
+.ta-fitem:active { background: var(--tint-brand); }
 .ta-fitem:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
 /* min-width:0 en toda la cadena. Sin esto el nombre de un cliente largo
@@ -481,15 +572,36 @@
   .ta-fpanel__scrim {
     display: block; position: fixed; inset: 0;
     background: var(--overlay-bg);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
     z-index: calc(var(--z-topbar) + 15);
+    animation: ta-fade var(--duration-panel) var(--ease-out);
   }
+  /* La hoja arranca un poco más abajo del borde y deja ver la lista detrás:
+     eso es lo que da la sensación de capa. Con un panel opaco a pantalla
+     completa se pierde el contexto de dónde estabas. */
   .ta-fpanel {
-    position: fixed; inset: 0; z-index: calc(var(--z-topbar) + 20);
-    border: none; border-radius: 0;
-    height: 100%; height: 100dvh;
+    position: fixed; inset: 34px 0 0; z-index: calc(var(--z-topbar) + 20);
+    border: none; border-bottom: none;
+    border-top: 1px solid var(--glass-border);
+    border-radius: var(--radius-surface) var(--radius-surface) 0 0;
+    height: auto;
     padding-top: env(safe-area-inset-top, 0px);
-    background: var(--bg-elevated);
+    background: linear-gradient(var(--glass-bg), var(--glass-bg)), var(--bg-elevated);
+    animation: ta-sheet-in var(--duration-panel) var(--ease-out);
   }
+  @keyframes ta-sheet-in {
+    from { transform: translateY(18px); opacity: 0 }
+    to   { transform: translateY(0); opacity: 1 }
+  }
+  /* Asa: la señal universal de "esto es una hoja que se puede cerrar". */
+  .ta-fpanel__head::before {
+    content: ''; position: absolute; top: 7px; left: 50%;
+    transform: translateX(-50%);
+    width: 36px; height: 4px; border-radius: 999px;
+    background: var(--border-strong);
+  }
+  .ta-fpanel__head { position: relative; padding-top: var(--space-4); }
   .ta-fpanel__body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .ta-fpanel__foot { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
 }

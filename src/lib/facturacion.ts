@@ -317,6 +317,10 @@ export type Senal = {
   montoARS: number
   /** Con qué estados se abre la lista al tocarla. */
   estados: ComprobanteEstado[]
+  /* El tono es semántico, no decorativo, y es el mismo criterio en toda la
+     app: info/cyan cuando la plata YA entró, warning/ámbar cuando falta que
+     entre, violeta para el e-cheq que está en tránsito. Poder distinguir la
+     situación por color antes de leer es la mitad del trabajo de la señal. */
   tono: 'warning' | 'info' | 'violet'
 }
 

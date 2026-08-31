@@ -153,7 +153,11 @@
 .ta-search__icon {
   position: absolute; left: var(--space-3); display: flex;
   color: var(--text-tertiary); pointer-events: none;
+  transition: color var(--duration-base) var(--ease);
 }
+/* Al enfocar, el campo entero despierta: el fondo sube, aparece el borde de
+   marca y también la lupa deja de estar apagada. */
+.ta-search:focus-within .ta-search__icon { color: var(--text-secondary); }
 .ta-search .ta-input { padding-left: 36px; padding-right: 34px; }
 .ta-search__clear {
   position: absolute; right: 6px;

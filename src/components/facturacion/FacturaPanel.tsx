@@ -3,11 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Paperclip, FileText, ChevronUp, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { Money } from '@/components/HideNumbers'
 import { Button, StatusBadge, IconButton } from '@/design/primitives'
-import { estadoDef } from '@/design/status'
 import { ars, usd, fdate } from '@/lib/utils'
 import type { Comprobante } from '@/lib/supabase'
 import type { Accion } from '@/design/permissions'
-import { accionesPara, type AccionId } from '@/lib/facturacion'
+import { accionesPara, situacionDe, type AccionId } from '@/lib/facturacion'
 
 /**
  * Detalle de una factura.
@@ -110,7 +109,10 @@ export function FacturaPanel({
               <StatusBadge estado={comp.estado} sm />
               <span className="ta-fresumen__fecha">{fdate(comp.fecha)}</span>
             </span>
-            <span className="ta-fresumen__hint">{estadoDef(comp.estado).hint}</span>
+            {/* La situación en palabras, derivada del dato: es lo que dice
+                cuál es el siguiente paso, y coincide con el botón del pie
+                porque las dos miran `recibo_id`. */}
+            <span className="ta-fresumen__hint">{situacionDe(comp)}</span>
           </div>
 
           {/* Lo que pasó con el cobro va antes que el desagregado fiscal:
@@ -197,7 +199,9 @@ export function FacturaPanel({
               </Button>
             ) : (
               // Sin siguiente paso: decirlo es mejor que dejar el pie mudo.
-              <span className="ta-fpanel__cerrado">Circuito completo</span>
+              // No repite la situación de arriba —que para una cobrada ya dice
+              // "Circuito completo"—: habla del pie, no del comprobante.
+              <span className="ta-fpanel__cerrado">Sin acciones pendientes</span>
             )}
           </footer>
         )}

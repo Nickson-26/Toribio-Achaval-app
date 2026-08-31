@@ -27,18 +27,38 @@
 .ta-hoy {
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   font-size: var(--text-body);
+  /* El importe de Hoy tiene que caer en la misma vertical que el de las
+     señales de abajo; si no, la columna de cifras se ve quebrada. Las
+     señales reservan a su derecha el chevron y su separación. */
+  padding-right: calc(16px + var(--space-3));
 }
-/* Indicador de entrada de dinero. Cyan porque la plata YA ingresó, que es el
-   mismo criterio semántico que usa la señal de retenciones. Con halo, para
-   que se lea como algo vivo y no como un icono decorativo. */
+/* RELEVANCIA DEL DATO -> PRESENCIA VISUAL.
+   Sin movimientos el indicador es un punto neutro del tamaño de los de "Por
+   resolver": mantiene la alineación de la columna y no promete nada. Con
+   movimientos se convierte en la pastilla cyan con halo —"entró plata"— y la
+   línea entera sube de contraste. */
 .ta-hoy__pin {
   display: grid; place-items: center;
-  width: 24px; height: 24px; flex-shrink: 0;
+  width: 8px; height: 8px; flex-shrink: 0;
+  margin: 0 8px;
+  border-radius: 50%;
+  background: var(--text-quaternary, var(--text-tertiary));
+  opacity: .45;
+  transition: width var(--duration-panel) var(--ease),
+              height var(--duration-panel) var(--ease),
+              margin var(--duration-panel) var(--ease),
+              border-radius var(--duration-panel) var(--ease),
+              opacity var(--duration-base) var(--ease);
+}
+.ta-hoy.is-activo .ta-hoy__pin {
+  width: 24px; height: 24px; margin: 0;
   border-radius: 8px;
+  opacity: 1;
   background: var(--info-soft); color: var(--info-text);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 22%, transparent),
               var(--glow-info);
 }
+.ta-hoy.is-activo .ta-hoy__label { color: var(--text-secondary); }
 .ta-hoy__label {
   font-size: var(--text-micro); font-weight: var(--weight-label);
   color: var(--text-tertiary);
@@ -126,13 +146,27 @@
 .ta-senal__detalle {
   display: block; margin-top: 1px;
   font-size: var(--text-micro); color: var(--text-secondary);
+  transition: color var(--duration-base) var(--ease);
 }
 .ta-senal__detalle--corto { display: none; }
 .ta-senal__monto {
   font-size: var(--text-body); font-weight: var(--weight-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.ta-senal__chev { color: var(--text-tertiary); flex-shrink: 0; }
+/* El chevron es la promesa de que esto abre algo. En reposo alcanza con
+   insinuarlo; al acercarse se completa. */
+.ta-senal__chev {
+  color: var(--text-tertiary); flex-shrink: 0;
+  opacity: .3;
+  transition: opacity var(--duration-base) var(--ease),
+              transform var(--duration-base) var(--ease);
+}
+@media (hover: hover) {
+  .ta-senal:hover .ta-senal__chev { opacity: 1; transform: translateX(2px); }
+  .ta-senal:hover .ta-senal__detalle { color: var(--text-primary); }
+}
+.ta-senal:focus .ta-senal__chev { opacity: 1; }
+.ta-senal:focus .ta-senal__detalle { color: var(--text-primary); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    EXPLORAR
@@ -267,7 +301,13 @@
   background: var(--bg-muted);
 }
 .ta-ftabla td {
-  padding: var(--space-3) var(--space-4);
+  /* Altura fija, no derivada del contenido. Dos cosas dependen de esto:
+     que el punto de venta tenga dónde aparecer al pasar por encima sin
+     empujar nada, y que una fila con importe en dólares mida lo mismo que
+     una sin él —antes las filas en USD eran un 30% más altas y rompían el
+     ritmo justo donde uno está comparando cifras. */
+  height: 56px;
+  padding: 10px var(--space-4);
   border-bottom: 1px solid var(--border);
   font-size: var(--text-body); color: var(--text-primary);
   vertical-align: middle;
@@ -279,19 +319,50 @@
 .ta-ftabla tr:last-child td { border-bottom: none; }
 .ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* ── Los tres estados de una fila ──────────────────────────────────────────
+   REPOSO      lo justo para comparar facturas: número, fecha, cliente,
+               importe, estado. El chevron casi no está y el PV no está.
+   INTENCIÓN   hover o foco de teclado: tinte de marca, chevron pleno, la
+               metadata sube de contraste y aparece el punto de venta.
+   SELECCIÓN   persistente, con barra de marca: es el vínculo visual con el
+               panel abierto al costado.
+
+   Regla que no se rompe: nada que haga falta para USAR la pantalla vive sólo
+   en el hover. Lo que aparece es metadata de verificación, y siempre tiene
+   una segunda casa —el detalle— y sigue en el árbol de accesibilidad. */
 .ta-frow {
   cursor: pointer;
-  transition: background var(--duration-hover) var(--ease);
+  transition: background var(--duration-base) var(--ease),
+              box-shadow var(--duration-base) var(--ease);
 }
-/* Hover teñido de marca en vez de un gris: el color de la casa aparece
-   incluso al pasar por encima de una fila. */
 @media (hover: hover) {
-  .ta-frow:hover { background: var(--tint-brand); }
-  .ta-frow:hover .ta-frow__chev { opacity: 1; }
+  .ta-frow:hover {
+    background: var(--tint-brand);
+    /* Reflejo superior: la fila se despega un punto del plano en vez de
+       simplemente cambiar de color. */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
 }
-.ta-frow:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
-/* La fila abierta queda marcada: sin esto, con el panel al costado se pierde
-   de vista cuál se está mirando. */
+/* Foco de teclado = misma intención que el hover, y además el anillo.
+   Sin esto, quien navega con Tab no ve nada de lo que ve quien usa mouse. */
+.ta-frow:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: -2px;
+  background: var(--tint-brand);
+}
+@media (hover: hover) {
+  .ta-frow:hover  .ta-frow__chev { opacity: 1; }
+  .ta-frow:hover  .ta-frow__pv   { opacity: 1; transform: none; }
+  .ta-frow:hover  .ta-frow__fecha { color: var(--text-primary); }
+  .ta-frow:hover  .ta-frow__usd   { color: var(--text-secondary); }
+}
+/* El anillo se dibuja sólo con :focus-visible —no queremos el aro después de
+   un clic— pero el REVELADO va con :focus a secas. focus-visible depende de
+   una heurística del navegador, y atarle información a esa heurística deja
+   caminos de teclado donde el hover termina siendo obligatorio. */
+.ta-frow:focus .ta-frow__chev { opacity: 1; }
+.ta-frow:focus .ta-frow__pv   { opacity: 1; transform: none; }
+.ta-frow:focus .ta-frow__fecha { color: var(--text-primary); }
+
 /* Seleccionada: material, no un bloque. Barra de marca a la izquierda para
    que el vínculo con el panel abierto sea inequívoco. */
 .ta-frow.is-sel {
@@ -299,8 +370,9 @@
   box-shadow: inset 3px 0 0 var(--brand), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .ta-frow.is-sel .ta-frow__n { color: var(--brand-text); }
+.ta-frow.is-sel .ta-frow__pv { opacity: 1; transform: none; }
 
-.ta-ftabla__num { width: 92px; }
+.ta-ftabla__num { width: 92px; position: relative; }
 /* Ancho propio: con table-layout:fixed la columna se repartía el sobrante y
    "Faltan retenciones" quedaba cortado en la "s". */
 .ta-ftabla__estado { width: 160px; }
@@ -310,20 +382,51 @@
    Con cinco columnas sobra lugar, así que se lo damos holgado. */
 .ta-ftabla__importe { width: 172px; }
 .ta-frow__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
-.ta-frow__pv { display: block; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
-.ta-frow__fecha { white-space: nowrap; color: var(--text-secondary); }
+/* height:0 con overflow visible: el PV se dibuja debajo del número pero no
+   suma altura a la fila. Así aparecer y desaparecer no mueve nada —revelar
+   algo que empuja el resto de la tabla es peor que no revelarlo— y de paso
+   la fila queda 30px más baja que antes, cuando el renglón estaba
+   permanentemente reservado. */
+.ta-frow__pv {
+  display: block; height: 0; overflow: visible;
+  /* Terciario daba 4,44:1 en dark y en alto contraste — por debajo de AA.
+     Es un dato que el usuario pidió ver al acercarse: cuando aparece tiene
+     que leerse, no insinuarse. */
+  font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);
+  opacity: 0; transform: translateY(-3px);
+  transition: opacity var(--duration-base) var(--ease),
+              transform var(--duration-base) var(--ease);
+  pointer-events: none;
+}
+.ta-frow__fecha {
+  white-space: nowrap; color: var(--text-secondary);
+  transition: color var(--duration-base) var(--ease);
+}
 .ta-frow__cliente { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-frow__unidad {
   width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--text-secondary-size); color: var(--text-tertiary);
 }
-.ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); }
-.ta-frow__usd { display: block; font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400; }
-/* El chevron casi no está hasta que la fila se toca. */
+/* Interlineados explícitos: sin esto la celda con importe en dólares sumaba
+   37px de contenido y estiraba la fila a 59px, mientras el resto quedaba en
+   56. La altura fija de la celda es un mínimo, no un máximo. */
+.ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); line-height: 20px; }
+/* El importe en dólares SE QUEDA en reposo. Es tentador esconderlo por
+   limpieza, pero sin él "$3.592.974" y "$75.020.000" se comparan mal: uno de
+   los dos es una factura en moneda extranjera y su peso real es otro. Lo que
+   sí baja es su jerarquía; sube de contraste con la fila. */
+.ta-frow__usd {
+  display: block; line-height: 13px;
+  font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400;
+  transition: color var(--duration-base) var(--ease);
+}
+/* El chevron casi no está hasta que la fila se toca. Casi: al 18% todavía se
+   percibe la columna, así que la fila sigue leyéndose como abrible sin
+   necesidad de pasar por encima. */
 .ta-frow__chev {
   width: 34px; text-align: right;
-  color: var(--text-tertiary); opacity: .35;
-  transition: opacity var(--duration-hover) var(--ease);
+  color: var(--text-tertiary); opacity: .18;
+  transition: opacity var(--duration-base) var(--ease);
 }
 .ta-frow.is-sel .ta-frow__chev { opacity: 1; }
 .ta-ftabla td .ta-badge { max-width: 100%; }
@@ -407,7 +510,9 @@
 }
 .ta-fresumen__estado { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; }
 .ta-fresumen__fecha { font-size: var(--text-micro); color: var(--text-tertiary); }
-.ta-fresumen__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+/* Es la línea que explica qué falta hacer. Terciario la dejaba en 4,51:1,
+   al filo de AA, para el texto más importante de la primera lectura. */
+.ta-fresumen__hint { font-size: var(--text-micro); color: var(--text-secondary); }
 
 /* El desagregado contable, plegado. Casi nunca decide el siguiente paso. */
 .ta-fmas-det { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -580,8 +685,16 @@
   /* La hoja arranca un poco más abajo del borde y deja ver la lista detrás:
      eso es lo que da la sensación de capa. Con un panel opaco a pantalla
      completa se pierde el contexto de dónde estabas. */
+  /* La hoja se ajusta a lo que trae, hasta donde le dejan.
+     Antes ocupaba siempre desde 34px hasta abajo: una factura cobrada, que
+     son cinco líneas, dejaba media pantalla de vacío entre el contenido y el
+     botón. Ahora crece con el contenido —una factura corta es una hoja
+     corta— y cuando el detalle es largo topa contra el máximo y scrollea
+     adentro, como cualquier hoja de iOS. */
   .ta-fpanel {
-    position: fixed; inset: 34px 0 0; z-index: calc(var(--z-topbar) + 20);
+    position: fixed; inset: auto 0 0 0; z-index: calc(var(--z-topbar) + 20);
+    max-height: calc(100dvh - 34px);
+    display: flex; flex-direction: column;
     border: none; border-bottom: none;
     border-top: 1px solid var(--glass-border);
     border-radius: var(--radius-surface) var(--radius-surface) 0 0;
@@ -590,6 +703,9 @@
     background: linear-gradient(var(--glass-bg), var(--glass-bg)), var(--bg-elevated);
     animation: ta-sheet-in var(--duration-panel) var(--ease-out);
   }
+  /* El cuerpo es lo único que cede: encabezado y pie quedan fijos. */
+  .ta-fpanel__body { flex: 0 1 auto; min-height: 0; }
+  .ta-fpanel__head, .ta-fpanel__foot { flex: 0 0 auto; }
   @keyframes ta-sheet-in {
     from { transform: translateY(18px); opacity: 0 }
     to   { transform: translateY(0); opacity: 1 }

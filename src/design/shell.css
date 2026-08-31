@@ -101,7 +101,10 @@
     color: var(--text-primary);
   }
   [data-theme="light"] .ta-nav__item:hover { background: rgba(22, 30, 52, 0.04); }
-  .ta-nav__item:hover svg { opacity: 1; }
+  /* El icono no sólo se aclara: toma el color de la casa. Es la misma
+     señal que da el activo, un escalón más abajo, así que al recorrer la
+     navegación se anticipa a dónde lleva cada ítem. */
+  .ta-nav__item:hover svg { opacity: 1; color: var(--brand-text); }
 }
 .ta-nav__item svg {
   flex-shrink: 0; opacity: .72;

@@ -8,6 +8,15 @@ import type { Accion } from '@/design/permissions'
 /**
  * ¿Qué querés hacer? — cuatro acciones, no diez.
  *
+ * Antes eran cuatro tarjetas grandes con borde y sombra que se comían la
+ * franja central del Inicio. El contenido era correcto; el envase pesaba más
+ * que lo que envasaba: son atajos de navegación, no cuatro decisiones.
+ *
+ * Ahora es una tira compacta. Los cuatro rótulos siguen escritos —esto NO se
+ * esconde detrás de un hover ni de un menú, porque es exactamente lo que
+ * alguien nuevo necesita ver para saber qué puede hacer— pero en reposo son
+ * botones tranquilos, y la superficie aparece al acercarse.
+ *
  * La lista se filtra con `puedeHacer()` de la Fase 1: un viewer no ve acciones
  * de escritura. No hay tres Homes distintos — es la misma estructura con el
  * contenido adaptado.

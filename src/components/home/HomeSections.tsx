@@ -10,6 +10,19 @@ import { tiempoRelativo, type ResumenHome, type Evento, type ComprobanteHome } f
  * Todas las cifras pasan por <Money>, la foundation de privacidad de Fase 1.
  */
 
+/**
+ * Encabezado de sección.
+ *
+ * Antes las cinco secciones del Inicio usaban el mismo h2 de 18px semibold:
+ * "Para revisar", "¿Qué querés hacer?", "Resumen", "Actividad reciente",
+ * "Últimas facturas". Cinco títulos idénticos es lo mismo que ninguno — el
+ * ojo no tiene por dónde entrar.
+ *
+ * Ahora el rótulo es la misma etiqueta pequeña en versalitas que ya usa
+ * "POR RESOLVER" en Facturación: separa sin competir, y de paso las dos
+ * pantallas empiezan a hablar el mismo idioma. El único texto grande de la
+ * página es el saludo.
+ */
 export function Section({
   title, action, children,
 }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -33,7 +46,15 @@ export function SectionLink({ label, onClick }: { label: string; onClick: () => 
 }
 
 /**
- * Resumen — tres métricas.
+ * Resumen — tres métricas, deliberadamente en segundo plano.
+ *
+ * Estos números eran el objeto más grande del Inicio: $2.473.654.482 a 24px
+ * bold pesaba más que "42 facturas pendientes", que es lo único de la pantalla
+ * sobre lo que hay que hacer algo. La jerarquía estaba invertida.
+ *
+ * No se elimina —es contexto legítimo y alguien lo mira todos los días— pero
+ * baja de tamaño y de contraste hasta ocupar el lugar que le corresponde:
+ * información de fondo, no la pregunta del día.
  *
  * "Pendiente" no está a propósito: ya vive en la cola de atención con cantidad,
  * monto y antigüedad. El % de cobranza es el subtexto de Cobrado, no una card.

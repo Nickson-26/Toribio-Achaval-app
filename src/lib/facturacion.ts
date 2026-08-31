@@ -566,6 +566,70 @@ export function accionPrimaria(
 // ── Presentación ────────────────────────────────────────────────────────────
 
 /**
+ * Qué le pasa a este comprobante, en las palabras del usuario.
+ *
+ * El estado interno es una etiqueta del circuito; esto es la explicación
+ * operativa, y sale del DATO, no del nombre del estado. Nadie debería tener
+ * que conocer nuestro esquema para saber qué falta.
+ *
+ * El caso que lo justifica es `faltan_retenciones`, que en realidad son dos
+ * situaciones distintas con dos pasos siguientes distintos:
+ *
+ *   el pago entró y no hay recibo   ->  falta emitir el recibo
+ *   el recibo está y faltan reten.  ->  falta cargar las retenciones
+ *
+ * Es exactamente la condición que ya decide `accionesPara()`, así que la
+ * frase y el botón no pueden contradecirse: los dos miran `recibo_id`.
+ *
+ * No cambia el estado, no cambia el badge, no cambia la base. Cambia lo que
+ * la pantalla explica.
+ *
+ * Y no repite al badge: "Cobrada" arriba y "Cobrada · circuito completo"
+ * cuatro píxeles abajo es ruido, no explicación. La frase empieza donde
+ * termina la etiqueta.
+ */
+export function situacionDe(c: Comprobante): string {
+  const sinRecibo = !c.recibo_id
+
+  switch (c.estado) {
+    case 'faltan_retenciones':
+      return sinRecibo
+        ? 'El pago entró · falta emitir el recibo'
+        : 'Recibo emitido · faltan cargar las retenciones'
+
+    case 'pendiente': {
+      const d = diasDesde(c.fecha)
+      // La antigüedad sólo se nombra cuando ya dice algo. "Hace 3 días" no es
+      // una situación; "hace 74" sí.
+      return d !== null && d >= DIAS_ANTIGUEDAD
+        ? `Esperando el pago desde hace ${d} días`
+        : 'Esperando el pago'
+    }
+
+    case 'echeq_pendiente':
+      return 'E-cheq registrado · todavía sin acreditar'
+
+    case 'cobrada':
+      return sinRecibo ? 'Sin recibo asociado' : 'Circuito completo'
+
+    case 'emitida':
+      return 'Comprobante emitido'
+
+    case 'anulada':
+      return 'Comprobante anulado'
+
+    default:
+      return estadoHint(c.estado)
+  }
+}
+
+/** Respaldo para estados que no conocemos: nunca devolver snake_case crudo. */
+function estadoHint(estado: string | null | undefined): string {
+  if (!estado) return ''
+  return estado.replace(/_/g, ' ').replace(/^./, s => s.toUpperCase())
+}
+
+/**
  * Las FACT B no discriminan IVA: mostrar columnas de neto e IVA vacías para
  * cincuenta filas es ruido.
  */

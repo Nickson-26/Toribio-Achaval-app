@@ -20,17 +20,30 @@ import { arsCorto, type Senal, type ResumenHoy } from '@/lib/facturacion'
  * algo. Y no hay acciones acá: esto anticipa trabajo, no lo ejecuta.
  */
 
+/**
+ * La presencia de HOY la decide el dato, no el layout.
+ *
+ * Un día sin movimientos y un día con dos pagos de $17,5 M no pueden pesar
+ * lo mismo en la pantalla. Cuando no pasó nada esto es un renglón terciario
+ * que se puede saltear con la vista; cuando pasó algo se enciende el
+ * indicador cyan —el color de "la plata entró"— y aparece el importe.
+ *
+ * Es la misma línea, no dos componentes: no hay una card que aparece y
+ * desaparece moviendo todo lo de abajo.
+ */
 export function Hoy({ r }: { r: ResumenHoy }) {
   const partes: string[] = []
   if (r.pagos > 0) partes.push(`${r.pagos} ${r.pagos === 1 ? 'pago' : 'pagos'}`)
   if (r.emitidas > 0) partes.push(`${r.emitidas} ${r.emitidas === 1 ? 'factura' : 'facturas'}`)
 
   return (
-    <p className="ta-hoy">
-      {/* El indicador cyan dice "esto está pasando ahora", que es distinto de
-          "este es otro KPI". Es un punto, no una card. */}
+    <p className={`ta-hoy${r.hayAlgo ? ' is-activo' : ''}`}>
+      {/* Con actividad, el indicador cyan dice "esto está pasando ahora".
+          Sin actividad no hay nada que señalar: queda un punto neutro, que
+          mantiene la línea alineada con las señales de abajo sin encender un
+          color que promete una novedad inexistente. */}
       <span className="ta-hoy__pin" aria-hidden>
-        <ArrowDownLeft size={13} />
+        {r.hayAlgo ? <ArrowDownLeft size={13} /> : null}
       </span>
       <span className="ta-hoy__label">Hoy</span>
       {r.hayAlgo ? (

@@ -18,7 +18,7 @@ import {
   puntoVentaDe, esARS, esUSD, FILTROS_INICIALES,
   calcularSenales, resumenHoy, pagosDelDia, esperandoRetenciones,
   echeqsPorAcreditar, pendientesDeCobro, pendientesAntiguas,
-  tipoInicialPara, diasDesde, arsCorto, DIAS_ANTIGUEDAD,
+  tipoInicialPara, diasDesde, arsCorto, situacionDe, DIAS_ANTIGUEDAD,
   type FiltrosFacturacion,
 } from '../src/lib/facturacion.ts'
 import { puede } from '../src/design/permissions.ts'
@@ -608,4 +608,69 @@ test('cada señal trae una versión corta para el teléfono', () => {
 test('la versión corta de pendientes conserva la antigüedad', () => {
   const s = calcularSenales([pendiente({ fecha: '2026-01-10' })], HOY).find(x => x.id === 'pendientes')!
   assert.match(s.detalleCorto, /\+60d/)
+})
+
+
+// ── Microcopy: la situación sale del dato, no del nombre del estado ─────────
+
+test('faltan_retenciones sin recibo se explica como "falta emitir el recibo"', () => {
+  const c = conRetencionesPendientes({ recibo_id: null })
+  assert.match(situacionDe(c), /falta emitir el recibo/i)
+})
+
+test('faltan_retenciones CON recibo se explica como retenciones, no como recibo', () => {
+  const c = conRetencionesPendientes({ recibo_id: 19301 })
+  assert.match(situacionDe(c), /retenciones/i)
+  assert.doesNotMatch(situacionDe(c), /emitir el recibo/i)
+})
+
+test('la frase y la acción primaria nunca se contradicen', () => {
+  // Las dos miran recibo_id. Si divergen, el usuario lee una cosa y el botón
+  // le ofrece otra, que es peor que no explicar nada.
+  for (const recibo_id of [null, 19301]) {
+    const c = conRetencionesPendientes({ recibo_id })
+    const frase = situacionDe(c)
+    const p = accionPrimaria(c, admin)
+    if (/emitir el recibo/i.test(frase)) {
+      assert.equal(p?.label, 'Emitir recibo')
+    } else {
+      assert.notEqual(p?.label, 'Emitir recibo')
+    }
+  }
+})
+
+test('una pendiente antigua nombra su antigüedad; una reciente no', () => {
+  assert.match(situacionDe(pendiente({ fecha: '2026-01-10' })), /hace \d+ días/)
+  const hoyISO = new Date().toISOString().slice(0, 10)
+  assert.doesNotMatch(situacionDe(pendiente({ fecha: hoyISO })), /hace/)
+})
+
+test('ninguna situación devuelve snake_case', () => {
+  const casos = [
+    pendiente(), conRetencionesPendientes(), pagada(),
+    f({ estado: 'echeq_pendiente' }), f({ estado: 'emitida' }), f({ estado: 'anulada' }),
+    f({ estado: 'estado_futuro_desconocido' }),
+  ]
+  for (const c of casos) {
+    assert.doesNotMatch(situacionDe(c), /_/, `${c.estado} filtró snake_case`)
+    assert.ok(situacionDe(c).length > 0, `${c.estado} sin explicación`)
+  }
+})
+
+test('cobrada sin recibo lo dice en vez de cantar circuito completo', () => {
+  assert.match(situacionDe(pagada({ recibo_id: null })), /sin recibo/i)
+  assert.match(situacionDe(pagada({ recibo_id: 19301 })), /circuito completo/i)
+})
+
+test('la situación no repite la etiqueta del badge', () => {
+  // "Cobrada" arriba y "Cobrada · ..." pegado abajo no explica nada nuevo.
+  for (const c of [pendiente(), conRetencionesPendientes(), pagada(),
+                   f({ estado: 'echeq_pendiente' }), f({ estado: 'emitida' }),
+                   f({ estado: 'anulada' })]) {
+    const etiqueta = estadoLabel(c.estado).toLowerCase()
+    assert.ok(
+      !situacionDe(c).toLowerCase().startsWith(etiqueta),
+      `${c.estado}: la situación arranca repitiendo el badge — "${situacionDe(c)}"`,
+    )
+  }
 })

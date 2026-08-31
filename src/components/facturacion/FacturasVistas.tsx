@@ -129,6 +129,13 @@ export function FacturasTabla({
             >
               <td className="ta-ftabla__num">
                 <span className="ta-frow__n">{c.numero}</span>
+                {/* El punto de venta es el mismo en el 99% de las filas: en
+                    reposo son sesenta repeticiones de "PV 0002" que no
+                    ayudan a distinguir una factura de otra. Aparece cuando el
+                    usuario se acerca a ESTA fila, y vive completo en el
+                    detalle. Sigue en el DOM y sin aria-hidden, así que un
+                    lector de pantalla lo lee siempre: la información no se
+                    perdió, se sacó del reposo. */}
                 <span className="ta-frow__pv">PV {puntoVentaDe(c)}</span>
               </td>
               <td className="ta-frow__fecha">{fdate(c.fecha)}</td>

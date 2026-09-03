@@ -228,10 +228,10 @@ export default function Facturas({ onPendientesChange }: { onPendientesChange?: 
   }
 
   return (
-    <div className={`ta-fact${abierta ? ' is-panel' : ''}`}>
-      <div className="ta-fact__main">
+    <div className={`ta-mod${abierta ? ' is-panel' : ''}`}>
+      <div className="ta-mod__main">
         {!cargando && (
-          <header className="ta-fact__contexto">
+          <header className="ta-mod__contexto">
             <Hoy r={hoy} />
             <PorResolver senales={senales} onAbrir={abrirSenal} />
           </header>

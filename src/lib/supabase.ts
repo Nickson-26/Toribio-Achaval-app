@@ -75,6 +75,37 @@ export type Recibo = {
   recibo_comprobantes?: { comprobante_id: string }[]
 }
 
+/**
+ * Una reserva.
+ *
+ * El tipo vivía dentro de la pantalla de Reservas, así que la lógica pura no
+ * podía usarlo sin importar un componente de React. Se muda acá, con
+ * `Comprobante` y `Recibo`: es la forma del dato, no de la pantalla.
+ *
+ * Anotado con lo que hay REALMENTE en la base, medido sobre las 147 filas,
+ * porque decide qué merece estar a la vista:
+ */
+export type Reserva = {
+  id: number
+  fecha: string                       // 147/147
+  direccion: string                   // 147/147 — la identidad de la reserva
+  broker: string | null               // 146/147
+  cliente: string | null              // 0/147   — vacío en toda la base
+  operacion: string                   // 147/147 — VENTA 115 · ALQUILER 32
+  unidad: string                      // 147/147
+  monto_ars: number | null            // 27/147
+  monto_usd: number | null            // 120/147 — la moneda real del negocio
+  modo_pago: string | null            // 0/147   — vacío en toda la base
+  firmo: string                       // 147/147 — 'PENDIENTE' en las 147
+  created_at: string
+  proa_codigo: string | null          // 109/147
+  tipo_inmueble: string | null        // 109/147
+  precio_publicado: number | null     // 109/147
+  precio_reserva: number | null       // 109/147
+  estado_reserva: string | null       // 109/147 — 'Reservada' o nada
+  email_message_id?: string | null
+}
+
 // ── Retenciones ────────────────────────────────────────────────
 export type TipoRetencion = 'ganancias' | 'iva' | 'iibb' | 'suss'
 
@@ -170,6 +201,21 @@ export const db = {
   async eliminarComprobante(id: string) {
     const { error } = await supabase.from('comprobantes').delete().eq('id', id)
     if (error) throw new Error(`Error al eliminar: ${error.message}`)
+  },
+
+  /**
+   * Todas las reservas, una vez.
+   *
+   * Mismo criterio que Facturación: la pantalla filtra y busca en memoria
+   * sobre un único universo, para que los conteos de las tres categorías
+   * cierren entre sí. Son 147 filas; cuando eso crezca de verdad, el paso
+   * siguiente es paginación + agregados server-side.
+   */
+  async getReservas() {
+    const { data, error } = await supabase
+      .from('reservas').select('*').order('fecha', { ascending: false })
+    if (error) throw new Error(`Error al cargar reservas: ${error.message}`)
+    return (data ?? []) as Reserva[]
   },
 
   async getRecibos(search?: string) {

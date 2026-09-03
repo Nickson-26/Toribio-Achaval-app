@@ -43,7 +43,7 @@ async function abrirFacturacion(p, vp) {
     await p.waitForTimeout(500)
   }
   await p.locator('.ta-nav__item', { hasText: 'Facturación' }).first().click()
-  await p.waitForSelector('.ta-fact', { timeout: 20000 })
+  await p.waitForSelector('.ta-mod', { timeout: 20000 })
   await p.waitForTimeout(1500)
 }
 
@@ -142,15 +142,15 @@ for (const u of users) {
         return !!(e && e.getBoundingClientRect().width > 0)
       }
       return {
-        tabla: vis('.ta-ftabla'),
-        items: document.querySelectorAll('.ta-fitem').length,
-        filas: document.querySelectorAll('.ta-frow').length,
-        toolbarAlto: Math.round(document.querySelector('.ta-fbar')?.getBoundingClientRect().height ?? 0),
+        tabla: vis('.ta-tabla'),
+        items: document.querySelectorAll('.ta-mov').length,
+        filas: document.querySelectorAll('.ta-fila').length,
+        toolbarAlto: Math.round(document.querySelector('.ta-barra')?.getBoundingClientRect().height ?? 0),
         tabs: [...document.querySelectorAll('.ta-vista')].map(e => e.textContent.trim()),
         senales: [...document.querySelectorAll('.ta-senal__titulo')].map(e => e.textContent),
         hoy: document.querySelector('.ta-hoy')?.textContent?.replace(/\s+/g, ' ') ?? null,
         // El listado es para consultar: ningún botón operativo adentro.
-        ctasEnFilas: document.querySelectorAll('.ta-fitem button').length,
+        ctasEnFilas: document.querySelectorAll('.ta-mov button').length,
       }
     })
     if (tag === 'desktop') {
@@ -176,8 +176,8 @@ for (const u of users) {
       const sel = [
         '.ta-vista', '.ta-hoy', '.ta-resolver__titulo',
         '.ta-senal__titulo', '.ta-senal__monto',
-        '.ta-fitem__monto', '.ta-fresumen__monto',
-        '.ta-frow__n', '.ta-frow__total', '.ta-fbar__chip',
+        '.ta-mov__monto', '.ta-pcab__monto',
+        '.ta-fila__n', '.ta-fila__total', '.ta-barra__chip',
         // Los badges también se recortan, y un estado a medias ("Faltan
         // retencione") es peor que no mostrarlo.
         '.ta-badge', '.ta-status',
@@ -201,30 +201,30 @@ for (const u of users) {
       const busca = re => txt.filter(t => re.test(t))
       return {
         nuevaFactura: busca(/nueva factura/).length,
-        ctaTarjetas: document.querySelectorAll('.ta-fitem button').length,
+        ctaTarjetas: document.querySelectorAll('.ta-mov button').length,
         // El CTA de la topbar también tiene que respetar el rol.
         ctaTopbar: !!document.querySelector('.ta-topbar__cta-icon, .ta-topbar .ta-btn--primary'),
       }
     })
     if (u.rol === 'viewer') {
       const altas = escritura.nuevaFactura +
-        (await p.locator('.ta-fbar__nueva').count())
+        (await p.locator('.ta-barra__nueva').count())
       if (altas > 0) fallo(ctxName, `el viewer ve ${altas} accesos al alta de facturas`)
       if (escritura.ctaTopbar) fallo(ctxName, 'el viewer ve el CTA de alta en la topbar')
       if (!altas && !escritura.ctaTopbar) ok('el viewer no ve ninguna acción de escritura')
     } else {
-      const puedeCrear = escritura.nuevaFactura > 0 || await p.locator('.ta-fbar__nueva').count() > 0
+      const puedeCrear = escritura.nuevaFactura > 0 || await p.locator('.ta-barra__nueva').count() > 0
       if (!puedeCrear) fallo(ctxName, `${u.rol} no tiene forma de crear una factura`)
       else ok(`${u.rol} puede crear una factura`)
     }
 
     // ── 5. Búsqueda local ─────────────────────────────────────────────────
     const antes = await p.evaluate(() =>
-      document.querySelectorAll('.ta-frow, .ta-fcard').length)
+      document.querySelectorAll('.ta-fila, .ta-fcard').length)
     await p.locator('input[type=search]').first().fill('zzzzzznoexiste')
     await p.waitForTimeout(600)
     const vacio = await p.evaluate(() => ({
-      items: document.querySelectorAll('.ta-frow, .ta-fcard').length,
+      items: document.querySelectorAll('.ta-fila, .ta-fcard').length,
       estadoVacio: !!document.querySelector('.ta-state'),
     }))
     if (vacio.items > 0) fallo(ctxName, 'la búsqueda sin resultados sigue mostrando filas')
@@ -234,16 +234,16 @@ for (const u of users) {
     await p.locator('input[type=search]').first().fill('')
     await p.waitForTimeout(600)
     const despues = await p.evaluate(() =>
-      document.querySelectorAll('.ta-frow, .ta-fcard').length)
+      document.querySelectorAll('.ta-fila, .ta-fcard').length)
     if (despues !== antes) fallo(ctxName, `limpiar la búsqueda no restaura (${antes} -> ${despues})`)
     else ok(`la búsqueda es local y reversible (${antes} items)`)
 
     // ── 6. Filtros y chips removibles ─────────────────────────────────────
-    await p.locator('.ta-fbar__filtros').click()
+    await p.locator('.ta-barra__filtros').click()
     await p.waitForTimeout(500)
     const hoja = await p.evaluate(() => ({
       abierta: !!document.querySelector('.ta-modal'),
-      estados: document.querySelectorAll('.ta-fsheet__estado').length,
+      estados: document.querySelectorAll('.ta-hojaf__estado').length,
       // Nunca snake_case delante del usuario.
       crudo: (document.querySelector('.ta-modal')?.textContent || '').match(/[a-z]+_[a-z]+/)?.[0] ?? null,
     }))
@@ -252,18 +252,18 @@ for (const u of users) {
     else ok(`hoja de filtros con ${hoja.estados} estados`)
 
     if (hoja.estados > 0) {
-      await p.locator('.ta-fsheet__estado').first().click()
+      await p.locator('.ta-hojaf__estado').first().click()
       await p.waitForTimeout(300)
       await p.locator('.ta-modal button', { hasText: /Ver resultados/ }).first().click()
       await p.waitForTimeout(700)
       const chips = await p.evaluate(() =>
-        [...document.querySelectorAll('.ta-fbar__chip')].map(e => e.textContent.trim()))
+        [...document.querySelectorAll('.ta-barra__chip')].map(e => e.textContent.trim()))
       if (!chips.length) fallo(ctxName, 'el filtro aplicado no aparece como chip')
       else {
         ok(`filtro activo visible como chip: "${chips[0]}"`)
-        await p.locator('.ta-fbar__chip').first().click()
+        await p.locator('.ta-barra__chip').first().click()
         await p.waitForTimeout(600)
-        const quedan = await p.evaluate(() => document.querySelectorAll('.ta-fbar__chip').length)
+        const quedan = await p.evaluate(() => document.querySelectorAll('.ta-barra__chip').length)
         if (quedan >= chips.length) fallo(ctxName, 'el chip no se puede quitar')
         else ok('el chip se quita al tocarlo')
       }
@@ -272,25 +272,25 @@ for (const u of users) {
     await p.screenshot({ path: path.join(OUT, `${u.rol}_${tag}_lista.png`) })
 
     // ── 7. Detalle ────────────────────────────────────────────────────────
-    const primer = tag === 'desktop' ? '.ta-frow' : '.ta-fitem'
+    const primer = tag === 'desktop' ? '.ta-fila' : '.ta-mov'
     await p.locator(primer).first().click()
     await p.waitForTimeout(800)
     const panel = await p.evaluate(() => {
-      const pn = document.querySelector('.ta-fpanel')
+      const pn = document.querySelector('.ta-panel')
       if (!pn) return null
       const r = pn.getBoundingClientRect()
-      const lista = document.querySelector('.ta-ftabla, .ta-flista')
+      const lista = document.querySelector('.ta-tabla, .ta-movs')
       const lr = lista?.getBoundingClientRect()
       return {
         ancho: Math.round(r.width),
         // ¿La lista sigue visible al lado, o el panel la tapa?
         listaVisible: !!lr && lr.width > 0 && lr.right <= r.left + 1,
-        seleccionada: !!document.querySelector('.ta-frow.is-sel'),
+        seleccionada: !!document.querySelector('.ta-fila.is-sel'),
         cerrar: !!document.querySelector('[aria-label="Cerrar detalle"]'),
-        acciones: [...(pn.querySelector('.ta-fpanel__foot')?.querySelectorAll('button') ?? [])]
+        acciones: [...(pn.querySelector('.ta-panel__foot')?.querySelectorAll('button') ?? [])]
           .map(b => b.textContent.trim() || b.getAttribute('aria-label')),
         // Progressive disclosure: el detalle contable arranca plegado.
-        contablePlegado: !!pn.querySelector('.ta-fmas-det') && !pn.querySelector('.ta-fmas-det[open]'),
+        contablePlegado: !!pn.querySelector('.ta-mas') && !pn.querySelector('.ta-mas[open]'),
         crudo: (pn.textContent || '').match(/\b[a-z]+_[a-z]+\b/)?.[0] ?? null,
       }
     })
@@ -324,9 +324,9 @@ for (const u of users) {
       // Buscar una factura que de verdad tenga el paso de cobro disponible.
       // Tomar la primera de la lista es una lotería: si está cobrada, el
       // formulario nunca se ejercita y el test pasa sin haber probado nada.
-      let cobrar = p.locator('.ta-fpanel__foot button', { hasText: /cobro|acreditación/i }).first()
+      let cobrar = p.locator('.ta-panel__foot button', { hasText: /cobro|acreditación/i }).first()
       if (!await cobrar.count()) {
-        const items = tag === 'desktop' ? '.ta-frow' : '.ta-fitem'
+        const items = tag === 'desktop' ? '.ta-fila' : '.ta-mov'
         const n = Math.min(await p.locator(items).count(), 25)
         for (let i = 1; i < n; i++) {
           // En mobile la hoja tapa la lista —que es lo correcto—, así que hay
@@ -335,7 +335,7 @@ for (const u of users) {
           if (await cerrar.count()) { await cerrar.click(); await p.waitForTimeout(350) }
           await p.locator(items).nth(i).click()
           await p.waitForTimeout(500)
-          cobrar = p.locator('.ta-fpanel__foot button', { hasText: /cobro|acreditación/i }).first()
+          cobrar = p.locator('.ta-panel__foot button', { hasText: /cobro|acreditación/i }).first()
           if (await cobrar.count()) break
         }
       }
@@ -361,7 +361,7 @@ for (const u of users) {
     if (await btnCerrar.count()) {
       await btnCerrar.click()
       await p.waitForTimeout(500)
-      const cerrado = await p.evaluate(() => !document.querySelector('.ta-fpanel'))
+      const cerrado = await p.evaluate(() => !document.querySelector('.ta-panel'))
       if (!cerrado) fallo(ctxName, 'el detalle no se cierra')
       else ok('el detalle se cierra')
     }
@@ -370,7 +370,7 @@ for (const u of users) {
     if (tag === 'mobile') {
       const chicos = await p.evaluate(() => {
         const out = []
-        for (const e of document.querySelectorAll('.ta-fact button, .ta-fact a')) {
+        for (const e of document.querySelectorAll('.ta-mod button, .ta-mod a')) {
           const r = e.getBoundingClientRect()
           if (r.width === 0) continue
           if (r.height < 32) out.push({ n: String(e.className).split(' ')[0], h: Math.round(r.height) })
@@ -400,9 +400,9 @@ console.log('\n═══ TEMAS (admin, escritorio) ═══')
     await abrirFacturacion(p, DESKTOP)
     const r = await p.evaluate(() => ({
       tema: document.documentElement.getAttribute('data-theme') ?? 'dark',
-      filas: document.querySelectorAll('.ta-frow').length,
+      filas: document.querySelectorAll('.ta-fila').length,
       // Un fondo transparente en un tema es un token faltante.
-      fondoTabla: getComputedStyle(document.querySelector('.ta-ftabla-wrap')).backgroundColor,
+      fondoTabla: getComputedStyle(document.querySelector('.ta-tabla-wrap')).backgroundColor,
     }))
     if (r.filas === 0) fallo(`tema ${tema}`, 'la tabla quedó vacía')
     else if (/rgba\(0, 0, 0, 0\)/.test(r.fondoTabla)) fallo(`tema ${tema}`, 'la tabla no tiene fondo')

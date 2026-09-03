@@ -1,17 +1,33 @@
 /* ============================================================================
-   FACTURACIÓN
+   PATRONES DE MÓDULO
    ============================================================================
+   Los tres módulos de datos —Facturación, Recibos y Reservas— resuelven el
+   mismo problema: entender qué pasa, encontrar un registro y operar sobre él.
+   Antes cada uno lo resolvía a su manera y se notaba: parecían pantallas de
+   generaciones distintas de la misma aplicación.
+
+   Acá vive lo que comparten, con nombres que ya no dicen "factura":
+
+     .ta-hoy        una línea de contexto, con presencia según el dato
+     .ta-senal      situación que requiere acción, sólo si existe
+     .ta-vistas     control segmentado
+     .ta-barra      buscador + filtros + chips activos
+     .ta-tabla      lista de escritorio, con sus tres estados de fila
+     .ta-movs       lista de movimientos para teléfono
+     .ta-panel      detalle: panel al costado en escritorio, hoja en mobile
+     .ta-hojaf      la hoja de filtros secundarios
+
    Dos composiciones sobre los mismos datos: tabla + panel en escritorio,
-   tarjetas + hoja en mobile. La mobile no es la de escritorio comprimida.
+   movimientos + hoja en mobile. La mobile no es la de escritorio comprimida.
    ============================================================================ */
 
-.ta-fact { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
-.ta-fact__main { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.ta-mod { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.ta-mod__main { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 
 /* Con el panel abierto la lista se angosta pero NO desaparece: el punto de
    haber dejado el modal era poder seguir viendo dónde estás parado. */
 @media (min-width: 1200px) {
-  .ta-fact.is-panel {
+  .ta-mod.is-panel {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 400px;
     gap: var(--space-5);
@@ -22,7 +38,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    HOY — una línea, no un panel
    ══════════════════════════════════════════════════════════════════════════ */
-.ta-fact__contexto { display: flex; flex-direction: column; gap: var(--space-5); }
+.ta-mod__contexto { display: flex; flex-direction: column; gap: var(--space-5); }
 
 .ta-hoy {
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
@@ -220,15 +236,19 @@
 .ta-vista.is-on { color: var(--text-primary); font-weight: var(--weight-semibold); }
 .ta-vista:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 .ta-vista__n { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* Dos rótulos para el mismo control: "Emprendimientos" no entra cuatro veces
+   en 390px, pero "Emp." solo sería críptico en escritorio, donde sí hay
+   lugar. El CSS elige; el DOM tiene los dos. */
+.ta-vista__label--corto { display: none; }
 .ta-vista.is-on .ta-vista__n { color: var(--brand-text); }
 
-.ta-fbar { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.ta-fbar__row { display: flex; align-items: center; gap: var(--space-2); }
-.ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: 440px; }
-.ta-fbar__sep { flex: 1 1 auto; }
-.ta-fbar__nueva { display: none; }
+.ta-barra { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.ta-barra__row { display: flex; align-items: center; gap: var(--space-2); }
+.ta-barra__search { flex: 1 1 auto; min-width: 0; max-width: 440px; }
+.ta-barra__sep { flex: 1 1 auto; }
+.ta-barra__nueva { display: none; }
 
-.ta-fbar__filtros {
+.ta-barra__filtros {
   display: inline-flex; align-items: center; gap: 6px;
   height: 34px; padding: 0 var(--space-3); flex-shrink: 0;
   background: var(--glass-bg);
@@ -243,8 +263,8 @@
   font-family: var(--font); font-size: var(--text-secondary-size);
   font-weight: var(--weight-medium); cursor: pointer;
 }
-.ta-fbar__filtros:hover { color: var(--text-primary); border-color: var(--border-strong); }
-.ta-fbar__dot {
+.ta-barra__filtros:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.ta-barra__dot {
   display: grid; place-items: center;
   min-width: 16px; height: 16px; padding: 0 4px;
   background: var(--brand); color: var(--on-brand);
@@ -253,43 +273,43 @@
 }
 
 /* Filtros activos. Sin esto una lista corta es indistinguible de una vacía. */
-.ta-fbar__chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.ta-fbar__chip {
+.ta-barra__chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ta-barra__chip {
   display: inline-flex; align-items: center; gap: 5px;
   height: 26px; padding: 0 var(--space-2) 0 var(--space-3);
   background: var(--bg-muted); color: var(--text-secondary);
   border: 1px solid var(--border); border-radius: var(--radius-pill);
   font-family: var(--font); font-size: var(--text-micro); cursor: pointer;
 }
-.ta-fbar__chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
-.ta-fbar__chip svg { opacity: .65; }
-.ta-fbar__limpiar {
+.ta-barra__chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.ta-barra__chip svg { opacity: .65; }
+.ta-barra__limpiar {
   background: none; border: none; cursor: pointer; padding: 0 var(--space-2);
   font-family: var(--font); font-size: var(--text-micro); color: var(--brand-text);
 }
 
-.ta-fsheet { display: flex; flex-direction: column; gap: var(--space-4); }
-.ta-fsheet__estados { display: flex; flex-wrap: wrap; gap: 6px; }
-.ta-fsheet__estado {
+.ta-hojaf { display: flex; flex-direction: column; gap: var(--space-4); }
+.ta-hojaf__estados { display: flex; flex-wrap: wrap; gap: 6px; }
+.ta-hojaf__estado {
   background: none; border: 1px solid transparent; border-radius: var(--radius-pill);
   padding: 2px; cursor: pointer; opacity: .5;
   transition: opacity var(--duration-fast) var(--ease);
 }
-.ta-fsheet__estado.is-on { opacity: 1; border-color: var(--border-focus); }
+.ta-hojaf__estado.is-on { opacity: 1; border-color: var(--border-focus); }
 
 /* ── Tabla ────────────────────────────────────────────────────────────────── */
 /* La tabla NO lleva vidrio: son números, y un número necesita fondo opaco y
    contraste pleno. Lo que sí lleva es una superficie limpia con radio
    generoso y una sombra de contacto. */
-.ta-ftabla-wrap {
+.ta-tabla-wrap {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
-.ta-ftabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.ta-ftabla th {
+.ta-tabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ta-tabla th {
   padding: var(--space-3) var(--space-4);
   overflow: hidden;
   text-align: left; white-space: nowrap;
@@ -300,7 +320,7 @@
      y un gris sólido volvía a verse como una barra de ERP. */
   background: var(--bg-muted);
 }
-.ta-ftabla td {
+.ta-tabla td {
   /* Altura fija, no derivada del contenido. Dos cosas dependen de esto:
      que el punto de venta tenga dónde aparecer al pasar por encima sin
      empujar nada, y que una fila con importe en dólares mida lo mismo que
@@ -316,8 +336,8 @@
      importes pisados. */
   overflow: hidden;
 }
-.ta-ftabla tr:last-child td { border-bottom: none; }
-.ta-ftabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ta-tabla tr:last-child td { border-bottom: none; }
+.ta-tabla .ta-num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── Los tres estados de una fila ──────────────────────────────────────────
    REPOSO      lo justo para comparar facturas: número, fecha, cliente,
@@ -330,13 +350,13 @@
    Regla que no se rompe: nada que haga falta para USAR la pantalla vive sólo
    en el hover. Lo que aparece es metadata de verificación, y siempre tiene
    una segunda casa —el detalle— y sigue en el árbol de accesibilidad. */
-.ta-frow {
+.ta-fila {
   cursor: pointer;
   transition: background var(--duration-base) var(--ease),
               box-shadow var(--duration-base) var(--ease);
 }
 @media (hover: hover) {
-  .ta-frow:hover {
+  .ta-fila:hover {
     background: var(--tint-brand);
     /* Reflejo superior: la fila se despega un punto del plano en vez de
        simplemente cambiar de color. */
@@ -345,49 +365,68 @@
 }
 /* Foco de teclado = misma intención que el hover, y además el anillo.
    Sin esto, quien navega con Tab no ve nada de lo que ve quien usa mouse. */
-.ta-frow:focus-visible {
+.ta-fila:focus-visible {
   outline: 2px solid var(--border-focus); outline-offset: -2px;
   background: var(--tint-brand);
 }
 @media (hover: hover) {
-  .ta-frow:hover  .ta-frow__chev { opacity: 1; }
-  .ta-frow:hover  .ta-frow__pv   { opacity: 1; transform: none; }
-  .ta-frow:hover  .ta-frow__fecha { color: var(--text-primary); }
-  .ta-frow:hover  .ta-frow__usd   { color: var(--text-secondary); }
+  .ta-fila:hover  td.ta-fila__chev { opacity: 1; }
+  .ta-fila:hover  .ta-fila__pv   { opacity: 1; transform: none; }
+  .ta-fila:hover  .ta-fila__fecha { color: var(--text-primary); }
+  .ta-fila:hover  .ta-fila__usd   { color: var(--text-secondary); }
 }
 /* El anillo se dibuja sólo con :focus-visible —no queremos el aro después de
    un clic— pero el REVELADO va con :focus a secas. focus-visible depende de
    una heurística del navegador, y atarle información a esa heurística deja
    caminos de teclado donde el hover termina siendo obligatorio. */
-.ta-frow:focus .ta-frow__chev { opacity: 1; }
-.ta-frow:focus .ta-frow__pv   { opacity: 1; transform: none; }
-.ta-frow:focus .ta-frow__fecha { color: var(--text-primary); }
+.ta-fila:focus td.ta-fila__chev { opacity: 1; }
+.ta-fila:focus .ta-fila__pv   { opacity: 1; transform: none; }
+.ta-fila:focus .ta-fila__fecha { color: var(--text-primary); }
 
 /* Seleccionada: material, no un bloque. Barra de marca a la izquierda para
    que el vínculo con el panel abierto sea inequívoco. */
-.ta-frow.is-sel {
+.ta-fila.is-sel {
   background: linear-gradient(var(--tint-brand), var(--tint-brand)), var(--brand-soft);
   box-shadow: inset 3px 0 0 var(--brand), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.ta-frow.is-sel .ta-frow__n { color: var(--brand-text); }
-.ta-frow.is-sel .ta-frow__pv { opacity: 1; transform: none; }
+.ta-fila.is-sel .ta-fila__n { color: var(--brand-text); }
+.ta-fila.is-sel .ta-fila__pv { opacity: 1; transform: none; }
 
-.ta-ftabla__num { width: 92px; position: relative; }
+.ta-tabla__num { width: 92px; position: relative; }
 /* Ancho propio: con table-layout:fixed la columna se repartía el sobrante y
    "Faltan retenciones" quedaba cortado en la "s". */
-.ta-ftabla__estado { width: 160px; }
-.ta-ftabla__fecha { width: 116px; }
+.ta-tabla__estado { width: 160px; }
+.ta-tabla__fecha { width: 116px; }
 /* Los importes necesitan ancho propio: con fixed layout se repartían el
    sobrante y un total de nueve dígitos quedaba cortado por cinco píxeles.
    Con cinco columnas sobra lugar, así que se lo damos holgado. */
-.ta-ftabla__importe { width: 172px; }
-.ta-frow__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
-/* height:0 con overflow visible: el PV se dibuja debajo del número pero no
-   suma altura a la fila. Así aparecer y desaparecer no mueve nada —revelar
-   algo que empuja el resto de la tabla es peor que no revelarlo— y de paso
-   la fila queda 30px más baja que antes, cuando el renglón estaba
-   permanentemente reservado. */
-.ta-frow__pv {
+.ta-tabla__importe { width: 172px; }
+/* Operación en Reservas: "Alquiler" con su badge no entra en menos. */
+.ta-tabla__op { width: 118px; }
+/* La propiedad domina la fila pero no se lleva TODO el sobrante: con
+   table-layout:fixed una columna sin ancho se queda con el resto, y una
+   dirección corta dejaba 400px de aire entre el texto y su badge. */
+.ta-tabla__prop { width: 42%; }
+/* El hueco de una celda cuyo dato no aplica en esta fila. Un guion tenue dice
+   "acá no hay nada" sin gritar. */
+.ta-fila__nada { color: var(--text-tertiary); opacity: .5; }
+.ta-fila__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+/* Igual que __n pero para un identificador de texto —una dirección— en vez
+   de un número: sin tabular-nums y recortando con elipsis. */
+.ta-fila__n2 {
+  display: block; font-weight: var(--weight-medium);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* El renglón que aparece al acercarse: punto de venta en Facturación,
+   factura vinculada en Recibos, broker en Reservas. Siempre lo mismo — un
+   dato que no sirve para ELEGIR una fila pero sí para confirmar que elegiste
+   la correcta.
+
+   height:0 con overflow visible: se dibuja debajo de la línea principal pero
+   no suma altura. Así aparecer y desaparecer no mueve nada —revelar algo que
+   empuja el resto de la tabla es peor que no revelarlo— y de paso la fila
+   quedó 30px más baja que cuando el renglón estaba siempre reservado. */
+.ta-fila__pv {
   display: block; height: 0; overflow: visible;
   /* Terciario daba 4,44:1 en dark y en alto contraste — por debajo de AA.
      Es un dato que el usuario pidió ver al acercarse: cuando aparece tiene
@@ -398,24 +437,27 @@
               transform var(--duration-base) var(--ease);
   pointer-events: none;
 }
-.ta-frow__fecha {
+.ta-fila__fecha {
   white-space: nowrap; color: var(--text-secondary);
   transition: color var(--duration-base) var(--ease);
 }
-.ta-frow__cliente { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ta-frow__unidad {
+.ta-fila__cliente { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cuando la celda de identidad lleva el renglón revelable, el ellipsis va en
+   el hijo, no en la celda. */
+.ta-fila__cliente:has(.ta-fila__n2) { white-space: normal; }
+.ta-fila__unidad {
   width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--text-secondary-size); color: var(--text-tertiary);
 }
 /* Interlineados explícitos: sin esto la celda con importe en dólares sumaba
    37px de contenido y estiraba la fila a 59px, mientras el resto quedaba en
    56. La altura fija de la celda es un mínimo, no un máximo. */
-.ta-frow__total { white-space: nowrap; font-weight: var(--weight-medium); line-height: 20px; }
+.ta-fila__total { white-space: nowrap; font-weight: var(--weight-medium); line-height: 20px; }
 /* El importe en dólares SE QUEDA en reposo. Es tentador esconderlo por
    limpieza, pero sin él "$3.592.974" y "$75.020.000" se comparan mal: uno de
    los dos es una factura en moneda extranjera y su peso real es otro. Lo que
    sí baja es su jerarquía; sube de contraste con la fila. */
-.ta-frow__usd {
+.ta-fila__usd {
   display: block; line-height: 13px;
   font-size: var(--text-micro); color: var(--text-tertiary); font-weight: 400;
   transition: color var(--duration-base) var(--ease);
@@ -423,15 +465,18 @@
 /* El chevron casi no está hasta que la fila se toca. Casi: al 18% todavía se
    percibe la columna, así que la fila sigue leyéndose como abrible sin
    necesidad de pasar por encima. */
-.ta-frow__chev {
-  width: 34px; text-align: right;
+/* Sólo el ancho es del `th`: la opacidad va en la celda de la FILA. Aplicada
+   al encabezado dejaba esa celda al 18% y se veía la superficie de abajo a
+   través — un rectángulo más claro en la punta derecha del encabezado. */
+.ta-fila__chev { width: 34px; text-align: right; }
+td.ta-fila__chev {
   color: var(--text-tertiary); opacity: .18;
   transition: opacity var(--duration-base) var(--ease);
 }
-.ta-frow.is-sel .ta-frow__chev { opacity: 1; }
-.ta-ftabla td .ta-badge { max-width: 100%; }
+.ta-fila.is-sel td.ta-fila__chev { opacity: 1; }
+.ta-tabla td .ta-badge { max-width: 100%; }
 
-.ta-fmas { display: flex; justify-content: center; padding: var(--space-4); }
+.ta-vermas { display: flex; justify-content: center; padding: var(--space-4); }
 
 .ta-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -443,7 +488,7 @@
    Una CAPA que aparece sobre la aplicación, no otra columna sólida: vidrio,
    sombra ambiental y una entrada corta desde la derecha. Es el mejor ejemplo
    del material en toda la pantalla. */
-.ta-fpanel {
+.ta-panel {
   display: flex; flex-direction: column;
   background: linear-gradient(var(--glass-bg), var(--glass-bg)), var(--bg-elevated);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -458,17 +503,17 @@
   from { opacity: 0; transform: translateX(14px) }
   to   { opacity: 1; transform: translateX(0) }
 }
-.ta-fpanel__scrim { display: none; }
+.ta-panel__scrim { display: none; }
 
 @media (min-width: 1200px) {
-  .ta-fpanel {
+  .ta-panel {
     position: sticky; top: var(--space-5);
     max-height: calc(100dvh - var(--topbar-h, 60px) - var(--space-8));
   }
-  .ta-fpanel__body { overflow-y: auto; }
+  .ta-panel__body { overflow-y: auto; }
 }
 
-.ta-fpanel__head {
+.ta-panel__head {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-3); padding: var(--space-4);
   border-bottom: 1px solid var(--border);
@@ -477,74 +522,74 @@
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
-.ta-fpanel__ident { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ta-fpanel__tipo {
+.ta-panel__ident { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ta-panel__tipo {
   font-size: var(--text-micro); color: var(--text-tertiary);
   text-transform: uppercase; letter-spacing: .06em; font-weight: var(--weight-label);
 }
-.ta-fpanel__n {
+.ta-panel__n {
   font-size: 17px; font-weight: var(--weight-semibold); color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-.ta-fpanel__nav { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
-.ta-fpanel__flechas { display: inline-flex; gap: 2px; }
+.ta-panel__nav { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+.ta-panel__flechas { display: inline-flex; gap: 2px; }
 
-.ta-fpanel__body {
+.ta-panel__body {
   display: flex; flex-direction: column; gap: var(--space-4);
   padding: var(--space-4); flex: 1; min-height: 0;
 }
 /* align-items: el badge es un pill, no una barra: en columna se estiraba
    a todo el ancho del panel. */
 /* Primera lectura del detalle: quién, cuánto, en qué estado. */
-.ta-fresumen { display: flex; flex-direction: column; gap: 3px; }
-.ta-fresumen__cliente {
+.ta-pcab { display: flex; flex-direction: column; gap: 3px; }
+.ta-pcab__cliente {
   font-size: 15px; font-weight: var(--weight-medium); color: var(--text-secondary);
 }
-.ta-fresumen__monto {
+.ta-pcab__monto {
   font-size: 26px; font-weight: var(--weight-strong); color: var(--text-primary);
   letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
 }
-.ta-fresumen__alt {
+.ta-pcab__alt {
   font-size: var(--text-secondary-size); color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
-.ta-fresumen__estado { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; }
-.ta-fresumen__fecha { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-pcab__estado { display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; }
+.ta-pcab__fecha { font-size: var(--text-micro); color: var(--text-tertiary); }
 /* Es la línea que explica qué falta hacer. Terciario la dejaba en 4,51:1,
    al filo de AA, para el texto más importante de la primera lectura. */
-.ta-fresumen__hint { font-size: var(--text-micro); color: var(--text-secondary); }
+.ta-pcab__hint { font-size: var(--text-micro); color: var(--text-secondary); }
 
 /* El desagregado contable, plegado. Casi nunca decide el siguiente paso. */
-.ta-fmas-det { display: flex; flex-direction: column; gap: var(--space-3); }
-.ta-fmas-det__sum {
+.ta-mas { display: flex; flex-direction: column; gap: var(--space-3); }
+.ta-mas__sum {
   cursor: pointer; list-style: none;
   padding: var(--space-2) 0;
   font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
   /* Secundario, no de marca: es una puerta opcional, no el siguiente paso. */
   color: var(--text-secondary);
 }
-.ta-fmas-det__sum:hover { color: var(--text-primary); }
-.ta-fmas-det__sum::-webkit-details-marker { display: none; }
-.ta-fmas-det__sum::before {
+.ta-mas__sum:hover { color: var(--text-primary); }
+.ta-mas__sum::-webkit-details-marker { display: none; }
+.ta-mas__sum::before {
   content: ''; display: inline-block; margin-right: 7px;
   width: 5px; height: 5px; vertical-align: middle;
   border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg) translate(-1px, -1px);
   transition: transform var(--duration-fast) var(--ease);
 }
-.ta-fmas-det[open] .ta-fmas-det__sum::before { transform: rotate(45deg) translate(-2px, -2px); }
+.ta-mas[open] .ta-mas__sum::before { transform: rotate(45deg) translate(-2px, -2px); }
 
-.ta-fdl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
-.ta-fdl > div { min-width: 0; }
-.ta-fdl__full { grid-column: 1 / -1; }
-.ta-fdl dt {
+.ta-dl { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin: 0; }
+.ta-dl > div { min-width: 0; }
+.ta-dl__full { grid-column: 1 / -1; }
+.ta-dl dt {
   font-size: var(--text-micro); color: var(--text-tertiary);
   text-transform: uppercase; letter-spacing: .05em; font-weight: var(--weight-label);
   margin-bottom: 2px;
 }
-.ta-fdl dd { margin: 0; font-size: var(--text-body); color: var(--text-primary); overflow-wrap: anywhere; }
+.ta-dl dd { margin: 0; font-size: var(--text-body); color: var(--text-primary); overflow-wrap: anywhere; }
 
-.ta-fmontos {
+.ta-datos {
   display: flex; flex-direction: column;
   background: var(--bg-muted);
   border: 1px solid var(--border);
@@ -554,39 +599,39 @@
 /* El verde apenas se insinúa. Un panel verde sólido grita "estado OK" con más
    fuerza que el propio badge, y lo que hay adentro son datos, no una alerta.
    El color entra por el borde, que es donde alcanza para leerlo como grupo. */
-.ta-fmontos--cobro {
+.ta-datos--cobro {
   background: color-mix(in srgb, var(--success-soft) 45%, transparent);
   border-color: color-mix(in srgb, var(--success) 22%, transparent);
 }
-.ta-fmontos__row {
+.ta-datos__row {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--space-3); padding: 5px 0;
   font-size: var(--text-secondary-size); color: var(--text-secondary);
 }
-.ta-fmontos__v { font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; }
-.ta-fmontos__row.is-fuerte { font-weight: var(--weight-semibold); font-size: var(--text-body); }
-.ta-fmontos__row.is-fuerte .ta-fmontos__v { font-size: 16px; font-weight: var(--weight-semibold); }
+.ta-datos__v { font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; }
+.ta-datos__row.is-fuerte { font-weight: var(--weight-semibold); font-size: var(--text-body); }
+.ta-datos__row.is-fuerte .ta-datos__v { font-size: 16px; font-weight: var(--weight-semibold); }
 .ta-mono { font-family: var(--font-mono); }
 
-.ta-fpdf { display: flex; flex-direction: column; gap: var(--space-2); }
-.ta-fpdf__label {
+.ta-arch { display: flex; flex-direction: column; gap: var(--space-2); }
+.ta-arch__label {
   font-size: var(--text-micro); color: var(--text-tertiary);
   text-transform: uppercase; letter-spacing: .05em; font-weight: var(--weight-label);
 }
-.ta-fpdf__acciones { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.ta-fpdf__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
-.ta-fpdf__file { cursor: pointer; }
-.ta-fpdf__file.is-busy { opacity: .7; cursor: wait; }
-.ta-fpdf__file input { display: none; }
+.ta-arch__acciones { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ta-arch__hint { font-size: var(--text-micro); color: var(--text-tertiary); }
+.ta-arch__file { cursor: pointer; }
+.ta-arch__file.is-busy { opacity: .7; cursor: wait; }
+.ta-arch__file input { display: none; }
 
-.ta-fpanel__cerrado {
+.ta-panel__cerrado {
   font-size: var(--text-secondary-size); color: var(--text-tertiary);
 }
 
 /* Menú de acciones secundarias. Cristalizado: es una superficie contextual,
    no información financiera. */
-.ta-fmenu { position: relative; }
-.ta-fmenu__pop {
+.ta-accmenu { position: relative; }
+.ta-accmenu__pop {
   position: absolute; bottom: calc(100% + 6px); left: 0;
   min-width: 190px; padding: 5px;
   background: var(--glass-bg);
@@ -603,18 +648,18 @@
   from { opacity: 0; transform: translateY(6px) scale(.96) }
   to   { opacity: 1; transform: translateY(0) scale(1) }
 }
-.ta-fmenu__item {
+.ta-accmenu__item {
   display: block; width: 100%;
   padding: 8px var(--space-3);
   background: none; border: none; border-radius: var(--radius-sm);
   cursor: pointer; text-align: left;
   font-family: var(--font); font-size: var(--text-body); color: var(--text-secondary);
 }
-.ta-fmenu__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.ta-fmenu__item.is-peligro { color: var(--danger); }
-.ta-fmenu__item.is-peligro:hover { background: var(--danger-soft); }
+.ta-accmenu__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ta-accmenu__item.is-peligro { color: var(--danger); }
+.ta-accmenu__item.is-peligro:hover { background: var(--danger-soft); }
 
-.ta-fpanel__foot {
+.ta-panel__foot {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
@@ -631,39 +676,39 @@
 /* ── Lista mobile: movimientos ─────────────────────────────────────────────
    Dos renglones y una línea. Sin caja, sin radio, sin botones adentro: el
    listado es para consultar, y operar se hace desde el detalle. */
-.ta-flista { display: flex; flex-direction: column; min-width: 0; }
+.ta-movs { display: flex; flex-direction: column; min-width: 0; }
 
-.ta-fitem {
+.ta-mov {
   display: flex; flex-direction: column; gap: 3px;
   width: 100%; min-width: 0; padding: 13px 2px;
   background: none; border: none; border-bottom: 1px solid var(--border);
   cursor: pointer; text-align: left; font-family: var(--font);
   transition: opacity var(--duration-fast) var(--ease);
 }
-.ta-fitem:last-of-type { border-bottom: none; }
-.ta-fitem:active { background: var(--tint-brand); }
-.ta-fitem:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.ta-mov:last-of-type { border-bottom: none; }
+.ta-mov:active { background: var(--tint-brand); }
+.ta-mov:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
 /* min-width:0 en toda la cadena. Sin esto el nombre de un cliente largo
    empujaba la fila hasta 416px dentro de un teléfono de 390 y el navegador
    terminaba ensanchando el viewport entero a 492px. */
-.ta-fitem__l1,
-.ta-fitem__l2 {
+.ta-mov__l1,
+.ta-mov__l2 {
   display: flex; align-items: baseline; gap: var(--space-3);
   width: 100%; min-width: 0;
 }
-.ta-fitem__l2 { align-items: center; }
+.ta-mov__l2 { align-items: center; }
 
-.ta-fitem__cliente {
+.ta-mov__cliente {
   flex: 1; min-width: 0;
   font-size: 15px; font-weight: var(--weight-medium); color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ta-fitem__monto {
+.ta-mov__monto {
   font-size: 15px; font-weight: var(--weight-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.ta-fitem__meta {
+.ta-mov__meta {
   flex: 1; min-width: 0;
   font-size: var(--text-micro); color: var(--text-tertiary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -674,7 +719,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 1023px) {
   /* La hoja de detalle cubre la pantalla: no hay ancho para dos cosas. */
-  .ta-fpanel__scrim {
+  .ta-panel__scrim {
     display: block; position: fixed; inset: 0;
     background: var(--overlay-bg);
     -webkit-backdrop-filter: blur(2px);
@@ -691,7 +736,7 @@
      botón. Ahora crece con el contenido —una factura corta es una hoja
      corta— y cuando el detalle es largo topa contra el máximo y scrollea
      adentro, como cualquier hoja de iOS. */
-  .ta-fpanel {
+  .ta-panel {
     position: fixed; inset: auto 0 0 0; z-index: calc(var(--z-topbar) + 20);
     max-height: calc(100dvh - 34px);
     display: flex; flex-direction: column;
@@ -704,31 +749,31 @@
     animation: ta-sheet-in var(--duration-panel) var(--ease-out);
   }
   /* El cuerpo es lo único que cede: encabezado y pie quedan fijos. */
-  .ta-fpanel__body { flex: 0 1 auto; min-height: 0; }
-  .ta-fpanel__head, .ta-fpanel__foot { flex: 0 0 auto; }
+  .ta-panel__body { flex: 0 1 auto; min-height: 0; }
+  .ta-panel__head, .ta-panel__foot { flex: 0 0 auto; }
   @keyframes ta-sheet-in {
     from { transform: translateY(18px); opacity: 0 }
     to   { transform: translateY(0); opacity: 1 }
   }
   /* Asa: la señal universal de "esto es una hoja que se puede cerrar". */
-  .ta-fpanel__head::before {
+  .ta-panel__head::before {
     content: ''; position: absolute; top: 7px; left: 50%;
     transform: translateX(-50%);
     width: 36px; height: 4px; border-radius: 999px;
     background: var(--border-strong);
   }
-  .ta-fpanel__head { position: relative; padding-top: var(--space-4); }
-  .ta-fpanel__body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .ta-fpanel__foot { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+  .ta-panel__head { position: relative; padding-top: var(--space-4); }
+  .ta-panel__body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .ta-panel__foot { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 640px) {
   /* Densidad de app nativa: menos aire entre bloques, escalas moderadas.
      El objetivo no es achicar todo — es que haya menos cosas para que el
      texto pueda tener tamaño natural. */
-  .ta-fact { gap: var(--space-4); }
-  .ta-fact__main { gap: var(--space-4); }
-  .ta-fact__contexto { gap: var(--space-3); }
+  .ta-mod { gap: var(--space-4); }
+  .ta-mod__main { gap: var(--space-4); }
+  .ta-mod__contexto { gap: var(--space-3); }
 
   .ta-hoy { gap: 6px; font-size: var(--text-secondary-size); }
   .ta-hoy__monto { margin-left: auto; }
@@ -744,10 +789,10 @@
 
   /* Escala de app nativa. El cliente es el ancla de lectura, el importe lo
      acompaña, y el comprobante y la fecha son metadata. Nada grita. */
-  .ta-fitem { padding: 11px 2px; gap: 2px; }
-  .ta-fitem__cliente { font-size: var(--text-body); }
-  .ta-fitem__monto { font-size: var(--text-body); }
-  .ta-fitem__meta { font-size: 11px; }
+  .ta-mov { padding: 11px 2px; gap: 2px; }
+  .ta-mov__cliente { font-size: var(--text-body); }
+  .ta-mov__monto { font-size: var(--text-body); }
+  .ta-mov__meta { font-size: 11px; }
 
   /* Vistas: etiquetas cortas y contador secundario. "Facturas A 207" en
      cuatro pestañas no entra en 390px sin scroll horizontal. */
@@ -755,34 +800,35 @@
   /* 34px: 30 no es un blanco táctil, y estas pestañas se tocan seguido. */
   .ta-vista { flex: 1; justify-content: center; padding: 0 var(--space-2); height: 34px; gap: 4px; }
   .ta-vista__label--largo { display: none; }
+  .ta-vista__label--corto { display: inline; }
   .ta-vista__n { font-size: 10px; }
 
-  .ta-fbar { gap: var(--space-2); }
-  .ta-fbar__row { flex-wrap: nowrap; gap: var(--space-2); }
-  .ta-fbar__search { flex: 1 1 auto; min-width: 0; max-width: none; }
-  .ta-fbar__sep { display: none; }
-  .ta-fbar__filtros { height: 36px; }
-  .ta-fbar__search .ta-input { height: 36px; }
+  .ta-barra { gap: var(--space-2); }
+  .ta-barra__row { flex-wrap: nowrap; gap: var(--space-2); }
+  .ta-barra__search { flex: 1 1 auto; min-width: 0; max-width: none; }
+  .ta-barra__sep { display: none; }
+  .ta-barra__filtros { height: 36px; }
+  .ta-barra__search .ta-input { height: 36px; }
 
   /* El alta no compite: mismo tamaño que Filtros y sin el rojo de marca.
      Sigue estando siempre a la vista, al lado del buscador. */
-  .ta-fbar__nueva {
+  .ta-barra__nueva {
     display: inline-flex; width: 36px; height: 36px; padding: 0; flex-shrink: 0;
     background: var(--bg-surface); color: var(--text-secondary);
     border: 1px solid var(--border-strong);
   }
-  .ta-fbar__nueva:active { background: var(--bg-surface-hover); color: var(--text-primary); }
+  .ta-barra__nueva:active { background: var(--bg-surface-hover); color: var(--text-primary); }
 
   /* Detalle a pantalla completa */
-  .ta-fpanel__head { padding: var(--space-3) var(--space-4); }
-  .ta-fpanel__body { padding: var(--space-4); gap: var(--space-5); }
-  .ta-fresumen__monto { font-size: 28px; }
-  .ta-fdl { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-  .ta-fpanel__foot { justify-content: space-between; }
-  .ta-fpanel__foot .ta-btn--primary { flex: 1; justify-content: center; }
+  .ta-panel__head { padding: var(--space-3) var(--space-4); }
+  .ta-panel__body { padding: var(--space-4); gap: var(--space-5); }
+  .ta-pcab__monto { font-size: 28px; }
+  .ta-dl { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .ta-panel__foot { justify-content: space-between; }
+  .ta-panel__foot .ta-btn--primary { flex: 1; justify-content: center; }
 }
 
 @media (max-width: 380px) {
-  .ta-fitem__cliente, .ta-fitem__monto { font-size: var(--text-body); }
+  .ta-mov__cliente, .ta-mov__monto { font-size: var(--text-body); }
   .ta-senal__monto { font-size: var(--text-micro); }
 }

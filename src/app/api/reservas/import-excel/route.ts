@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { UNIDAD_POR_PREFIJO } from '@/lib/reservas'
 import { createClient } from '@supabase/supabase-js'
 import { requireUser, isDenied, actorLabel } from '@/lib/apiAuth'
 
@@ -13,25 +14,13 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 // mande explícitamente este valor en el form-data.
 const CONFIRM_TOKEN = 'REEMPLAZAR'
 
-const UNIDAD_BY_PREFIX: Record<string, string> = {
-  TAR: 'RESIDENCIAL', TCD: 'RESIDENCIAL', TMO: 'RESIDENCIAL', TRO: 'RESIDENCIAL',
-  TJU: 'RESIDENCIAL', TCR: 'RESIDENCIAL', TBB: 'RESIDENCIAL', TNP: 'RESIDENCIAL',
-  TSI: 'RESIDENCIAL', TPM: 'RESIDENCIAL', TAC: 'RESIDENCIAL', TBA: 'RESIDENCIAL',
-  TPA: 'RESIDENCIAL', TPI: 'RESIDENCIAL', TCN: 'RESIDENCIAL', TRS: 'RESIDENCIAL',
-  TCL: 'RESIDENCIAL',
-  TOE: 'OFICINAS Y EDIFICIOS',
-  TLT: 'LOCALES Y TERRENOS',
-  TLL: 'LOCALES Y TERRENOS',
-  TCO: 'CONSULTORIA',
-  TII: 'INDUSTRIA',
-  TAP: 'TAP',
-  TAE: 'EMPRENDIMIENTOS',
-  TES: 'EMPRENDIMIENTOS',
-  TUC: 'EMPRENDIMIENTOS',
-  TUN: 'EMPRENDIMIENTOS',
-  TMC: 'EMPRENDIMIENTOS',
-  TEG: 'EMPRENDIMIENTOS',
-}
+/**
+ * Mismo mapa que usa el sync de PROA. Esta ruta tenía el suyo propio y
+ * aplanaba todas las plataformas a 'RESIDENCIAL' —incluida `TCN`, que es
+ * PLAT. CANNING y pertenece a Emprendimientos—. Las cuatro reservas TCN que
+ * hoy están guardadas como 'RESIDENCIAL' entraron por acá.
+ */
+const UNIDAD_BY_PREFIX = UNIDAD_POR_PREFIJO
 
 function getUnidad(codigo: string): string {
   const prefix = codigo.slice(0, 3).toUpperCase()

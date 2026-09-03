@@ -66,7 +66,7 @@ function Centinela({
 }: { faltan: number; refEl: React.RefObject<HTMLDivElement>; onVerMas: () => void }) {
   if (faltan <= 0) return null
   return (
-    <div ref={refEl} className="ta-fmas">
+    <div ref={refEl} className="ta-vermas">
       {/* El botón existe para quien navega con teclado o tiene el observer
           bloqueado: el scroll infinito solo deja gente afuera. */}
       <Button variant="ghost" size="sm" onClick={onVerMas}>
@@ -102,23 +102,23 @@ export function FacturasTabla({
   if (!facturas.length) return <Vacio hayFiltros={hayFiltros} />
 
   return (
-    <div className="ta-ftabla-wrap">
-      <table className="ta-ftabla">
+    <div className="ta-tabla-wrap">
+      <table className="ta-tabla">
         <thead>
           <tr>
-            <th className="ta-ftabla__num">N°</th>
-            <th className="ta-ftabla__fecha">Fecha</th>
+            <th className="ta-tabla__num">N°</th>
+            <th className="ta-tabla__fecha">Fecha</th>
             <th>Cliente</th>
-            <th className="ta-num ta-ftabla__importe">Importe</th>
-            <th className="ta-ftabla__estado">Estado</th>
-            <th className="ta-frow__chev"><span className="ta-sr">Abrir</span></th>
+            <th className="ta-num ta-tabla__importe">Importe</th>
+            <th className="ta-tabla__estado">Estado</th>
+            <th className="ta-fila__chev"><span className="ta-sr">Abrir</span></th>
           </tr>
         </thead>
         <tbody>
           {visibles.map(c => (
             <tr
               key={c.id}
-              className={`ta-frow${seleccionadaId === c.id ? ' is-sel' : ''}`}
+              className={`ta-fila${seleccionadaId === c.id ? ' is-sel' : ''}`}
               onClick={() => onAbrir(c)}
               tabIndex={0}
               role="button"
@@ -127,8 +127,8 @@ export function FacturasTabla({
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrir(c) }
               }}
             >
-              <td className="ta-ftabla__num">
-                <span className="ta-frow__n">{c.numero}</span>
+              <td className="ta-tabla__num">
+                <span className="ta-fila__n">{c.numero}</span>
                 {/* El punto de venta es el mismo en el 99% de las filas: en
                     reposo son sesenta repeticiones de "PV 0002" que no
                     ayudan a distinguir una factura de otra. Aparece cuando el
@@ -136,16 +136,16 @@ export function FacturasTabla({
                     detalle. Sigue en el DOM y sin aria-hidden, así que un
                     lector de pantalla lo lee siempre: la información no se
                     perdió, se sacó del reposo. */}
-                <span className="ta-frow__pv">PV {puntoVentaDe(c)}</span>
+                <span className="ta-fila__pv">PV {puntoVentaDe(c)}</span>
               </td>
-              <td className="ta-frow__fecha">{fdate(c.fecha)}</td>
-              <td className="ta-frow__cliente" title={c.cliente}>{c.cliente}</td>
-              <td className="ta-num ta-ftabla__importe ta-frow__total">
+              <td className="ta-fila__fecha">{fdate(c.fecha)}</td>
+              <td className="ta-fila__cliente" title={c.cliente}>{c.cliente}</td>
+              <td className="ta-num ta-tabla__importe ta-fila__total">
                 <Money>{ars(c.monto_ars)}</Money>
-                {c.monto_usd ? <Money className="ta-frow__usd">{usd(c.monto_usd)}</Money> : null}
+                {c.monto_usd ? <Money className="ta-fila__usd">{usd(c.monto_usd)}</Money> : null}
               </td>
-              <td className="ta-ftabla__estado"><StatusBadge estado={c.estado} sm withHint /></td>
-              <td className="ta-frow__chev"><ChevronRight size={15} aria-hidden /></td>
+              <td className="ta-tabla__estado"><StatusBadge estado={c.estado} sm withHint /></td>
+              <td className="ta-fila__chev"><ChevronRight size={15} aria-hidden /></td>
             </tr>
           ))}
         </tbody>
@@ -184,7 +184,7 @@ export function FacturasLista({
   if (!facturas.length) return <Vacio hayFiltros={hayFiltros} />
 
   return (
-    <div className="ta-flista">
+    <div className="ta-movs">
       {visibles.map(c => {
         // La antigüedad sólo importa mientras la plata no entró: en una
         // cobrada, "hace 74 días" no le sirve a nadie.
@@ -193,17 +193,17 @@ export function FacturasLista({
           <button
             key={c.id}
             type="button"
-            className="ta-fitem"
+            className="ta-mov"
             onClick={() => onAbrir(c)}
             aria-label={`${c.cliente}, ${c.tipo} ${c.numero}, ${ars(c.monto_ars)}`}
           >
-            <span className="ta-fitem__l1">
-              <span className="ta-fitem__cliente">{c.cliente}</span>
-              <Money className="ta-fitem__monto">{ars(c.monto_ars)}</Money>
+            <span className="ta-mov__l1">
+              <span className="ta-mov__cliente">{c.cliente}</span>
+              <Money className="ta-mov__monto">{ars(c.monto_ars)}</Money>
             </span>
 
-            <span className="ta-fitem__l2">
-              <span className="ta-fitem__meta">
+            <span className="ta-mov__l2">
+              <span className="ta-mov__meta">
                 {c.tipo} {c.numero} · {fechaCorta(c.fecha)}
                 {dias !== null && ` · ${dias}d`}
               </span>

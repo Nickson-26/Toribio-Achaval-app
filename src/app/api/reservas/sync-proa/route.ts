@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { UNIDAD_POR_PREFIJO } from '@/lib/reservas'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
@@ -7,24 +8,15 @@ export const maxDuration = 60
 
 const PROA_BASE = 'https://proa.toribioachaval.net'
 
-const CODE_TO_UNIDAD: Record<string, string> = {
-  TAR: 'PLAT. PALERMO',    TCD: 'PLAT. PALERMO',
-  TMO: 'PLAT. CABALLITO',  TRO: 'PLAT. CABALLITO',
-  TJU: 'PLAT. RECOLETA',   TCR: 'PLAT. RECOLETA',
-  TBB: 'PLAT. BELGRANO',   TNP: 'PLAT. BELGRANO',
-  TBA: 'PLAT. BARILOCHE',
-  TPA: 'PLAT. ANGOSTURA',
-  TPI: 'PLAT. PILAR',
-  TRS: 'DPTO DE BÚSQUEDA',
-  TCN: 'PLAT. CANNING',
-  TAE: 'EMPRENDIMIENTOS',  TES: 'EMPRENDIMIENTOS',
-  TUC: 'EMPRENDIMIENTOS',  TMC: 'EMPRENDIMIENTOS',
-  TOE: 'OFICINAS Y EDIFICIOS',
-  TLT: 'LOCALES Y TERRENOS',
-  TCO: 'CONSULTORIA',
-  TII: 'INDUSTRIA',
-  TAP: 'TAP',
-}
+/**
+ * El mapa de prefijos vive en `lib/reservas.ts`, no acá.
+ *
+ * Antes esta ruta y el importador de Excel tenían cada una su propia tabla y
+ * discrepaban: para `TCN` una decía 'PLAT. CANNING' y la otra 'RESIDENCIAL'.
+ * Según por dónde entrara el dato, la misma reserva terminaba en una
+ * categoría o en otra.
+ */
+const CODE_TO_UNIDAD = UNIDAD_POR_PREFIJO
 
 function stripHtml(s: string) {
   return (s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()

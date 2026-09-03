@@ -247,18 +247,32 @@
   /* Blanco frío con azul hielo. No es dark invertido: acá la jerarquía la da
      la LUZ —superficies blancas que flotan sobre un fondo apenas más frío—
      y no una grilla de líneas grises. */
-  --bg-base:      #eef1f7;   /* gris perla / azul hielo */
-  --bg-primary:   #ffffff;
-  --bg-secondary: #f4f6fa;
-  --bg-tertiary:  #e8ecf4;
-  --bg-card:      #ffffff;
-  --bg-hover:     #f5f7fc;
-  --bg-elevated:  #ffffff;
+  /* SUPERFICIES CLARAS — perla, bruma, hielo. Casi nada de blanco puro.
+     La versión anterior apoyaba tarjetas, tablas y paneles en #ffffff sobre
+     un fondo #eef1f7: el contenido brillaba y a las dos horas cansaba, y las
+     capas sólo se distinguían por una línea gris.
+
+     Ahora hay una escalera tonal corta y fría, y ninguna superficie de
+     trabajo es blanca. Lo que separa una capa de otra es LUZ —cada escalón
+     es más claro que el de abajo— y no un borde: por eso los bordes bajaron
+     a la mitad y las sombras subieron un punto.
+
+     El blanco puro queda sólo para los reflejos del vidrio, donde es luz y
+     no superficie. */
+  --bg-base:      #e9edf4;   /* el fondo de la aplicación: bruma fría   */
+  --bg-primary:   #f7f9fc;   /* superficie de trabajo: perla, no blanco */
+  --bg-secondary: #eff2f8;
+  --bg-tertiary:  #e3e8f1;
+  --bg-card:      #f8fafd;   /* tarjetas y tablas: medio tono sobre el fondo */
+  --bg-hover:     #eef2f9;
+  --bg-elevated:  #fdfefe;   /* lo que flota: panel, popover, modal      */
 
   /* Texto: se sube el contraste. --text-tertiary daba 2,85:1 sobre blanco
      (falla AA) y es el token más usado del sistema. */
-  --text-primary:   #16181d;
-  --text-secondary: #55596b;
+  /* Tinta, no negro: #16181d sobre una superficie fría se lee como un golpe.
+     #1b2030 tiene el mismo azul de las superficies y sigue en 14,9:1. */
+  --text-primary:   #1b2030;
+  --text-secondary: #545a6d;
   /* #6e7383 daba 4,37:1 sobre blanco y 4,18:1 sobre --bg-muted: por debajo de
      AA justo donde más se usa —encabezados de sección en versalitas y el
      header de la tabla—. #5c6175 da 6,14 y 5,43. Es el token más consumido
@@ -266,15 +280,18 @@
   --text-tertiary:  #5c6175;
   --text-inverse:   #ffffff;
 
-  --border:        rgba(22, 30, 52, 0.055);
-  --border-strong: rgba(22, 30, 52, 0.10);
+  /* Bordes al mínimo: la separación la hace la diferencia de luz entre
+     superficies. Una línea gris dura es lo que hacía que la app se leyera
+     como un formulario impreso. */
+  --border:        rgba(22, 30, 52, 0.038);
+  --border-strong: rgba(22, 30, 52, 0.085);
   --border-accent: rgba(200, 16, 46, 0.28);
 
   /* Sombras con matiz azul, no grises: una sombra neutra sobre un fondo frío
      se ve sucia. */
-  --elev-1: 0 1px 2px rgba(22, 30, 52, 0.05);
-  --elev-2: 0 1px 3px rgba(22, 30, 52, 0.05), 0 8px 24px rgba(22, 30, 52, 0.06);
-  --elev-3: 0 2px 8px rgba(22, 30, 52, 0.07), 0 24px 60px rgba(22, 30, 52, 0.11);
+  --elev-1: 0 1px 2px rgba(22, 30, 52, 0.06);
+  --elev-2: 0 1px 3px rgba(22, 30, 52, 0.06), 0 8px 24px rgba(22, 30, 52, 0.075);
+  --elev-3: 0 2px 8px rgba(22, 30, 52, 0.08), 0 24px 60px rgba(22, 30, 52, 0.13);
   --shadow-sm: var(--elev-1);
   --shadow-md: var(--elev-2);
   --shadow-lg: var(--elev-3);
@@ -323,8 +340,8 @@
 
   /* Vidrio claro. La transparencia va SOLO en el background: el texto
      conserva opacidad completa. */
-  --glass-bg:     rgba(255, 255, 255, 0.66);
-  --glass-border: rgba(22, 30, 52, 0.05);
+  --glass-bg:     rgba(250, 252, 255, 0.62);
+  --glass-border: rgba(22, 30, 52, 0.045);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --glass-shadow:    var(--elev-3);
   /* En claro el rojo tiñe muchísimo más: con 0.07 la sidebar quedaba rosa. */

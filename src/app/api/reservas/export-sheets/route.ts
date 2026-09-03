@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { porCategoria } from '@/lib/reservas'
 import { requireUser, isDenied, actorLabel } from '@/lib/apiAuth'
 import { createClient } from '@supabase/supabase-js'
 
@@ -435,9 +436,9 @@ async function runExport() {
   })
 
   // 5. Preparar datos por pestaña
-  const EMP_UNIDADES = ['EMPRENDIMIENTOS']
-  const RES_UNIDADES = ['PLAT. PALERMO','PLAT. BELGRANO','PLAT. CABALLITO','PLAT. RECOLETA','PLAT. BARILOCHE','PLAT. ANGOSTURA','PLAT. PILAR','PLAT. CANNING','DPTO DE BÚSQUEDA','RESIDENCIAL']
-  const COM_UNIDADES = ['OFICINAS Y EDIFICIOS','LOCALES Y TERRENOS','CONSULTORIA','INDUSTRIA','TAP']
+  // La partición en tres pestañas usa la MISMA función que la pantalla, así
+  // que el Sheets y la app no pueden discrepar. Antes esta ruta tenía su
+  // propia lista con 'PLAT. CANNING' dentro de Residencial.
 
   function buildSheetData(list: any[], label: string) {
     const rows = toRows(list)
@@ -463,9 +464,9 @@ async function runExport() {
 
   const sheets = [
     { range: 'Todas',          sheetId: 0, data: buildSheetData(reservas!, SHEET_TITLE) },
-    { range: 'Emprendimientos', sheetId: 1, data: buildSheetData(reservas!.filter(r => EMP_UNIDADES.includes(r.unidad)), 'Emprendimientos') },
-    { range: 'Residencial',    sheetId: 2, data: buildSheetData(reservas!.filter(r => RES_UNIDADES.includes(r.unidad)), 'Residencial') },
-    { range: 'Comercial',      sheetId: 3, data: buildSheetData(reservas!.filter(r => COM_UNIDADES.includes(r.unidad)), 'Comercial') },
+    { range: 'Emprendimientos', sheetId: 1, data: buildSheetData(porCategoria(reservas as any, 'EMPRENDIMIENTOS'), 'Emprendimientos') },
+    { range: 'Residencial',    sheetId: 2, data: buildSheetData(porCategoria(reservas as any, 'RESIDENCIAL'), 'Residencial') },
+    { range: 'Comercial',      sheetId: 3, data: buildSheetData(porCategoria(reservas as any, 'COMERCIAL'), 'Comercial') },
   ]
 
   // 6. Escribir valores

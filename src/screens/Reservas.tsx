@@ -1,103 +1,143 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { ars, usd, fdate, today } from '@/lib/utils'
-import { Spinner, Modal, FG, toast } from '@/components/ui'
-import { useHideNumbers } from '@/components/HideNumbers'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Home, MapPin, ChevronRight } from 'lucide-react'
+import { db, supabase, type Reserva } from '@/lib/supabase'
+import { Money } from '@/components/HideNumbers'
+import { usePermisos } from '@/design/usePermisos'
+import { Select, Field, Badge, ErrorState } from '@/design/primitives'
+import { usd, ars, fdate, MESES } from '@/lib/utils'
+import { toast } from '@/components/ui'
 import { apiFetch, apiErrorMessage } from '@/lib/apiClient'
+import { ReservaModal } from '@/components/ReservaModal'
+import {
+  ContextoLinea, Segmentado, BarraExplorar, PanelDetalle, PanelCabecera,
+  Dato, Mas, Movimiento, useVentana, Centinela, Vacio, SkeletonRows, type Chip,
+} from '@/components/modulo'
+import {
+  CATEGORIAS, CATEGORIA_LABEL, categoriaDe, porCategoria, contarPorCategoria,
+  aplicarFiltros, ordenar, chipsActivos, contarFiltros, hayFiltros,
+  opcionesAnio, opcionesUnidad, resumenDelMes,
+  codigoCorto, operacionLabel, situacionDe,
+  FILTROS_INICIALES, type FiltrosReservas, type Categoria,
+} from '@/lib/reservas'
 
-type Tab = 'DASHBOARD' | 'EMPRENDIMIENTOS' | 'RESIDENCIAL' | 'COMERCIAL'
-type Operacion = 'all' | 'VENTA' | 'ALQUILER'
-type FirmoFilter = 'all' | 'PENDIENTE' | 'FIRMADO'
-type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio' | 'all'
+/**
+ * RESERVAS.
+ *
+ * La versión anterior mezclaba un Dashboard con tres tarjetas de KPIs, tres
+ * tablas de resumen por unidad, un selector de período, cinco filtros
+ * permanentes, dos botones de colores propios para importar y exportar, una
+ * tabla de nueve columnas y dos botones por fila. Entrar a la pantalla era
+ * elegir por dónde empezar.
+ *
+ * Ahora sigue el mismo recorrido que Facturación y Recibos:
+ *
+ *   contexto del mes  ->  categoría  ->  buscar / filtrar  ->  lista  ->  detalle
+ *
+ * Qué se muestra lo decidieron los datos, no el modelo. Medido sobre las 147
+ * reservas de producción:
+ *
+ *   · `cliente` está vacío en las 147. La identidad de una reserva es la
+ *     DIRECCIÓN, así que ese es el título de la fila.
+ *   · `modo_pago` está vacío en las 147. No se muestra en ningún lado.
+ *   · `firmo` vale 'PENDIENTE' en las 147 y `estado_reserva` es 'Reservada'
+ *     o nada. Una columna que dice lo mismo en el 100% de las filas no
+ *     distingue nada: los dos bajaron al detalle.
+ *   · 120 reservas tienen importe en dólares y 27 en pesos. El precio de
+ *     reserva se muestra en su moneda; el total del mes se suma en dólares,
+ *     porque mezclar las dos sería inventar una cifra.
+ *
+ * La lógica de negocio no cambió. Sí se corrigió la clasificación de Canning
+ * —ver RESERVAS_CANNING.md—, que ahora sale de `lib/reservas.ts` y es la
+ * misma para la pantalla, el sync de PROA, el importador y el export a Sheets.
+ */
+export default function Reservas() {
+  const { puedeHacer } = usePermisos()
 
-export interface Reserva {
-  id: number
-  proa_codigo: string | null
-  tipo_inmueble: string | null
-  direccion: string
-  precio_publicado: number | null
-  operacion: string
-  precio_reserva: number | null
-  estado_reserva: string | null
-  modo_pago: string | null
-  // legacy
-  fecha: string
-  broker: string | null
-  cliente: string | null
-  unidad: string
-  monto_ars: number | null
-  monto_usd: number | null
-  firmo: string
-}
+  const [todas, setTodas] = useState<Reserva[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [categoria, setCategoria] = useState<Categoria>('EMPRENDIMIENTOS')
+  const [filtros, setFiltros] = useState<FiltrosReservas>(FILTROS_INICIALES)
+  const [sel, setSel] = useState<Reserva | null>(null)
+  const [modal, setModal] = useState<'nueva' | 'editar' | null>(null)
+  const [trabajando, setTrabajando] = useState<'importando' | 'exportando' | null>(null)
 
-const EMPRENDIMIENTOS_UNIDADES = ['EMPRENDIMIENTOS']
-const RESIDENCIAL_UNIDADES = [
-  'PLAT. PALERMO','PLAT. BELGRANO','PLAT. CABALLITO','PLAT. RECOLETA',
-  'PLAT. BARILOCHE','PLAT. ANGOSTURA','PLAT. PILAR','PLAT. CANNING',
-  'DPTO DE BÚSQUEDA','RESIDENCIAL',
-]
-const COMERCIAL_UNIDADES = ['OFICINAS Y EDIFICIOS','LOCALES Y TERRENOS','CONSULTORIA','INDUSTRIA','TAP']
+  const cargar = useCallback(async () => {
+    setCargando(true); setError(null)
+    try { setTodas(await db.getReservas()) }
+    catch (e: any) { setError(e?.message ?? 'Error desconocido') }
+    finally { setCargando(false) }
+  }, [])
 
-const UNIDADES_BY_TAB: Record<string, string[]> = {
-  EMPRENDIMIENTOS: EMPRENDIMIENTOS_UNIDADES,
-  RESIDENCIAL: RESIDENCIAL_UNIDADES,
-  COMERCIAL: COMERCIAL_UNIDADES,
-}
+  useEffect(() => { cargar() }, [cargar])
 
-const MESES = [
-  {num:'01',label:'Enero'},{num:'02',label:'Febrero'},{num:'03',label:'Marzo'},
-  {num:'04',label:'Abril'},{num:'05',label:'Mayo'},{num:'06',label:'Junio'},
-  {num:'07',label:'Julio'},{num:'08',label:'Agosto'},{num:'09',label:'Septiembre'},
-  {num:'10',label:'Octubre'},{num:'11',label:'Noviembre'},{num:'12',label:'Diciembre'},
-]
+  // ── Derivados ─────────────────────────────────────────────────────────────
+  const conteos = useMemo(() => contarPorCategoria(todas), [todas])
+  const deCategoria = useMemo(() => porCategoria(todas, categoria), [todas, categoria])
+  const filtradas = useMemo(() => ordenar(aplicarFiltros(deCategoria, filtros)), [deCategoria, filtros])
+  const contexto = useMemo(() => resumenDelMes(todas), [todas])
+  const anios = useMemo(() => opcionesAnio(todas), [todas])
+  const unidades = useMemo(() => opcionesUnidad(deCategoria), [deCategoria])
 
-export default function Reservas(_: any) {
-  const [all,        setAll]        = useState<Reserva[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [tab,        setTab]        = useState<Tab>('DASHBOARD')
-  const [opFilt,     setOpFilt]     = useState<Operacion>('all')
-  const [firmoFilt,  setFirmoFilt]  = useState<FirmoFilter>('all')
-  const [unidadFilt, setUnidadFilt] = useState('all')
-  const [mesFilt,    setMesFilt]    = useState('all')
-  const [anioFilt,   setAnioFilt]   = useState('2026')
-  const [periodo,    setPeriodo]    = useState<Periodo>('mes')
-  const [search,     setSearch]     = useState('')
-  const [modal,      setModal]      = useState<'new'|'edit'|null>(null)
-  const [sel,        setSel]        = useState<Reserva|null>(null)
-  const [exporting,  setExporting]  = useState(false)
-  const [importing,  setImporting]  = useState(false)
+  const set = (p: Partial<FiltrosReservas>) => setFiltros(f => ({ ...f, ...p }))
+  const mesLabel = (mm: string) => MESES[Number(mm) - 1] ?? mm
 
-  const { hidden } = useHideNumbers()
+  // Permisos granulares, no uno solo: importar reemplaza TODA la tabla y por
+  // eso está reservado a admin. Un editor da de alta y edita, pero no importa.
+  const puedeCrear    = puedeHacer('reserva.crear')
+  const puedeEditar   = puedeHacer('reserva.editar')
+  const puedeEliminar = puedeHacer('reserva.eliminar')
+  const puedeImportar = puedeHacer('reserva.importar')
+  const puedeExportar = puedeHacer('reserva.exportar')
 
-  async function importProaExcel(e: React.ChangeEvent<HTMLInputElement>) {
+  function quitar(chip: Chip) {
+    set({ [chip.clave]: FILTROS_INICIALES[chip.clave as keyof FiltrosReservas] } as Partial<FiltrosReservas>)
+  }
+
+  async function eliminar(r: Reserva) {
+    if (!confirm(`¿Eliminar la reserva de ${r.direccion}?`)) return
+    const { error } = await supabase.from('reservas').delete().eq('id', r.id)
+    if (error) { toast('Error al eliminar'); return }
+    toast('Reserva eliminada')
+    setSel(null); cargar()
+  }
+
+  /**
+   * Importar el Excel de PROA REEMPLAZA la tabla entera. Es la operación más
+   * destructiva de la aplicación, así que además de la confirmación que exige
+   * el servidor, acá se pregunta con todas las letras — y vive detrás del
+   * •••, no compitiendo con "Nueva reserva".
+   */
+  async function importarExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setImporting(true)
+    if (!confirm(
+      'Importar el Excel de PROA REEMPLAZA todas las reservas existentes.\n\n' +
+      '¿Confirmás que querés reemplazarlas?',
+    )) { e.target.value = ''; return }
+
+    setTrabajando('importando')
     try {
       const fd = new FormData()
       fd.append('file', file)
-      // El servidor exige esta confirmación explícita: la operación reemplaza
-      // TODAS las reservas. Ver src/app/api/reservas/import-excel/route.ts
+      // El servidor exige esta confirmación explícita. Ver
+      // src/app/api/reservas/import-excel/route.ts
       fd.append('confirm', 'REEMPLAZAR')
       const resp = await apiFetch('/api/reservas/import-excel', { method: 'POST', body: fd })
       const json = await resp.json()
       if (json.ok) {
         toast(`✓ ${json.inserted} reservas importadas (reemplazaron ${json.replaced ?? 0})`)
-        load()
+        cargar()
       } else {
         toast('Error al importar: ' + apiErrorMessage(json))
       }
-    } catch {
-      toast('Error al importar')
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
+    } catch { toast('Error al importar') }
+    finally { setTrabajando(null); e.target.value = '' }
   }
 
-  async function exportToSheets() {
-    setExporting(true)
+  async function exportarSheets() {
+    setTrabajando('exportando')
     try {
       const resp = await apiFetch('/api/reservas/export-sheets', { method: 'POST' })
       const json = await resp.json()
@@ -107,510 +147,358 @@ export default function Reservas(_: any) {
       } else {
         toast('Error al exportar: ' + apiErrorMessage(json))
       }
-    } catch {
-      toast('Error al exportar')
-    } finally {
-      setExporting(false)
-    }
+    } catch { toast('Error al exportar') }
+    finally { setTrabajando(null) }
   }
 
-  const load = async () => {
-    setLoading(true)
-    const { data, error } = await supabase.from('reservas').select('*').order('fecha', { ascending: false })
-    if (error) toast('Error cargando reservas')
-    setAll(data || [])
-    setLoading(false)
+  if (error) {
+    return <ErrorState description="No pudimos traer las reservas." detail={error} onRetry={cargar} />
   }
-  useEffect(() => { load() }, [])
-  useEffect(() => { setUnidadFilt('all') }, [tab])
-
-  // Compute dashRows based on selected period
-  function getPeriodoRows(rows: Reserva[]): Reserva[] {
-    const now = new Date()
-    if (periodo === 'semana') {
-      const day = now.getDay() === 0 ? 6 : now.getDay() - 1 // Monday=0
-      const mon = new Date(now); mon.setDate(now.getDate() - day); mon.setHours(0,0,0,0)
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999)
-      const from = mon.toISOString().slice(0,10)
-      const to   = sun.toISOString().slice(0,10)
-      return rows.filter(r => r.fecha >= from && r.fecha <= to)
-    }
-    if (periodo === 'mes') {
-      const y = now.getFullYear().toString()
-      const m = String(now.getMonth() + 1).padStart(2,'0')
-      return rows.filter(r => r.fecha?.startsWith(`${y}-${m}`))
-    }
-    if (periodo === 'trimestre') {
-      const y = now.getFullYear()
-      const q = Math.floor(now.getMonth() / 3)
-      const mStart = q * 3
-      const months = [0,1,2].map(i => `${y}-${String(mStart + i + 1).padStart(2,'0')}`)
-      return rows.filter(r => months.some(m => r.fecha?.startsWith(m)))
-    }
-    if (periodo === 'anio') {
-      return rows.filter(r => r.fecha?.startsWith(now.getFullYear().toString()))
-    }
-    return rows // 'all'
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm('¿Eliminar esta reserva?')) return
-    await supabase.from('reservas').delete().eq('id', id)
-    toast('Reserva eliminada'); load()
-  }
-
-  function getBaseRows(t: Tab) {
-    let rows = all
-    if (t === 'EMPRENDIMIENTOS') rows = all.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-    else if (t === 'RESIDENCIAL') rows = all.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
-    else if (t === 'COMERCIAL')   rows = all.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
-    return rows
-  }
-
-  // Apply all filters
-  function applyFilters(rows: Reserva[]) {
-    if (anioFilt !== 'all')    rows = rows.filter(r => r.fecha?.startsWith(anioFilt))
-    if (mesFilt !== 'all')     rows = rows.filter(r => r.fecha?.slice(5,7) === mesFilt)
-    if (unidadFilt !== 'all')  rows = rows.filter(r => r.unidad === unidadFilt)
-    if (opFilt !== 'all')      rows = rows.filter(r => r.operacion === opFilt)
-    if (firmoFilt !== 'all')   rows = rows.filter(r => r.firmo === firmoFilt)
-    if (search) rows = rows.filter(r =>
-      r.direccion?.toLowerCase().includes(search.toLowerCase()) ||
-      r.broker?.toLowerCase().includes(search.toLowerCase()) ||
-      r.cliente?.toLowerCase().includes(search.toLowerCase())
-    )
-    return rows.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''))
-  }
-
-  const tabData = applyFilters(getBaseRows(tab))
-
-  // Dashboard: filtered by period selector
-  const dashRows = getPeriodoRows(all)
-  const empRows  = dashRows.filter(r => EMPRENDIMIENTOS_UNIDADES.includes(r.unidad))
-  const resRows  = dashRows.filter(r => !EMPRENDIMIENTOS_UNIDADES.includes(r.unidad) && !COMERCIAL_UNIDADES.includes(r.unidad))
-  const comRows  = dashRows.filter(r => COMERCIAL_UNIDADES.includes(r.unidad))
-
-  function sumaARS(rows: Reserva[]) { return rows.reduce((s,r) => s + (r.monto_ars||0), 0) }
-  function sumaUSD(rows: Reserva[]) { return rows.reduce((s,r) => s + (r.monto_usd||0), 0) }
-
-  const TABS = [
-    { id: 'DASHBOARD' as Tab,       label: '◈ Dashboard' },
-    { id: 'EMPRENDIMIENTOS' as Tab,  label: 'Emprendimientos' },
-    { id: 'RESIDENCIAL' as Tab,      label: 'Residencial' },
-    { id: 'COMERCIAL' as Tab,        label: 'Comercial' },
-  ]
-
-  const unidadesDisponibles = tab !== 'DASHBOARD' ? (UNIDADES_BY_TAB[tab] || []) : []
 
   return (
-    <>
-      {/* Header */}
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Módulo de Reservas</h2>
-          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{all.length} reservas registradas</p>
+    <div className={`ta-mod${sel ? ' is-panel' : ''}`}>
+      <div className="ta-mod__main">
+        {/* Contexto del mes: dos datos, no diez KPIs. Cuando el mes todavía
+            no arrancó, la línea se apaga en vez de mostrar ceros. */}
+        <div className="ta-mod__contexto">
+          <ContextoLinea
+            rotulo="Este mes"
+            icono={Home}
+            activo={contexto.hayAlgo}
+            texto={contexto.hayAlgo
+              ? `${contexto.mes} ${contexto.mes === 1 ? 'reserva' : 'reservas'}` +
+                (contexto.ventas > 0 ? ` · ${contexto.ventas} de venta` : '')
+              : 'todavía sin reservas'}
+            monto={contexto.montoUSD > 0 ? <Money>{usd(contexto.montoUSD)}</Money> : undefined}
+          />
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className="btn"
-            style={{ background: '#0f9d58', borderColor: '#0f9d58', color: '#fff' }}
-            onClick={exportToSheets}
-            disabled={exporting}
-          >
-            {exporting ? '⏳ Exportando...' : '📊 Exportar a Sheets'}
-          </button>
-          <label
-            className="btn"
-            style={{ background: importing ? '#555' : '#7b2d8b', borderColor: '#7b2d8b', color: '#fff', cursor: 'pointer' }}
-          >
-            {importing ? '⏳ Importando...' : '📥 Importar Excel PROA'}
-            <input type="file" accept=".xlsx" style={{ display: 'none' }} onChange={importProaExcel} disabled={importing} />
-          </label>
-          {tab !== 'DASHBOARD' && (
-            <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={() => setModal('new')}>
-              + Nueva reserva
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', marginBottom:20 }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding:'10px 20px', fontSize:13, fontWeight: tab===t.id ? 600 : 400,
-            cursor:'pointer', background:'none', border:'none',
-            color: tab===t.id ? '#6eb3ff' : 'var(--text-secondary)',
-            borderBottom: tab===t.id ? '2px solid #1a6bc8' : '2px solid transparent',
-            marginBottom:-1, whiteSpace:'nowrap',
-          }}>
-            {t.label}
-            {t.id !== 'DASHBOARD' && (
-              <span style={{ marginLeft:6, fontSize:11, color:'var(--text-tertiary)' }}>
-                ({getBaseRows(t.id).length})
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+        <section className="ta-explorar">
+          {/* Las tres categorías son el contexto de trabajo, igual que los
+              tipos de comprobante en Facturación. Mismo control, no tabs con
+              borde inferior. */}
+          <Segmentado
+            etiqueta="Categoría de reserva"
+            activa={categoria}
+            onCambiar={c => { setCategoria(c as Categoria); setSel(null); set({ unidad: 'all' }) }}
+            vistas={CATEGORIAS.map(c => ({
+              id: c,
+              label: CATEGORIA_LABEL[c],
+              corto: c === 'EMPRENDIMIENTOS' ? 'Emprend.' : CATEGORIA_LABEL[c],
+              n: conteos[c],
+            }))}
+          />
 
-      {/* Totales globales — siempre visibles en el dashboard */}
-      {tab === 'DASHBOARD' && !loading && (
-        <div className="metrics-grid" style={{ marginBottom:16, gridTemplateColumns:'repeat(3,minmax(0,1fr))' }}>
-          <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
-            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
-            <div className="metric-label">Total Reservas</div>
-            <div className="metric-value">{all.length}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Total Reserva Pesos</div>
-            <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:15 }}>{ars(all.reduce((s,r)=>s+(r.monto_ars||0),0))}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Total Reserva Dolares</div>
-            <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:15, color:'var(--info)' }}>{usd(all.reduce((s,r)=>s+(r.monto_usd||0),0))}</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── DASHBOARD ── */}
-      {tab === 'DASHBOARD' && (
-        loading ? <Spinner /> : <>
-          {/* Selector de período */}
-          <div className="dash-filters" style={{ marginBottom:20, alignItems:'center' }}>
-            {(['semana','mes','trimestre','anio','all'] as Periodo[]).map(p => {
-              const labels: Record<Periodo,string> = { semana:'Esta semana', mes:'Este mes', trimestre:'Este trimestre', anio:'Este año', all:'Todo' }
-              return (
-                <button
-                  key={p}
-                  className={`btn btn-sm${periodo===p?' btn-primary':''}`}
-                  style={periodo===p ? { background:'#1a6bc8', borderColor:'#1a6bc8', color:'#fff' } : {}}
-                  onClick={() => setPeriodo(p)}
-                >{labels[p]}</button>
-              )
-            })}
-          </div>
-
-          {/* KPIs por unidad de negocio */}
-          <div className="metrics-grid" style={{ marginBottom:20 }}>
-            <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
-              <div className="metric-label">Total Reservas</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(dashRows))}</div>
-              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(dashRows))} · {dashRows.length} reservas</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Emprendimientos</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(empRows))}</div>
-              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(empRows))} · {empRows.length} res.</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Residencial</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(resRows))}</div>
-              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(resRows))} · {resRows.length} res.</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Comercial</div>
-              <div className={`metric-value${hidden?' num-hidden':''}`} style={{ fontSize:16 }}>{ars(sumaARS(comRows))}</div>
-              <div className={`metric-sub${hidden?' num-hidden':''}`}>{usd(sumaUSD(comRows))} · {comRows.length} res.</div>
-            </div>
-          </div>
-
-          {/* 3 tablas con montos */}
-          <ResumenTable titulo="Emprendimientos" rows={empRows} unidades={EMPRENDIMIENTOS_UNIDADES} hidden={hidden} />
-          <ResumenTable titulo="Residencial — Plataformas" rows={resRows} unidades={RESIDENCIAL_UNIDADES} hidden={hidden} />
-          <ResumenTable titulo="Comercial" rows={comRows} unidades={COMERCIAL_UNIDADES} hidden={hidden} />
-        </>
-      )}
-
-      {/* ── LISTADO ── */}
-      {tab !== 'DASHBOARD' && (
-        <>
-          <div className="toolbar">
-            <input placeholder="Buscar dirección, broker, cliente…" value={search} onChange={e=>setSearch(e.target.value)} />
-            <select value={anioFilt} onChange={e=>setAnioFilt(e.target.value)}>
-              <option value="all">Todos los años</option>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-            </select>
-            <select value={mesFilt} onChange={e=>setMesFilt(e.target.value)}>
-              <option value="all">Todos los meses</option>
-              {MESES.map(m=><option key={m.num} value={m.num}>{m.label}</option>)}
-            </select>
-            {unidadesDisponibles.length > 1 && (
-              <select value={unidadFilt} onChange={e=>setUnidadFilt(e.target.value)}>
-                <option value="all">Todas las unidades</option>
-                {unidadesDisponibles.map(u=><option key={u} value={u}>{u}</option>)}
-              </select>
-            )}
-            <select value={opFilt} onChange={e=>setOpFilt(e.target.value as Operacion)}>
-              <option value="all">Venta + Alquiler</option>
-              <option value="VENTA">Solo Ventas</option>
-              <option value="ALQUILER">Solo Alquileres</option>
-            </select>
-            <select value={firmoFilt} onChange={e=>setFirmoFilt(e.target.value as FirmoFilter)}>
-              <option value="all">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="FIRMADO">Firmado</option>
-            </select>
-          </div>
-
-          <div className="metrics-grid" style={{ gridTemplateColumns:'repeat(4,minmax(0,1fr))', marginBottom:16 }}>
-            <div className="metric-card" style={{ borderColor:'rgba(26,107,200,0.4)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'#1a6bc8' }}/>
-              <div className="metric-label">Total</div>
-              <div className="metric-value">{tabData.length}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Ventas</div>
-              <div className="metric-value">{tabData.filter(r=>r.operacion==='VENTA').length}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Alquileres</div>
-              <div className="metric-value">{tabData.filter(r=>r.operacion==='ALQUILER').length}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-label">Pendientes firma</div>
-              <div className="metric-value" style={{ color:'var(--warn)' }}>{tabData.filter(r=>r.firmo==='PENDIENTE').length}</div>
-            </div>
-          </div>
-
-          {loading ? <Spinner /> : (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">{tabData.length} reservas</span>
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Código PROA</th>
-                      <th>Tipo</th>
-                      <th>Dirección</th>
-                      <th className="text-right">Precio Publicado</th>
-                      <th>Fecha Reserva</th>
-                      <th>Operación</th>
-                      <th>Estado Reserva</th>
-                      <th className="text-right">Precio Reserva</th>
-                      <th>Broker</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tabData.length === 0 ? (
-                      <tr><td colSpan={10} className="empty-row">Sin reservas</td></tr>
-                    ) : tabData.map(r => (
-                      <tr key={r.id}>
-                        <td style={{ fontSize:11, color:'var(--text-tertiary)', fontFamily:'monospace' }}>{r.proa_codigo ? r.proa_codigo.split('|')[0] : '—'}</td>
-                        <td style={{ fontSize:11.5, color:'var(--text-secondary)' }}>{r.tipo_inmueble||'—'}</td>
-                        <td style={{ maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', fontWeight:500 }}>{r.direccion}</td>
-                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontSize:12 }}>
-                          {r.precio_publicado ? usd(r.precio_publicado) : '—'}
-                        </td>
-                        <td style={{ fontSize:11, color:'var(--text-secondary)', whiteSpace:'nowrap' }}>{fdate(r.fecha)}</td>
-                        <td><span className={`badge ${r.operacion==='VENTA'?'badge-red':'badge-blue'}`}>{r.operacion}</span></td>
-                        <td>
-                          <span className={`badge ${r.estado_reserva==='Reservada'?'badge-green': r.firmo==='FIRMADO'?'badge-green':'badge-amber'}`}>
-                            {r.estado_reserva || r.firmo || '—'}
-                          </span>
-                        </td>
-                        <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, fontSize:13 }}>
-                          {r.precio_reserva ? usd(r.precio_reserva) : (r.monto_usd ? usd(r.monto_usd) : r.monto_ars ? ars(r.monto_ars) : '—')}
-                        </td>
-                        <td style={{ fontSize:12, color:'var(--text-secondary)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis' }}>{r.broker || '—'}</td>
-                        <td>
-                          <div style={{ display:'flex', gap:4 }}>
-                            <button className="btn btn-sm" onClick={()=>{setSel(r);setModal('edit')}}>Editar</button>
-                            <button className="btn btn-sm btn-danger" onClick={()=>handleDelete(r.id)}>Eliminar</button>
-                          </div>
-                        </td>
-                      </tr>
+          <BarraExplorar
+            buscar={filtros.buscar}
+            onBuscar={v => set({ buscar: v })}
+            placeholder="Buscar dirección, broker o código…"
+            placeholderCorto="Buscar…"
+            filtrosActivos={contarFiltros(filtros)}
+            chips={chipsActivos(filtros, mesLabel) as Chip[]}
+            onQuitarChip={quitar}
+            onLimpiar={() => setFiltros(FILTROS_INICIALES)}
+            // Importar y exportar no son de todos los días, y una de las dos
+            // reemplaza la base entera: detrás del •••.
+            acciones={[
+              ...(puedeExportar ? [{
+                id: 'exportar',
+                label: trabajando === 'exportando' ? 'Exportando…' : 'Exportar a Google Sheets',
+                onClick: exportarSheets,
+              }] : []),
+              ...(puedeImportar ? [{
+                id: 'importar',
+                label: trabajando === 'importando' ? 'Importando…' : 'Importar Excel de PROA…',
+                peligrosa: true,
+                onClick: () => document.getElementById('ta-import-proa')?.click(),
+              }] : []),
+            ]}
+            primaria={puedeCrear
+              ? { label: 'Nueva reserva', icon: Plus, onClick: () => setModal('nueva') }
+              : undefined}
+            primariaMobile="Nueva reserva"
+            hojaFiltros={
+              <>
+                {anios.length > 1 && (
+                  <Field label="Año">
+                    <Select value={filtros.anio} onChange={e => set({ anio: e.target.value })}>
+                      <option value="all">Todos los años</option>
+                      {anios.map(a => <option key={a} value={a}>{a}</option>)}
+                    </Select>
+                  </Field>
+                )}
+                <Field label="Mes">
+                  <Select value={filtros.mes} onChange={e => set({ mes: e.target.value })}>
+                    <option value="all">Todos los meses</option>
+                    {MESES.map((m, i) => (
+                      <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
+                  </Select>
+                </Field>
+                <Field label="Operación">
+                  <Select
+                    value={filtros.operacion}
+                    onChange={e => set({ operacion: e.target.value as FiltrosReservas['operacion'] })}
+                  >
+                    <option value="all">Venta y alquiler</option>
+                    <option value="VENTA">Solo venta</option>
+                    <option value="ALQUILER">Solo alquiler</option>
+                  </Select>
+                </Field>
+                {/* Las unidades ofrecidas son las de ESTA categoría y sólo las
+                    que tienen reservas. Un select con opciones que no
+                    devuelven nada es una trampa. */}
+                {unidades.length > 1 && (
+                  <Field label="Unidad">
+                    <Select value={filtros.unidad} onChange={e => set({ unidad: e.target.value })}>
+                      <option value="all">Todas las unidades</option>
+                      {unidades.map(u => <option key={u} value={u}>{u}</option>)}
+                    </Select>
+                  </Field>
+                )}
+              </>
+            }
+          />
+
+          <ReservasVista
+            reservas={filtradas}
+            cargando={cargando}
+            seleccionadaId={sel?.id ?? null}
+            onAbrir={setSel}
+            hayFiltros={hayFiltros(filtros) || !!filtros.buscar}
+          />
+        </section>
+      </div>
+
+      {sel && (
+        <ReservaPanel
+          reserva={sel}
+          onCerrar={() => setSel(null)}
+          onEditar={puedeEditar ? () => setModal('editar') : undefined}
+          onEliminar={puedeEliminar ? () => eliminar(sel) : undefined}
+        />
       )}
 
-      {modal==='new' && <ReservaModal tab={tab as any} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load()}} />}
-      {modal==='edit' && sel && <ReservaModal tab={tab as any} reserva={sel} onClose={()=>{setModal(null);setSel(null)}} onSaved={()=>{setModal(null);setSel(null);load()}} />}
-    </>
-  )
-}
+      {/* El input vive fuera del menú: un <input type=file> adentro de un
+          popover que se cierra al hacer clic no llega a abrir el diálogo. */}
+      {puedeImportar && (
+        <input
+          id="ta-import-proa" type="file" accept=".xlsx" hidden
+          onChange={importarExcel} disabled={trabajando === 'importando'}
+        />
+      )}
 
-// ── Tabla resumen por unidad (montos) ────────────────────────
-function ResumenTable({ titulo, rows, unidades, hidden }: {
-  titulo: string; rows: Reserva[]; unidades: string[]; hidden?: boolean
-}) {
-  if (!rows.length) return null
-
-  function uARS(unidad: string) {
-    return rows.filter(r => r.unidad === unidad).reduce((s,r) => s + (r.monto_ars||0), 0)
-  }
-  function uUSD(unidad: string) {
-    return rows.filter(r => r.unidad === unidad).reduce((s,r) => s + (r.monto_usd||0), 0)
-  }
-  function uCount(unidad: string) {
-    return rows.filter(r => r.unidad === unidad).length
-  }
-
-  const totalARS = rows.reduce((s,r) => s + (r.monto_ars||0), 0)
-  const totalUSD = rows.reduce((s,r) => s + (r.monto_usd||0), 0)
-
-  const unidadesConDatos = unidades.filter(u => uCount(u) > 0)
-  if (!unidadesConDatos.length) return null
-
-  return (
-    <div className="card" style={{ marginBottom:20 }}>
-      <div className="card-header">
-        <span className="card-title">{titulo}</span>
-        <span className="card-hint">{rows.length} reservas</span>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style={{ minWidth:180 }}>Sub-unidad</th>
-              <th className="text-right">Reservas</th>
-              <th className="text-right">Monto ARS</th>
-              <th className="text-right">Monto USD</th>
-              <th className="text-right" style={{ fontSize:10, color:'var(--text-tertiary)' }}>% del total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {unidadesConDatos.map(u => {
-              const arsVal = uARS(u)
-              const usdVal = uUSD(u)
-              const cnt    = uCount(u)
-              const share  = totalARS > 0 && arsVal > 0 ? Math.round((arsVal / totalARS) * 100) : (totalUSD > 0 && usdVal > 0 ? Math.round((usdVal / totalUSD) * 100) : 0)
-              return (
-                <tr key={u}>
-                  <td style={{ fontWeight:500, fontSize:12 }}>{u}</td>
-                  <td className="text-right" style={{ color:'var(--text-secondary)', fontSize:12 }}>{cnt}</td>
-                  <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight: arsVal>0?600:400, color: arsVal>0?'var(--text-primary)':'var(--text-tertiary)' }}>
-                    {arsVal > 0 ? ars(arsVal) : '—'}
-                  </td>
-                  <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight: usdVal>0?600:400, color: usdVal>0?'var(--info)':'var(--text-tertiary)' }}>
-                    {usdVal > 0 ? usd(usdVal) : '—'}
-                  </td>
-                  <td className="text-right" style={{ fontSize:11 }}>
-                    {share > 0 ? (
-                      <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end' }}>
-                        <div style={{ width:48, height:4, background:'var(--bg-tertiary)', borderRadius:2, overflow:'hidden' }}>
-                          <div style={{ width:`${share}%`, height:'100%', background:'#1a6bc8', borderRadius:2 }} />
-                        </div>
-                        <span style={{ color:'var(--text-tertiary)', minWidth:28 }}>{share}%</span>
-                      </div>
-                    ) : '—'}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr style={{ background:'var(--bg-secondary)', borderTop:'1px solid var(--border)' }}>
-              <td style={{ fontWeight:700, fontSize:12 }}>TOTAL</td>
-              <td className="text-right" style={{ fontWeight:700 }}>{rows.length}</td>
-              <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700 }}>{totalARS > 0 ? ars(totalARS) : '—'}</td>
-              <td className={`text-right text-mono${hidden?' num-hidden':''}`} style={{ fontWeight:700, color:'var(--info)' }}>{totalUSD > 0 ? usd(totalUSD) : '—'}</td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      {modal === 'nueva' && (
+        <ReservaModal
+          tab={categoria}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); cargar() }}
+        />
+      )}
+      {modal === 'editar' && sel && (
+        <ReservaModal
+          tab={categoriaDe(sel)}
+          reserva={sel}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); setSel(null); cargar() }}
+        />
+      )}
     </div>
   )
 }
 
-
-// ── Modal ─────────────────────────────────────────────────────
-function ReservaModal({ tab, reserva, onClose, onSaved }: {
-  tab: 'EMPRENDIMIENTOS'|'RESIDENCIAL'|'COMERCIAL'
-  reserva?: Reserva; onClose:()=>void; onSaved:()=>void
+/* ══════════════════════════════════════════════════════════════════════════
+   Las dos formas de mirar la lista
+   ══════════════════════════════════════════════════════════════════════════
+   Escritorio: cinco columnas. De las nueve anteriores quedaron las que sirven
+   para escanear —fecha, propiedad, operación, precio de reserva, situación—;
+   código PROA, tipo de inmueble, precio publicado y broker bajaron al detalle
+   o aparecen al acercarse. */
+function ReservasVista({
+  reservas, cargando, seleccionadaId, onAbrir, hayFiltros,
+}: {
+  reservas: Reserva[]
+  cargando: boolean
+  seleccionadaId: number | null
+  onAbrir: (r: Reserva) => void
+  hayFiltros: boolean
 }) {
-  const isEdit = !!reserva
-  const [saving,  setSaving]  = useState(false)
-  const [fecha,   setFecha]   = useState(reserva?.fecha || today())
-  const [dir,     setDir]     = useState(reserva?.direccion || '')
-  const [broker,  setBroker]  = useState(reserva?.broker || '')
-  const [cliente, setCliente] = useState(reserva?.cliente || '')
-  const [op,      setOp]      = useState(reserva?.operacion || 'VENTA')
-  const [unidad,  setUnidad]  = useState(reserva?.unidad || '')
-  const [arsV,    setArs]     = useState(String(reserva?.monto_ars || ''))
-  const [usdV,    setUsd]     = useState(String(reserva?.monto_usd || ''))
-  const [pago,    setPago]    = useState(reserva?.modo_pago || 'EFECTIVO')
-  const [firmo,   setFirmo]   = useState(reserva?.firmo || 'PENDIENTE')
+  const { visibles, faltan, centinela, verMas } = useVentana(reservas)
 
-  const unidades = UNIDADES_BY_TAB[tab] || [tab]
+  // `firmo` vale 'PENDIENTE' en las 147 reservas de la base. Una columna que
+  // repite "Sin firmar" en todas las filas —y encima en ámbar, que es el
+  // color de "prestá atención"— no distingue nada: es ruido con acento.
+  // Aparece solamente si en lo que se está mirando hay alguna firmada, que es
+  // cuando pasa a haber dos valores y la columna informa.
+  const hayFirmadas = reservas.some(r => r.firmo === 'FIRMADO')
 
-  async function save() {
-    if (!dir.trim()) { toast('La dirección es obligatoria'); return }
-    setSaving(true)
-    try {
-      const payload = {
-        fecha, direccion: dir.trim(),
-        broker: broker.trim()||null, cliente: cliente.trim()||null,
-        operacion: op, unidad: unidad||unidades[0],
-        monto_ars: arsV?parseFloat(arsV):null,
-        monto_usd: usdV?parseFloat(usdV):null,
-        modo_pago: pago, firmo,
-      }
-      if (isEdit && reserva) {
-        await supabase.from('reservas').update(payload).eq('id', reserva.id)
-        toast('✓ Reserva actualizada')
-      } else {
-        await supabase.from('reservas').insert(payload)
-        toast('✓ Reserva creada')
-      }
-      onSaved()
-    } catch (e: any) {
-      toast('Error: '+(e.message||''))
-    } finally { setSaving(false) }
+  if (cargando) return <SkeletonRows rows={8} />
+  if (!reservas.length) {
+    return <Vacio icono={MapPin} hayFiltros={hayFiltros}
+      vacio="Todavía no hay reservas" filtrado="Ninguna reserva coincide" />
   }
 
   return (
-    <Modal
-      title={isEdit ? `Editar — ${reserva?.direccion?.slice(0,30)}` : `Nueva reserva — ${tab.charAt(0)+tab.slice(1).toLowerCase()}`}
-      onClose={onClose}
-      footer={<>
-        <button className="btn" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" style={{ background:'#1a6bc8', borderColor:'#1a6bc8' }} onClick={save} disabled={saving}>
-          {saving?'Guardando…':isEdit?'Guardar cambios':'Crear reserva'}
-        </button>
-      </>}
-    >
-      <div className="form-grid">
-        <FG label="Fecha *"><input type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/></FG>
-        <FG label="Operación *">
-          <select value={op} onChange={e=>setOp(e.target.value)}>
-            <option value="VENTA">Venta</option>
-            <option value="ALQUILER">Alquiler</option>
-          </select>
-        </FG>
-        <FG label="Dirección *" full><input placeholder="Ej: Av. Santa Fe 1234 3° A" value={dir} onChange={e=>setDir(e.target.value)}/></FG>
-        <FG label="Broker"><input placeholder="Nombre del broker" value={broker} onChange={e=>setBroker(e.target.value)}/></FG>
-        <FG label="Cliente"><input placeholder="Nombre del cliente" value={cliente} onChange={e=>setCliente(e.target.value)}/></FG>
-        <FG label="Unidad">
-          <select value={unidad} onChange={e=>setUnidad(e.target.value)}>
-            {unidades.map(u=><option key={u} value={u}>{u}</option>)}
-          </select>
-        </FG>
-        <FG label="Forma de pago">
-          <select value={pago} onChange={e=>setPago(e.target.value)}>
-            {['EFECTIVO','TRANSFERENCIA','CHEQUE','OTRO'].map(p=><option key={p}>{p}</option>)}
-          </select>
-        </FG>
-        <FG label="Monto ARS"><input type="number" min="0" placeholder="0" value={arsV} onChange={e=>setArs(e.target.value)}/></FG>
-        <FG label="Monto USD"><input type="number" min="0" placeholder="0" value={usdV} onChange={e=>setUsd(e.target.value)}/></FG>
-        <FG label="Estado firma">
-          <select value={firmo} onChange={e=>setFirmo(e.target.value)}>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="FIRMADO">Firmado</option>
-          </select>
-        </FG>
+    <>
+      {/* ── Escritorio ── */}
+      <div className="ta-tabla-wrap ta-only-desktop">
+        <table className="ta-tabla">
+          <thead>
+            <tr>
+              <th className="ta-tabla__fecha">Fecha</th>
+              <th className="ta-tabla__prop">Propiedad</th>
+              <th className="ta-tabla__op">Operación</th>
+              <th className="ta-num ta-tabla__importe">Reserva</th>
+              {hayFirmadas && <th className="ta-tabla__estado">Firma</th>}
+              <th className="ta-fila__chev"><span className="ta-sr">Abrir</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.map(r => (
+              <tr
+                key={r.id}
+                className={`ta-fila${seleccionadaId === r.id ? ' is-sel' : ''}`}
+                onClick={() => onAbrir(r)}
+                tabIndex={0}
+                role="button"
+                aria-label={`Abrir reserva de ${r.direccion}`}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrir(r) }
+                }}
+              >
+                <td className="ta-fila__fecha">{fdate(r.fecha)}</td>
+                <td className="ta-fila__cliente ta-tabla__prop" title={r.direccion}>
+                  <span className="ta-fila__n2">{r.direccion}</span>
+                  {/* El broker no ayuda a encontrar una propiedad, pero sí
+                      confirma que encontraste la correcta. Aparece al
+                      acercarse a ESTA fila y vive completo en el detalle. */}
+                  <span className="ta-fila__pv">{r.broker || 'Sin broker'}</span>
+                </td>
+                <td className="ta-tabla__op">
+                  <Badge tone={r.operacion === 'VENTA' ? 'brand' : 'info'} sm>
+                    {operacionLabel(r.operacion)}
+                  </Badge>
+                </td>
+                <td className="ta-num ta-tabla__importe ta-fila__total">
+                  <Money>{precioDe(r)}</Money>
+                </td>
+                {hayFirmadas && (
+                  <td className="ta-tabla__estado">
+                    {r.firmo === 'FIRMADO'
+                      ? <Badge tone="success" sm>Firmada</Badge>
+                      : <span className="ta-fila__nada">—</span>}
+                  </td>
+                )}
+                <td className="ta-fila__chev"><ChevronRight size={15} aria-hidden /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Centinela faltan={faltan} refEl={centinela} onVerMas={verMas} />
       </div>
-    </Modal>
+
+      {/* ── Mobile ── */}
+      <div className="ta-movs ta-only-mobile">
+        {visibles.map(r => (
+          <Movimiento
+            key={r.id}
+            titulo={r.direccion}
+            monto={<Money>{precioDe(r)}</Money>}
+            meta={`${operacionLabel(r.operacion)} · ${fdate(r.fecha).slice(0, 5)}`}
+            estado={r.firmo === 'FIRMADO'
+              ? <Badge tone="success" sm>Firmada</Badge>
+              : <Badge tone="neutral" sm>{r.tipo_inmueble || operacionLabel(r.operacion)}</Badge>}
+            onAbrir={() => onAbrir(r)}
+            ariaLabel={`${r.direccion}, ${operacionLabel(r.operacion)}, ${precioDe(r)}`}
+          />
+        ))}
+        <Centinela faltan={faltan} refEl={centinela} onVerMas={verMas} />
+      </div>
+    </>
+  )
+}
+
+/**
+ * El importe de la reserva, en la moneda que tenga.
+ *
+ * `precio_reserva` es el campo que trae PROA; las reservas cargadas a mano no
+ * lo tienen y usan `monto_usd` o `monto_ars`. No se convierte una moneda a la
+ * otra: no hay tipo de cambio guardado y estimarlo sería inventar un número.
+ */
+function precioDe(r: Reserva): string {
+  if (r.precio_reserva) return usd(r.precio_reserva)
+  if (r.monto_usd) return usd(r.monto_usd)
+  if (r.monto_ars) return ars(r.monto_ars)
+  return '—'
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Detalle
+   ══════════════════════════════════════════════════════════════════════════ */
+function ReservaPanel({
+  reserva, onCerrar, onEditar, onEliminar,
+}: {
+  reserva: Reserva
+  onCerrar: () => void
+  onEditar?: () => void
+  onEliminar?: () => void
+}) {
+  const secundarias = [
+    ...(onEliminar ? [{ id: 'eliminar', label: 'Eliminar reserva', peligrosa: true, onClick: onEliminar }] : []),
+  ]
+
+  return (
+    <PanelDetalle
+      // El identificador de una reserva es su código PROA; el tipo de
+      // inmueble es una característica y va con la categoría, arriba.
+      tipo={[CATEGORIA_LABEL[categoriaDe(reserva)], reserva.tipo_inmueble]
+        .filter(Boolean).join(' · ')}
+      titulo={codigoCorto(reserva.proa_codigo) === '—'
+        ? 'Reserva'
+        : codigoCorto(reserva.proa_codigo)}
+      etiqueta={`Reserva de ${reserva.direccion}`}
+      onCerrar={onCerrar}
+      // Editar SÍ es el siguiente paso natural de una reserva abierta: es lo
+      // que se hace cuando se firma o cambia el precio.
+      primaria={onEditar ? { label: 'Editar reserva', onClick: onEditar } : null}
+      secundarias={secundarias}
+      sinAcciones="Sólo lectura"
+    >
+      <PanelCabecera
+        titulo={reserva.direccion}
+        monto={<Money>{precioDe(reserva)}</Money>}
+        montoAlt={reserva.precio_publicado
+          ? <Money>{`Publicado ${usd(reserva.precio_publicado)}`}</Money>
+          : undefined}
+        estado={
+          <Badge tone={reserva.operacion === 'VENTA' ? 'brand' : 'info'} sm>
+            {operacionLabel(reserva.operacion)}
+          </Badge>
+        }
+        fecha={fdate(reserva.fecha)}
+        situacion={situacionDe(reserva)}
+      />
+
+      <div className="ta-datos ta-datos--cobro">
+        <Dato label="Unidad"><span>{reserva.unidad}</span></Dato>
+        {reserva.broker ? <Dato label="Broker"><span>{reserva.broker}</span></Dato> : null}
+      </div>
+
+      <Mas titulo="Más datos">
+        <dl className="ta-dl">
+          <div><dt>Tipo de inmueble</dt><dd>{reserva.tipo_inmueble || '—'}</dd></div>
+          <div><dt>Código PROA</dt><dd className="ta-mono">{codigoCorto(reserva.proa_codigo)}</dd></div>
+          {reserva.precio_publicado ? (
+            <div><dt>Precio publicado</dt><dd><Money>{usd(reserva.precio_publicado)}</Money></dd></div>
+          ) : null}
+          {reserva.monto_ars ? (
+            <div><dt>Importe ARS</dt><dd><Money>{ars(reserva.monto_ars)}</Money></dd></div>
+          ) : null}
+          <div><dt>Estado</dt><dd>{reserva.estado_reserva || '—'}</dd></div>
+          <div><dt>Firma</dt><dd>{reserva.firmo === 'FIRMADO' ? 'Firmada' : 'Pendiente'}</dd></div>
+          <div className="ta-dl__full"><dt>Dirección</dt><dd>{reserva.direccion}</dd></div>
+        </dl>
+      </Mas>
+    </PanelDetalle>
   )
 }

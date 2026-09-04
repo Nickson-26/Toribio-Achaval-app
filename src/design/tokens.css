@@ -73,10 +73,23 @@
   --z-drawer:   210;
   --z-toast:    300;
 
-  /* Movimiento */
-  --ease:          cubic-bezier(0.4, 0, 0.2, 1);
-  --duration-fast: 150ms;
-  --duration-base: 200ms;
+  /* ── Movimiento ──
+     Tres duraciones con destino: lo que sólo cambia de color es casi
+     instantáneo, lo que cambia de superficie tarda un poco más, y lo que
+     entra en pantalla necesita tiempo para que el ojo lo siga.
+     El easing es el de iOS: sale rápido y frena con calma. */
+  --ease:            cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-hover:  140ms;   /* color, opacidad */
+  --duration-fast:   150ms;
+  --duration-base:   200ms;   /* superficies */
+  --duration-panel:  260ms;   /* paneles, hojas, popovers */
+
+  /* ── Elevación ──
+     Cuatro niveles con significado, no una sombra genérica repetida.
+     Los valores concretos los define cada tema, porque una sombra en dark
+     y una en light no se construyen igual. */
+  --elev-0: none;
 
   /* ── Tipografía ──
      Antes decía 'Inter' y 'JetBrains Mono' sin cargarlas nunca: no había
@@ -148,12 +161,78 @@
   --border-focus: var(--brand);
   --focus-ring:   0 0 0 3px rgba(200, 16, 46, 0.30);
 
-  /* Superficies de vidrio */
-  --glass-bg:     rgba(24, 24, 32, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur:   blur(18px);
+  /* ══════════════════════════════════════════════════════════════════════
+     SUPERFICIES — graphite con matiz navy
+     ══════════════════════════════════════════════════════════════════════
+     Nunca negro puro. La base tiene azul suficiente para que se lea como
+     material y no como ausencia de luz, y hay una escalera real: cuanto más
+     "arriba" está algo, más claro es. Sin esa escalera el vidrio no tiene
+     nada que refractar. */
+  --bg-base:      #080a0f;   /* midnight, el piso de todo */
+  --bg-primary:   #10131b;
+  --bg-secondary: #141822;
+  --bg-tertiary:  #1a1f2b;
+  --bg-card:      #141926;
+  --bg-hover:     #1a2030;
+  --bg-elevated:  #1a1f2b;   /* lo que flota */
 
-  --overlay-bg:   rgba(0, 0, 0, 0.62);
+  /* Bordes de muy bajo contraste. La separación la dan el color y la luz. */
+  --border:        rgba(255, 255, 255, 0.055);
+  --border-strong: rgba(255, 255, 255, 0.10);
+
+  /* ── Elevación ──
+     Cada nivel suma una capa. En dark las sombras llevan una pizca de azul
+     en vez de negro puro: una sombra neutra sobre una base con matiz se ve
+     como un agujero. */
+  --elev-1: 0 1px 2px rgba(2, 4, 10, 0.45);
+  --elev-2: 0 1px 3px rgba(2, 4, 10, 0.40), 0 8px 24px rgba(2, 4, 10, 0.38);
+  --elev-3: 0 2px 8px rgba(2, 4, 10, 0.45), 0 20px 56px rgba(2, 4, 10, 0.55);
+  --shadow-sm: var(--elev-1);
+  --shadow-md: var(--elev-2);
+  --shadow-lg: var(--elev-3);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LUZ AMBIENTAL
+     ══════════════════════════════════════════════════════════════════════
+     Dos focos enormes y difusísimos sobre la base: bordó de marca cerca de
+     la navegación, cyan frío del otro lado. Mirando el fondo de frente casi
+     no se notan; se descubren atravesando el vidrio y alrededor de las
+     superficies, que es exactamente para lo que están. Sin esto el blur no
+     tiene nada que hacer y el "cristal" es un rectángulo con opacidad. */
+  --ambient:
+    radial-gradient(900px 640px at 2% -14%,  rgba(200, 16, 46, 0.085), transparent 58%),
+    radial-gradient(1000px 780px at 99% 6%,  rgba(28, 120, 190, 0.075), transparent 58%),
+    radial-gradient(1300px 900px at 45% 122%, rgba(60, 80, 160, 0.06), transparent 64%);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     VIDRIO
+     ══════════════════════════════════════════════════════════════════════
+     saturate() es lo que separa un blur decente de uno gris: sin él lo que
+     pasa por detrás pierde color y la superficie se ve sucia. El reflejo de
+     un píxel en el canto superior es lo que la vuelve material. */
+  --glass-bg:     rgba(22, 27, 38, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.085);
+  --glass-blur:   blur(34px) saturate(190%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-shadow:    var(--elev-3);
+  /* Vidrio teñido: misma materialidad, temperatura distinta. */
+  /* El tinte de marca es una insinuación, no un lavado: con 0.13 la sidebar
+     se veía magenta en vez de cristalizada. El bordó lo aporta sobre todo la
+     luz ambiental que pasa POR DETRÁS del vidrio, que es como funciona un
+     material real. */
+  --glass-brand:  rgba(200, 16, 46, 0.05);
+  --glass-info:   rgba(56, 160, 230, 0.06);
+
+  /* ── Color como luz ──
+     Tintes y halos para usar el color sin pintar rectángulos. */
+  --tint-brand:  rgba(200, 16, 46, 0.09);
+  --tint-info:   rgba(56, 160, 230, 0.09);
+  --tint-warn:   rgba(245, 158, 11, 0.09);
+  --tint-success:rgba(34, 197, 94, 0.09);
+  --glow-brand:  0 0 0 1px rgba(200, 16, 46, 0.22), 0 6px 20px rgba(200, 16, 46, 0.22);
+  --glow-info:   0 0 22px rgba(56, 160, 230, 0.16);
+
+  --overlay-bg:   rgba(3, 5, 10, 0.56);
 
   /* Reemplaza el gradiente verde oscuro al 92% que estaba hardcodeado en
      .dash-hero-main y .dash-control-panel. En tema claro pintaba verde
@@ -165,30 +244,62 @@
    3. LIGHT — referencia principal del nuevo diseño
    ────────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg-base:      #f5f6f9;
-  --bg-primary:   #ffffff;
-  --bg-secondary: #f1f2f6;
-  --bg-tertiary:  #e9ebf1;
-  --bg-card:      #ffffff;
-  --bg-hover:     #f2f3f8;
-  --bg-elevated:  #ffffff;
+  /* Blanco frío con azul hielo. No es dark invertido: acá la jerarquía la da
+     la LUZ —superficies blancas que flotan sobre un fondo apenas más frío—
+     y no una grilla de líneas grises. */
+  /* SUPERFICIES CLARAS — perla, bruma, hielo. Casi nada de blanco puro.
+     La versión anterior apoyaba tarjetas, tablas y paneles en #ffffff sobre
+     un fondo #eef1f7: el contenido brillaba y a las dos horas cansaba, y las
+     capas sólo se distinguían por una línea gris.
+
+     Ahora hay una escalera tonal corta y fría, y ninguna superficie de
+     trabajo es blanca. Lo que separa una capa de otra es LUZ —cada escalón
+     es más claro que el de abajo— y no un borde: por eso los bordes bajaron
+     a la mitad y las sombras subieron un punto.
+
+     El blanco puro queda sólo para los reflejos del vidrio, donde es luz y
+     no superficie. */
+  --bg-base:      #e9edf4;   /* el fondo de la aplicación: bruma fría   */
+  --bg-primary:   #f7f9fc;   /* superficie de trabajo: perla, no blanco */
+  --bg-secondary: #eff2f8;
+  --bg-tertiary:  #e3e8f1;
+  --bg-card:      #f8fafd;   /* tarjetas y tablas: medio tono sobre el fondo */
+  --bg-hover:     #eef2f9;
+  --bg-elevated:  #fdfefe;   /* lo que flota: panel, popover, modal      */
 
   /* Texto: se sube el contraste. --text-tertiary daba 2,85:1 sobre blanco
      (falla AA) y es el token más usado del sistema. */
-  --text-primary:   #16181d;
-  --text-secondary: #55596b;
-  --text-tertiary:  #6e7383;
+  /* Tinta, no negro: #16181d sobre una superficie fría se lee como un golpe.
+     #1b2030 tiene el mismo azul de las superficies y sigue en 14,9:1. */
+  --text-primary:   #1b2030;
+  --text-secondary: #545a6d;
+  /* #6e7383 daba 4,37:1 sobre blanco y 4,18:1 sobre --bg-muted: por debajo de
+     AA justo donde más se usa —encabezados de sección en versalitas y el
+     header de la tabla—. #5c6175 da 6,14 y 5,43. Es el token más consumido
+     del sistema, así que el ajuste se nota en toda la app. */
+  --text-tertiary:  #5c6175;
   --text-inverse:   #ffffff;
 
-  --border:        rgba(16, 18, 27, 0.08);
-  --border-strong: rgba(16, 18, 27, 0.14);
+  /* Bordes al mínimo: la separación la hace la diferencia de luz entre
+     superficies. Una línea gris dura es lo que hacía que la app se leyera
+     como un formulario impreso. */
+  --border:        rgba(22, 30, 52, 0.038);
+  --border-strong: rgba(22, 30, 52, 0.085);
   --border-accent: rgba(200, 16, 46, 0.28);
 
-  /* Sombras suaves, casi imperceptibles: la jerarquía la dan el fondo,
-     el borde y el espaciado. */
-  --shadow-sm: 0 1px 2px rgba(16, 18, 27, 0.05);
-  --shadow-md: 0 4px 14px rgba(16, 18, 27, 0.07);
-  --shadow-lg: 0 16px 44px rgba(16, 18, 27, 0.11);
+  /* Sombras con matiz azul, no grises: una sombra neutra sobre un fondo frío
+     se ve sucia. */
+  --elev-1: 0 1px 2px rgba(22, 30, 52, 0.06);
+  --elev-2: 0 1px 3px rgba(22, 30, 52, 0.06), 0 8px 24px rgba(22, 30, 52, 0.075);
+  --elev-3: 0 2px 8px rgba(22, 30, 52, 0.08), 0 24px 60px rgba(22, 30, 52, 0.13);
+  --shadow-sm: var(--elev-1);
+  --shadow-md: var(--elev-2);
+  --shadow-lg: var(--elev-3);
+
+  --ambient:
+    radial-gradient(900px 640px at 2% -14%,  rgba(200, 16, 46, 0.030), transparent 58%),
+    radial-gradient(1000px 780px at 99% 6%,  rgba(56, 130, 220, 0.045), transparent 58%),
+    radial-gradient(1200px 900px at 50% 118%, rgba(120, 150, 220, 0.04), transparent 64%);
 
   /* Colores semánticos oscurecidos para pasar AA sobre blanco.
      Los de dark daban entre 2,15:1 y 3,76:1. */
@@ -229,10 +340,22 @@
 
   /* Vidrio claro. La transparencia va SOLO en el background: el texto
      conserva opacidad completa. */
-  --glass-bg:     rgba(255, 255, 255, 0.84);
-  --glass-border: rgba(16, 18, 27, 0.07);
+  --glass-bg:     rgba(250, 252, 255, 0.62);
+  --glass-border: rgba(22, 30, 52, 0.045);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-shadow:    var(--elev-3);
+  /* En claro el rojo tiñe muchísimo más: con 0.07 la sidebar quedaba rosa. */
+  --glass-brand:  rgba(200, 16, 46, 0.022);
+  --glass-info:   rgba(56, 130, 220, 0.045);
 
-  --overlay-bg: rgba(16, 18, 27, 0.34);
+  --tint-brand:   rgba(200, 16, 46, 0.055);
+  --tint-info:    rgba(37, 99, 235, 0.055);
+  --tint-warn:    rgba(178, 106, 0, 0.06);
+  --tint-success: rgba(22, 163, 106, 0.055);
+  --glow-brand:   0 0 0 1px rgba(200, 16, 46, 0.16), 0 6px 18px rgba(200, 16, 46, 0.16);
+  --glow-info:    0 0 20px rgba(37, 99, 235, 0.10);
+
+  --overlay-bg: rgba(22, 30, 52, 0.22);
 
   --hero-gradient: linear-gradient(135deg, rgba(200,16,46,0.055) 0%, rgba(200,16,46,0.02) 36%, transparent 64%);
 }
@@ -275,6 +398,16 @@
   --focus-ring:   0 0 0 3px #FFD700, 0 0 0 5px #000000;
 
   /* Sin vidrio: la transparencia degrada la legibilidad. */
+  /* Accesibilidad antes que estética: sin ambiente, sin vidrio, sin tintes.
+     Los otros dos temas pueden ser expresivos; éste tiene un solo trabajo. */
+  --ambient: none;
+  --glass-highlight: none;
+  --glass-shadow:    none;
+  --elev-1: none; --elev-2: none; --elev-3: none;
+  --tint-brand: transparent; --tint-info: transparent;
+  --tint-warn: transparent;  --tint-success: transparent;
+  --glow-brand: none; --glow-info: none;
+  --glass-brand: transparent; --glass-info: transparent;
   --glass-bg:     #000000;
   --glass-border: rgba(255, 255, 255, 0.35);
   --glass-blur:   none;
@@ -323,4 +456,62 @@
   user-select: none;
   pointer-events: none;
   transition: filter var(--duration-base) var(--ease);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. SUPERFICIE DE VIDRIO
+   ──────────────────────────────────────────────────────────────────────────
+   Una sola definición para toda la app. Antes cada componente repetía las
+   cuatro propiedades y ninguno tenía ni el reflejo ni la sombra, así que el
+   "vidrio" era un rectángulo con opacidad.
+
+   Dónde va: navegación, encabezado, controles segmentados, filtros, hojas,
+   paneles, menús y overlays. Dónde NO va: las listas y los números. Un
+   importe tiene que leerse perfecto, y para eso necesita fondo opaco y
+   contraste pleno.
+   ────────────────────────────────────────────────────────────────────────── */
+.ta-glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* Vidrio teñido. Misma materialidad, temperatura distinta: el color entra
+   como luz, no como relleno. */
+.ta-glass--brand { background: linear-gradient(var(--glass-brand), var(--glass-brand)), var(--glass-bg); }
+.ta-glass--info  { background: linear-gradient(var(--glass-info),  var(--glass-info)),  var(--glass-bg); }
+
+/* Sin blur disponible el vidrio queda transparente y el texto ilegible.
+   Se cae a una superficie sólida. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ta-glass, .ta-glass--brand, .ta-glass--info { background: var(--bg-elevated); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   6. LUZ AMBIENTAL
+   ──────────────────────────────────────────────────────────────────────────
+   Va en una capa fija detrás de todo, no en el body: así no se mueve con el
+   scroll y el vidrio siempre tiene algo distinto que refractar según dónde
+   esté parado. Es lo que convierte el blur en material.
+   ────────────────────────────────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: var(--ambient);
+  pointer-events: none;
+  z-index: 0;
+}
+/* El contenido va por encima de la luz. */
+#__next, body > div { position: relative; z-index: 1; }
+
+/* Quien pidió menos movimiento no quiere transiciones de 200ms en cada
+   superficie. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

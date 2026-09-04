@@ -19,14 +19,18 @@ async function getNextReciboId(): Promise<number> {
 }
 
 // ── Nueva Factura ──────────────────────────────────────────────
-export function NuevoComprobanteModal({ onClose, onSaved, clientes }: {
+export function NuevoComprobanteModal({ onClose, onSaved, clientes, tipoInicial }: {
   onClose: () => void
   onSaved: (c: Comprobante) => void
   clientes: string[]
+  /** Tipo con el que abre el formulario. Lo hereda de la vista en la que
+   *  estaba parado el usuario: si venía de Facturas B, abre en B. Se puede
+   *  cambiar acá adentro; esto es sólo el default. */
+  tipoInicial?: string
 }) {
   const [saving,     setSaving]     = useState(false)
   const [extracting, setExtracting] = useState(false)
-  const [tipo,       setTipo]       = useState('FACT A')
+  const [tipo,       setTipo]       = useState(tipoInicial ?? 'FACT A')
   const [fecha,      setFecha]      = useState(today())
   const [cliente,    setCliente]    = useState('')
   const [persona,    setPersona]    = useState(PERSONAS[0])
@@ -418,10 +422,13 @@ export function EditarComprobanteModal({ comp, onClose, onSaved }: {
 const TIPOS_RET = ['ganancias', 'iva', 'iibb', 'suss'] as const
 type RetCfg = { aplica: boolean; importe: string; docRef: string }
 
-export function MarcarCobradaModal({ comp, nextReciboId, onClose, onSaved }: {
-  comp: Comprobante; nextReciboId: number
+export function MarcarCobradaModal({ comp, onClose, onSaved }: {
+  comp: Comprobante
   onClose: () => void; onSaved: () => void
 }) {
+  // `nextReciboId` era una prop muerta: la pantalla pasaba 19200 hardcodeado y
+  // este componente lo ignoraba, porque el número real lo pide abajo con
+  // getNextReciboId(). Se elimina la prop; el comportamiento no cambia.
   const [saving,    setSaving]    = useState(false)
   const [fecha,     setFecha]     = useState(today())
   const [nroRecibo, setNroRecibo] = useState('')

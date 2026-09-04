@@ -24,12 +24,16 @@
 .ta-sidebar__inner {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
+  /* Placa flotante de vidrio, teñida con el bordó de marca. Es la pieza que
+     define el material de toda la app: si acá el cristal no se percibe, no se
+     percibe en ningún lado. La luz ambiental de tokens.css es lo que le da
+     algo que refractar. */
+  background: linear-gradient(var(--glass-brand), var(--glass-brand)), var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   overflow: hidden;
 }
 
@@ -84,24 +88,50 @@
   border-radius: var(--radius-input);
   font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-medium);
   color: var(--text-secondary); text-align: left; cursor: pointer;
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  transition: background var(--duration-hover) var(--ease),
+              color var(--duration-hover) var(--ease),
+              box-shadow var(--duration-base) var(--ease);
   position: relative;
 }
-.ta-nav__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.ta-nav__item svg { flex-shrink: 0; opacity: .82; }
+/* Hover: aparece apenas una superficie y el icono toma protagonismo.
+   Sólo con puntero: en táctil el hover queda pegado tras el toque. */
+@media (hover: hover) {
+  .ta-nav__item:hover {
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--text-primary);
+  }
+  [data-theme="light"] .ta-nav__item:hover { background: rgba(22, 30, 52, 0.04); }
+  /* El icono no sólo se aclara: toma el color de la casa. Es la misma
+     señal que da el activo, un escalón más abajo, así que al recorrer la
+     navegación se anticipa a dónde lleva cada ítem. */
+  .ta-nav__item:hover svg { opacity: 1; color: var(--brand-text); }
+}
+.ta-nav__item svg {
+  flex-shrink: 0; opacity: .72;
+  transition: opacity var(--duration-hover) var(--ease), color var(--duration-hover) var(--ease);
+}
 
-/* Activo: fondo suave de marca, sin bloque rojo saturado. */
+/* ── Activo ──
+   No una pastilla bordó opaca: rojo translúcido con reflejo interior y un
+   halo corto. El estado se lee como material seleccionado, no como un
+   rectángulo pintado. */
 .ta-nav__item.is-active {
-  background: var(--brand-soft);
+  background: linear-gradient(var(--tint-brand), var(--tint-brand)), var(--brand-soft);
   color: var(--brand-text);
   font-weight: var(--weight-label);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(200, 16, 46, 0.20),
+    0 2px 10px rgba(200, 16, 46, 0.13);
 }
-.ta-nav__item.is-active svg { opacity: 1; }
+.ta-nav__item.is-active svg { opacity: 1; color: var(--brand-text); }
+/* Indicador lateral: una línea corta con degradado, no un bloque. */
 .ta-nav__item.is-active::before {
   content: ''; position: absolute; left: calc(var(--space-3) * -1); top: 50%;
   transform: translateY(-50%);
-  width: 3px; height: 17px; border-radius: 0 3px 3px 0;
-  background: var(--brand);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--brand-hover), var(--brand));
+  box-shadow: 0 0 10px rgba(200, 16, 46, 0.45);
 }
 /* En alto contraste el color no alcanza como único diferenciador. */
 [data-theme="accessible"] .ta-nav__item.is-active {
@@ -174,10 +204,27 @@
   position: sticky; top: 0; z-index: var(--z-topbar);
   display: flex; align-items: center; gap: var(--space-4);
   height: 60px; padding: 0 var(--space-6) 0 var(--space-2);
+  /* Toolbar flotante, no un header sólido: el fondo se ve pasar por debajo.
+     El canto se marca con un reflejo de un píxel y una sombra muy corta;
+     una línea sólida parte la pantalla en dos. */
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid var(--border);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 1px 14px rgba(2, 4, 10, 0.10);
+}
+
+/* ── Grupo de controles de la topbar ──
+   Privacidad, tema y accesibilidad forman UN conjunto, como los controles de
+   una app nativa: comparten una pista de vidrio en vez de flotar sueltos. */
+.ta-topbar__actions > .ta-theme-group {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--glass-highlight);
 }
 /* Ocupa el espacio libre: la topbar se lee completa sin depender de un
    buscador que todavía no existe. */

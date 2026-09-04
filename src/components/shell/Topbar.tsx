@@ -32,7 +32,12 @@ export function Topbar({
   const { puedeHacer } = usePermisos()
 
   const titulo = RUTAS[route.to]?.titulo ?? ''
-  const puedeCrear = puedeHacer('comprobante.crear')
+  // Los tres módulos de datos tienen su propia acción primaria, con contexto:
+  // Facturación hereda el tipo de la vista activa, Recibos abre el alta de
+  // recibo, Reservas la de reserva. Un "Nueva factura" fijo en la topbar
+  // encima de ellas serían dos primarias compitiendo, y una para otro módulo.
+  const CON_PRIMARIA_PROPIA = ['facturas', 'recibos', 'reservas']
+  const puedeCrear = puedeHacer('comprobante.crear') && !CON_PRIMARIA_PROPIA.includes(route.to)
 
   return (
     <header className="ta-topbar">

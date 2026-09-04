@@ -1,15 +1,14 @@
 'use client'
 import {
   FileClock, FileCheck2, CalendarClock, UserPlus, ChevronRight,
-  CircleCheck, TriangleAlert, type LucideIcon,
+  TriangleAlert, type LucideIcon,
 } from 'lucide-react'
 import { Money } from '@/components/HideNumbers'
-import { EmptyState } from '@/design/primitives'
 import { ars } from '@/lib/utils'
 import type { AttentionItem } from '@/lib/home'
 
 /**
- * Para revisar — la sección más importante del Inicio.
+ * Para revisar — lo primero de la pantalla.
  *
  * Lista accionable, no una grilla de métricas. Cada fila es un botón entero:
  * icono, qué pasa, cuánto, y a dónde va.
@@ -26,15 +25,11 @@ export function AttentionList({
   items: AttentionItem[]
   onAbrir: (item: AttentionItem) => void
 }) {
-  if (!items.length) {
-    return (
-      <EmptyState
-        icon={CircleCheck}
-        title="Todo al día"
-        description="No hay pendientes que requieran tu atención."
-      />
-    )
-  }
+  // Nada que revisar: no hay bloque. Antes acá vivía una tarjeta con icono
+  // grande que decía "Todo al día" — una superficie del tamaño de un
+  // problema, para anunciar que no hay ninguno. El saludo ya lo dice en una
+  // línea y la pantalla arranca directamente por lo que sí se puede hacer.
+  if (!items.length) return null
 
   return (
     <div className="ta-atn">
@@ -65,6 +60,11 @@ export function AttentionList({
                 {item.monto !== null && (
                   <Money className="ta-atn__monto">{ars(item.monto)}</Money>
                 )}
+                {/* El rótulo de la acción ("Ver pendientes") es redundante en
+                    reposo: la fila entera es un botón y tiene su chevron. Se
+                    revela al acercarse, para confirmar a dónde lleva antes de
+                    hacer clic. En mobile —donde no hay hover— se muestra
+                    siempre, en la línea de abajo. */}
                 <span className="ta-atn__cta">{item.cta}</span>
                 <ChevronRight size={16} className="ta-atn__chev" aria-hidden />
               </span>

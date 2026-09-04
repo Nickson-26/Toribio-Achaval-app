@@ -120,11 +120,18 @@ export default function Inicio({ onPendientesChange }: { onPendientesChange?: (n
 
   return (
     <div className="ta-home">
-      {/* ── Encabezado: humano y simple. No es un hero. ── */}
+      {/* ── Encabezado: humano y simple. No es un hero.
+             El subtítulo lo escribe el dato, no la plantilla: prometer "esto
+             es lo que requiere tu atención" arriba de una lista vacía es la
+             clase de texto que enseña a no leer los textos. ── */}
       <header className="ta-home__head">
-        <div>
+        <div className="ta-home__id">
           <h1 className="ta-home__saludo">{saludo(user?.nombre)}</h1>
-          <p className="ta-home__sub">Esto es lo que requiere tu atención.</p>
+          <p className="ta-home__sub">
+            {atencion.length > 0
+              ? 'Esto es lo que requiere tu atención.'
+              : 'No hay nada pendiente de tu lado.'}
+          </p>
         </div>
 
         <HomeFilters
@@ -136,13 +143,15 @@ export default function Inicio({ onPendientesChange }: { onPendientesChange?: (n
         />
       </header>
 
-      {/* ── 1. Para revisar ── */}
-      <Section title="Para revisar">
-        <AttentionList items={atencion} onAbrir={abrirAtencion} />
-      </Section>
+      {/* ── 1. Para revisar ──
+             Sin encabezado propio: el subtítulo del saludo ya dijo qué es
+             esto, y un "Para revisar" del mismo tamaño que los otros cuatro
+             títulos convertía lo más importante de la pantalla en uno más de
+             la fila. Es lo primero que se ve y va pegado al saludo. */}
+      <AttentionList items={atencion} onAbrir={abrirAtencion} />
 
       {/* ── 2. Acciones rápidas ── */}
-      <Section title="¿Qué querés hacer?">
+      <Section title="Accesos rápidos">
         <QuickActions onNuevaFactura={() => setNuevaFactura(true)} />
       </Section>
 

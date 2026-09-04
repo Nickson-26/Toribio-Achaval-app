@@ -6,7 +6,8 @@ import Facturas  from '@/screens/Facturas'
 import Usuarios  from '@/screens/Usuarios'
 import Informe   from '@/screens/Informe'
 import Reservas  from '@/screens/Reservas'
-import { Recibos, Clientes, NotasCredito, NotasDebito } from '@/screens/OtherPages'
+import Recibos   from '@/screens/Recibos'
+import { Clientes, NotasCredito, NotasDebito } from '@/screens/OtherPages'
 
 /**
  * Qué componente renderiza cada destino.

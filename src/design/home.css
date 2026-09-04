@@ -26,42 +26,69 @@
   font-size: var(--text-body); color: var(--text-secondary);
 }
 
-/* Filtros: presentes pero secundarios. Sin card, sin encabezado. */
-.ta-home__filtros { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-
-/* Versión mobile: un botón, no dos selects a ancho completo.
-   El `display` lo maneja `.ta-only-mobile` (shell.css) para que la regla valga
-   en todo el rango táctil, no sólo por debajo de 640px. */
-.ta-home__filtros-btn {
-  align-items: center; gap: 6px;
+/* ── Filtros ──────────────────────────────────────────────────────────────
+   Un solo control, escritorio y mobile. Los selects permanentes se fueron:
+   ocupaban la esquina superior derecha para informar que no había ningún
+   filtro puesto. */
+.ta-hfiltros {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap; justify-content: flex-end;
+}
+.ta-hfiltros__btn {
+  display: inline-flex; align-items: center; gap: 6px;
   flex-shrink: 0; height: 34px; padding: 0 var(--space-3);
   background: var(--bg-surface); color: var(--text-secondary);
   border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
   font-family: var(--font); font-size: var(--text-secondary-size);
   font-weight: var(--weight-medium); cursor: pointer;
+  transition: color var(--duration-hover) var(--ease),
+              border-color var(--duration-hover) var(--ease),
+              background var(--duration-hover) var(--ease);
 }
-.ta-home__filtros-btn:active { background: var(--bg-surface-hover); }
-.ta-home__filtros-dot {
+@media (hover: hover) {
+  .ta-hfiltros__btn:hover {
+    color: var(--text-primary); border-color: var(--border-focus);
+    background: var(--bg-surface-hover);
+  }
+}
+.ta-hfiltros__btn:active { background: var(--bg-surface-hover); }
+.ta-hfiltros__btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.ta-hfiltros__dot {
   display: grid; place-items: center;
   min-width: 17px; height: 17px; padding: 0 4px;
   background: var(--brand); color: var(--on-brand);
   border-radius: var(--radius-pill);
   font-size: 10px; font-weight: var(--weight-strong);
 }
-.ta-home__filtros .ta-select {
-  height: 34px; width: auto; min-width: 128px;
-  font-size: var(--text-secondary-size);
-  background: var(--bg-surface);
+/* Filtro puesto = chip visible. Sin esto, un Inicio filtrado por "Marzo" es
+   indistinguible de un Inicio con pocos datos, y el usuario no ve por qué le
+   faltan cosas. */
+.ta-hfiltros__chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 28px; padding: 0 6px 0 10px;
+  background: var(--brand-soft); color: var(--brand-text);
+  border: 1px solid transparent; border-radius: var(--radius-pill);
+  font-family: var(--font); font-size: var(--text-micro);
+  font-weight: var(--weight-medium); cursor: pointer;
+  transition: background var(--duration-hover) var(--ease);
 }
+@media (hover: hover) {
+  .ta-hfiltros__chip:hover { background: var(--tint-brand); }
+}
+.ta-hfiltros__chip:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.ta-hfiltros__campos { display: flex; flex-direction: column; gap: var(--space-4); }
 
 /* ── Secciones ────────────────────────────────────────────────────────────── */
 .ta-sec { display: flex; flex-direction: column; gap: var(--space-3); }
 .ta-sec__head {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
 }
+/* Rótulo, no título. Mismo tratamiento que "POR RESOLVER" en Facturación:
+   las dos pantallas separan sus bloques igual. */
 .ta-sec__title {
-  font-size: var(--text-section); font-weight: var(--weight-semibold);
-  color: var(--text-primary); letter-spacing: -0.015em;
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .07em;
 }
 .ta-sec__link {
   display: inline-flex; align-items: center; gap: 3px;
@@ -95,6 +122,7 @@
   display: grid; place-items: center;
   width: 36px; height: 36px; flex-shrink: 0;
   border-radius: var(--radius-input);
+  transition: transform var(--duration-base) var(--ease);
 }
 .ta-atn__icon--warning { background: var(--warning-soft); color: var(--warning-text); }
 .ta-atn__icon--info    { background: var(--info-soft);    color: var(--info-text); }
@@ -134,50 +162,98 @@
 
 .ta-atn__right { display: flex; align-items: center; gap: var(--space-4); flex-shrink: 0; }
 .ta-atn__monto {
-  font-size: 17px; font-weight: var(--weight-semibold);
+  font-size: 20px; font-weight: var(--weight-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums;
   text-align: right; white-space: nowrap;
 }
+/* "Ver pendientes" en reposo es una etiqueta que repite lo que ya dicen la
+   fila-botón y el chevron. Aparece al acercarse, para confirmar el destino
+   antes del clic. En mobile no existe hover: ahí se muestra siempre, en su
+   propia línea (ver .ta-atn__cta-mobile más abajo). */
 .ta-atn__cta {
   font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
-  color: var(--text-secondary); white-space: nowrap;
+  color: var(--brand-text); white-space: nowrap;
+  opacity: 0; transform: translateX(-4px);
+  transition: opacity var(--duration-base) var(--ease),
+              transform var(--duration-base) var(--ease);
 }
-.ta-atn__item:hover .ta-atn__cta { color: var(--brand-text); }
-.ta-atn__chev { color: var(--text-tertiary); flex-shrink: 0; }
+.ta-atn__chev {
+  color: var(--text-tertiary); flex-shrink: 0;
+  opacity: .3;
+  transition: opacity var(--duration-base) var(--ease),
+              transform var(--duration-base) var(--ease);
+}
+@media (hover: hover) {
+  .ta-atn__item:hover .ta-atn__cta  { opacity: 1; transform: none; }
+  .ta-atn__item:hover .ta-atn__chev { opacity: 1; transform: translateX(2px); }
+  .ta-atn__item:hover .ta-atn__icon { transform: scale(1.04); }
+}
+.ta-atn__item:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: -2px;
+  background: var(--bg-surface-hover);
+}
+.ta-atn__item:focus .ta-atn__cta  { opacity: 1; transform: none; }
+.ta-atn__item:focus .ta-atn__chev { opacity: 1; }
 
-/* ── Acciones rápidas ─────────────────────────────────────────────────────── */
-.ta-qa { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+/* ── Acciones rápidas ─────────────────────────────────────────────────────
+   Tira, no cuatro tarjetas. Los cuatro rótulos siguen escritos —esconderlos
+   detrás de un hover sería exactamente el minimalismo que rompe la
+   discoverability— pero en reposo son botones tranquilos y la superficie
+   aparece cuando el usuario se acerca. */
+.ta-qa { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ta-qa__btn {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--bg-surface);
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 38px; padding: 0 14px 0 8px;
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-pill);
   cursor: pointer; text-align: left;
-  font-family: var(--font); font-size: var(--text-body); font-weight: var(--weight-label);
-  color: var(--text-primary);
-  transition: border-color var(--duration-fast) var(--ease),
-              background var(--duration-fast) var(--ease);
+  font-family: var(--font); font-size: var(--text-secondary-size);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+  transition: color var(--duration-hover) var(--ease),
+              border-color var(--duration-base) var(--ease),
+              background var(--duration-base) var(--ease),
+              box-shadow var(--duration-base) var(--ease);
 }
-.ta-qa__btn:hover { border-color: var(--border-focus); background: var(--bg-surface-hover); }
+@media (hover: hover) {
+  .ta-qa__btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border-color: var(--border-strong);
+    box-shadow: var(--elev-1);
+  }
+  .ta-qa__btn:hover .ta-qa__ico { background: var(--brand-soft); color: var(--brand-text); }
+}
+.ta-qa__btn:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 2px;
+  color: var(--text-primary);
+}
+.ta-qa__btn:active { transform: scale(.985); }
 .ta-qa__ico {
   display: grid; place-items: center;
-  width: 32px; height: 32px; flex-shrink: 0;
-  background: var(--brand-soft); color: var(--brand-text);
-  border-radius: var(--radius-input);
+  width: 26px; height: 26px; flex-shrink: 0;
+  background: var(--bg-muted); color: var(--text-secondary);
+  border-radius: 999px;
+  transition: background var(--duration-base) var(--ease),
+              color var(--duration-base) var(--ease);
 }
+.ta-qa__ico svg { width: 15px; height: 15px; }
 
 /* ── Resumen ──────────────────────────────────────────────────────────────── */
 .ta-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
 .ta-sum__item { min-width: 0; }
 .ta-sum__label {
-  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  font-size: var(--text-micro); color: var(--text-tertiary);
   font-weight: var(--weight-medium);
 }
+/* 24px bold hacía de estas tres cifras el objeto más grande del Inicio, por
+   encima de lo único accionable de la pantalla. Bajan a 19px medium: se
+   siguen leyendo de un vistazo y ya no compiten. */
 .ta-sum__valor {
   margin-top: 4px;
-  font-size: 24px; font-weight: var(--weight-strong);
-  color: var(--text-primary); letter-spacing: -0.025em;
+  font-size: 17px; font-weight: var(--weight-semibold);
+  color: var(--text-primary); letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
 }
 .ta-sum__nota { margin-top: 3px; font-size: var(--text-micro); color: var(--text-tertiary); }
@@ -231,9 +307,6 @@
 @media (max-width: 1100px) {
   .ta-home__cols { grid-template-columns: 1fr; gap: var(--space-6); }
 }
-@media (max-width: 900px) {
-  .ta-qa { grid-template-columns: repeat(2, 1fr); }
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE — composición propia, no la de escritorio comprimida.
@@ -252,7 +325,6 @@
   .ta-home__sub { font-size: var(--text-secondary-size); margin-top: 2px; }
 
   .ta-sec { gap: var(--space-2); }
-  .ta-sec__title { font-size: 16px; }
   /* 19px de alto no es un blanco táctil. */
   .ta-sec__link { min-height: 34px; padding: 0 var(--space-2); margin-right: calc(var(--space-2) * -1); }
 
@@ -289,14 +361,15 @@
     color: var(--brand-text);
   }
 
-  /* ── Acciones: filas compactas, icono + label en horizontal ── */
-  .ta-qa { gap: var(--space-2); }
+  /* ── Acciones: dos por fila, no una tira irregular ── */
+  .ta-qa { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
   .ta-qa__btn {
     flex-direction: row; align-items: center; gap: var(--space-2);
     /* 46px: cómodo al tacto sin gastar 94px de alto por acción. */
-    min-height: 46px; padding: 0 var(--space-3);
+    min-height: 46px; height: auto; padding: 0 var(--space-3);
     border-radius: var(--radius-input);
     font-size: var(--text-secondary-size);
+    background: var(--bg-surface); color: var(--text-primary);
   }
   .ta-qa__ico { width: 26px; height: 26px; border-radius: 8px; }
   .ta-qa__ico svg { width: 14px; height: 14px; }

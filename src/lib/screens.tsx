@@ -7,7 +7,8 @@ import Usuarios  from '@/screens/Usuarios'
 import Informe   from '@/screens/Informe'
 import Reservas  from '@/screens/Reservas'
 import Recibos   from '@/screens/Recibos'
-import { Clientes, NotasCredito, NotasDebito } from '@/screens/OtherPages'
+import Clientes   from '@/screens/Clientes'
+import Documentos from '@/screens/Documentos'
 
 /**
  * Qué componente renderiza cada destino.
@@ -35,8 +36,12 @@ export const SCREENS: Record<RouteId, ComponentType<any>> = {
   facturas: Facturas,
   recibos:  Recibos,
   clientes: Clientes,
-  nc:       NotasCredito,
-  nd:       NotasDebito,
+  // Notas de crédito y de débito son dos clases del mismo documento y viven
+  // en la misma tabla: comparten pantalla. Las dos entradas de la navegación
+  // se conservan —y con ellas los enlaces /notas-credito y /notas-debito—;
+  // lo que cambia es con qué clase abre `Documentos`.
+  nc:       Documentos,
+  nd:       Documentos,
   reservas: Reservas,
   informe:  Informe,
   usuarios: Usuarios,

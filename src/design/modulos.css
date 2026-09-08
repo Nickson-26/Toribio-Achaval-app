@@ -407,9 +407,65 @@
    table-layout:fixed una columna sin ancho se queda con el resto, y una
    dirección corta dejaba 400px de aire entre el texto y su badge. */
 .ta-tabla__prop { width: 42%; }
+/* Un conteo de dos dígitos no necesita más. */
+.ta-tabla__docs { width: 70px; }
 /* El hueco de una celda cuyo dato no aplica en esta fila. Un guion tenue dice
    "acá no hay nada" sin gritar. */
 .ta-fila__nada { color: var(--text-tertiary); opacity: .5; }
+/* Conteo tranquilo: "3 facturas · 1 recibo". Sin badge, porque no pide nada.
+   El badge se reserva para lo que sí requiere acción. */
+.ta-fila__docs {
+  font-size: var(--text-secondary-size); color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LÍNEA DE TIEMPO DE UN CLIENTE
+   ══════════════════════════════════════════════════════════════════════════
+   Facturas, notas y recibos mezclados dentro del detalle. Es la pregunta que
+   se hace quien abre un cliente —"¿qué pasó con este?"— y no tres listas
+   separadas que hay que reconciliar mentalmente.
+
+   Deliberadamente NO es una tabla: son renglones, como los movimientos de
+   mobile, para que no compita con la lista principal que está al lado. */
+.ta-movcli { display: flex; flex-direction: column; }
+.ta-movcli__titulo {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-micro); font-weight: var(--weight-label);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.ta-movcli__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'id monto' 'fecha estado';
+  gap: 1px var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.ta-movcli__row:last-of-type { border-bottom: none; }
+.ta-movcli__id {
+  grid-area: id; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-secondary-size); font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+.ta-movcli__fecha {
+  grid-area: fecha;
+  font-size: var(--text-micro); color: var(--text-tertiary);
+}
+.ta-movcli__monto {
+  grid-area: monto; text-align: right; white-space: nowrap;
+  font-size: var(--text-secondary-size); font-weight: var(--weight-label);
+  color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.ta-movcli__row .ta-badge { grid-area: estado; justify-self: end; }
+.ta-movcli__mas {
+  margin-top: var(--space-2);
+  font-size: var(--text-micro); color: var(--text-tertiary);
+}
 .ta-fila__n { display: block; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 /* Igual que __n pero para un identificador de texto —una dirección— en vez
    de un número: sin tabular-nums y recortando con elipsis. */

@@ -9,7 +9,7 @@ import { IconButton } from '@/design/primitives'
 import { ThemeGroup, type Theme } from './Topbar'
 import { useAuth } from '@/components/AuthProvider'
 import { useNavigation } from '@/components/NavigationProvider'
-import { navegacionPara, type AppRoute, type RouteId } from '@/lib/navigation'
+import { navegacionPara, itemActivo, type AppRoute, type RouteId } from '@/lib/navigation'
 import { ROLE_LABEL } from '@/design/permissions'
 import { supabase } from '@/lib/supabase'
 
@@ -103,7 +103,7 @@ export function Sidebar({
               {seccion.label && <div className="ta-nav__heading">{seccion.label}</div>}
               {rutas.map(r => {
                 const Icon = ICONS[r.icono] ?? FileText
-                const active = route.to === r.id
+                const active = itemActivo(route.to) === r.id
                 const badge = r.id === 'facturas' && pendientes > 0 ? pendientes : null
                 return (
                   <button

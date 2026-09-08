@@ -13,7 +13,7 @@ import {
 import {
   agregarClientes, aplicarFiltros, chipsActivos, contarFiltros, hayFiltros,
   opcionesUnidad, resumenClientes, movimientosDe, situacionDe, volumenDe,
-  montoPrincipal, montoSecundario,
+  montoPrincipal, montoSecundario, tieneNotas, desglosePorMoneda,
   FILTROS_INICIALES, type Cliente, type FiltrosClientes,
 } from '@/lib/clientes'
 
@@ -331,6 +331,30 @@ function ClientePanel({
       )}
 
       <Mas titulo="Más datos">
+        {/* De dónde sale el total. No es una métrica nueva: es la explicación
+            del número que ya está arriba. Sin notas no hace falta —el total
+            ES el facturado— y por eso el bloque no aparece. */}
+        {tieneNotas(cliente) && desglosePorMoneda(cliente).map(d => {
+          // Un bloque por moneda. Las dos monedas no se restan entre sí, así
+          // que tampoco pueden compartir una columna: verlas apiladas hacía
+          // leer "3.200 − 3.872" cuando eran dólares y pesos.
+          const fmt = d.moneda === 'usd' ? usd : ars
+          return (
+            <div className="ta-datos" key={d.moneda}>
+              <Dato label={`Facturas · ${d.moneda === 'usd' ? 'USD' : 'ARS'}`}>
+                <Money>{fmt(d.facturado)}</Money>
+              </Dato>
+              {d.nd !== 0 && (
+                <Dato label="Notas de débito"><Money>{`+ ${fmt(d.nd)}`}</Money></Dato>
+              )}
+              {d.nc !== 0 && (
+                <Dato label="Notas de crédito"><Money>{`− ${fmt(d.nc)}`}</Money></Dato>
+              )}
+              <Dato label="Facturado" fuerte><Money>{fmt(d.total)}</Money></Dato>
+            </div>
+          )
+        })}
+
         <div className="ta-datos">
           <Dato label="Facturas"><span>{cliente.facturas}</span></Dato>
           {cliente.notas > 0 ? <Dato label="Notas de crédito/débito"><span>{cliente.notas}</span></Dato> : null}

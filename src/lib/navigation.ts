@@ -85,6 +85,9 @@ export type SeccionDef = {
 
 export const SECCIONES: SeccionDef[] = [
   { id: 'principal',      label: 'Principal' },
+  // Sin rutas desde que NC/ND comparten pantalla y entrada. Queda declarada:
+  // `navegacionPara()` descarta los grupos vacíos, así que no molesta, y el
+  // día que haya otro documento tiene dónde ir.
   { id: 'documentos',     label: 'Documentos' },
   { id: 'analisis',       label: 'Análisis' },
   { id: 'administracion', label: 'Administración' },
@@ -104,6 +107,14 @@ export type RouteDef = {
   roles?: UserRole[]
   /** Si es false, no aparece en la navegación (accesible sólo por navigate). */
   enNav: boolean
+  /**
+   * Esta ruta se representa en la navegación con la entrada de OTRA.
+   *
+   * Sirve para pantallas que son una sola pero conservan más de una ruta por
+   * compatibilidad: `nd` no tiene ítem propio, y cuando el usuario está ahí
+   * se resalta el de `nc`, que es el que dice "Documentos".
+   */
+  agrupaCon?: RouteId
   /** Nombre del icono de lucide-react. Se conecta en la Fase 1. */
   icono: string
 }
@@ -126,8 +137,13 @@ export const RUTAS: Record<RouteId, RouteDef> = {
   reservas: { id: 'reservas', label: 'Reservas',         titulo: 'Reservas',            seccion: 'principal',      enNav: true, icono: 'Building2' },
 
   // ── Documentos ──
-  nc:       { id: 'nc',       label: 'Notas de Crédito', titulo: 'Notas de Crédito',    seccion: 'documentos',     enNav: true, icono: 'FileMinus2' },
-  nd:       { id: 'nd',       label: 'Notas de Débito',  titulo: 'Notas de Débito',     seccion: 'documentos',     enNav: true, icono: 'FilePlus2' },
+  // Notas de crédito y de débito son una sola pantalla con un segmentado
+  // adentro, así que la navegación muestra UNA entrada: "Documentos". Las dos
+  // rutas se conservan —y con ellas /notas-credito y /notas-debito, que
+  // siguen abriendo su clase—, pero `nd` no tiene ítem propio: se representa
+  // con el de `nc`.
+  nc:       { id: 'nc',       label: 'Documentos',       titulo: 'Documentos',          seccion: 'principal',      enNav: true,  icono: 'FileMinus2' },
+  nd:       { id: 'nd',       label: 'Notas de Débito',  titulo: 'Documentos',          seccion: 'principal',      enNav: false, icono: 'FilePlus2', agrupaCon: 'nc' },
 
   // ── Análisis ──
   informe:  { id: 'informe',  label: 'Reportes',         titulo: 'Reportes',            seccion: 'analisis',       enNav: true, icono: 'ChartNoAxesCombined', roles: ['admin'] },
@@ -148,6 +164,17 @@ export function puedeAcceder(ruta: RouteDef, role: UserRole | null | undefined):
 /** Rutas visibles en la navegación de una sección, filtradas por rol. */
 export function rutasDeSeccion(seccion: SeccionId, role: UserRole | null | undefined): RouteDef[] {
   return Object.values(RUTAS).filter(r => r.seccion === seccion && r.enNav && puedeAcceder(r, role))
+}
+
+/**
+ * Qué ítem de la navegación hay que resaltar para la ruta activa.
+ *
+ * Casi siempre el suyo. La excepción son las rutas agrupadas: estando en
+ * `nd`, el ítem que corresponde marcar es el de `nc` — "Documentos"—, porque
+ * es la única entrada visible de esa pantalla.
+ */
+export function itemActivo(actual: RouteId): RouteId {
+  return RUTAS[actual]?.agrupaCon ?? actual
 }
 
 /**

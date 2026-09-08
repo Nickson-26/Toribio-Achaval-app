@@ -39,7 +39,23 @@ export type Cliente = {
   pendientes: number
   /** Facturas con el pago recibido y el circuito sin cerrar. */
   porCerrar: number
-  /** Facturado vivo (excluye anuladas). */
+
+  /* ── Importes ──────────────────────────────────────────────────────────
+     Todos en la MISMA base: `monto_ars` / `monto_usd`, que son los totales
+     con IVA. No se mezclan con `neto_ars`, y las dos monedas no se suman
+     nunca entre sí: no hay tipo de cambio guardado y estimarlo sería
+     inventar una cifra. */
+
+  /** Facturas no anuladas. Es el bruto, antes de las notas. */
+  facturadoArs: number
+  facturadoUsd: number
+  /** Notas de débito: aumentan lo facturado. */
+  ndArs: number
+  ndUsd: number
+  /** Notas de crédito que descuentan de verdad (ver `descuenta()`). */
+  ncArs: number
+  ncUsd: number
+  /** facturas − NC + ND. Puede dar negativo, y si da, es un dato real. */
   ars: number
   usd: number
   /** Fecha del movimiento más reciente, de cualquier tipo. */
@@ -49,8 +65,42 @@ export type Cliente = {
 }
 
 const esFactura = (c: Comprobante) => (c.tipo ?? '').startsWith('FACT')
-const esNota = (c: Comprobante) =>
-  (c.tipo ?? '').startsWith('NC') || (c.tipo ?? '').startsWith('ND')
+const esNC = (c: Comprobante) => (c.tipo ?? '').startsWith('NC')
+const esND = (c: Comprobante) => (c.tipo ?? '').startsWith('ND')
+const esNota = (c: Comprobante) => esNC(c) || esND(c)
+
+/**
+ * ¿Esta nota de crédito tiene que restar?
+ *
+ * Casi siempre sí. La excepción es el caso que produciría un doble descuento:
+ * cuando la NC canceló una factura que además quedó ANULADA. En ese caso la
+ * cancelación ya está representada por la exclusión de la factura del total,
+ * y restar la nota además la contaría dos veces.
+ *
+ *   factura 100 anulada (no suma) + NC 100 que la cancela  ->  0
+ *   restando igual la NC daría -100, que es falso.
+ *
+ * Para saber que la NC canceló ESA factura no se adivina por importe, fecha
+ * ni parecido de cliente: se usa `factura_asociada_id`, que es la única
+ * relación que el modelo declara. Si no hay vínculo, la NC resta — que es lo
+ * correcto para un ajuste que no cancela nada excluido.
+ *
+ * En los datos de hoy esta excepción no se activa nunca: las 7 NC de
+ * producción tienen `factura_asociada_id` vacío. Existe para el flujo real
+ * de alta, que sí escribe el vínculo y anula la factura, y para que el
+ * cálculo no se rompa cuando eso ocurra.
+ *
+ * Nota sobre el otro camino de anulación: `db.deleteComprobante()` anula
+ * poniendo además `cliente = 'ANULADO'`, así que esas facturas salen de la
+ * agregación por nombre y no por estado. Las 23 anuladas de producción son
+ * todas de ese tipo.
+ */
+function descuenta(nc: Comprobante, porId: Map<string, Comprobante>): boolean {
+  if (!nc.factura_asociada_id) return true
+  const factura = porId.get(nc.factura_asociada_id)
+  if (!factura) return true          // vínculo roto: la factura no está
+  return factura.estado !== 'anulada'
+}
 
 /** Un nombre que no identifica a nadie. Las anuladas pierden el cliente. */
 const nombreValido = (n: string | null | undefined): n is string =>
@@ -66,13 +116,17 @@ const nombreValido = (n: string | null | undefined): n is string =>
  */
 export function agregarClientes(comprobantes: Comprobante[], recibos: Recibo[]): Cliente[] {
   const mapa = new Map<string, Cliente & { _unidades: Set<string> }>()
+  // Índice por id para poder mirar la factura que una NC dice cancelar.
+  const porId = new Map(comprobantes.map(d => [d.id, d]))
 
   const traer = (nombre: string) => {
     let c = mapa.get(nombre)
     if (!c) {
       c = {
         nombre, facturas: 0, notas: 0, recibos: 0, documentos: 0,
-        pendientes: 0, porCerrar: 0, ars: 0, usd: 0, ultimo: '',
+        pendientes: 0, porCerrar: 0,
+        facturadoArs: 0, facturadoUsd: 0, ndArs: 0, ndUsd: 0, ncArs: 0, ncUsd: 0,
+        ars: 0, usd: 0, ultimo: '',
         unidades: [], _unidades: new Set<string>(),
       }
       mapa.set(nombre, c)
@@ -88,15 +142,30 @@ export function agregarClientes(comprobantes: Comprobante[], recibos: Recibo[]):
     c.documentos++
     if (d.estado === 'pendiente') c.pendientes++
     if (d.estado === 'faltan_retenciones' || d.estado === 'echeq_pendiente') c.porCerrar++
-    // Una anulada no es facturación: cuenta como documento pero no suma plata.
-    if (d.estado !== 'anulada') {
-      c.ars += d.monto_ars ?? 0
-      c.usd += d.monto_usd ?? 0
+
+    const ars = d.monto_ars ?? 0
+    const usd = d.monto_usd ?? 0
+
+    // Los importes se guardan SIEMPRE en positivo, también en las notas
+    // —verificado: 0 de 7 NC tiene signo negativo—. El signo lo pone esta
+    // función, no el dato.
+    if (esNC(d)) {
+      if (descuenta(d, porId)) { c.ncArs += ars; c.ncUsd += usd }
+    } else if (esND(d)) {
+      c.ndArs += ars; c.ndUsd += usd
+    } else if (d.estado !== 'anulada') {
+      // Una factura anulada no es facturación. Cuenta como documento pero no
+      // suma plata.
+      c.facturadoArs += ars; c.facturadoUsd += usd
     }
+
     if ((d.fecha ?? '') > c.ultimo) c.ultimo = d.fecha ?? ''
     if (d.persona) c._unidades.add(d.persona)
   }
 
+  // Un recibo documenta un COBRO, no una facturación: no toca ningún
+  // importe de esta agregación. Sólo suma al conteo y puede mover la fecha
+  // del último movimiento.
   for (const r of recibos) {
     if (!nombreValido(r.cliente)) continue
     const c = traer(r.cliente)
@@ -106,7 +175,13 @@ export function agregarClientes(comprobantes: Comprobante[], recibos: Recibo[]):
   }
 
   return [...mapa.values()]
-    .map(({ _unidades, ...c }) => ({ ...c, unidades: [..._unidades].sort() }))
+    .map(({ _unidades, ...c }) => ({
+      ...c,
+      unidades: [..._unidades].sort(),
+      // facturas + ND − NC, cada moneda por su cuenta.
+      ars: c.facturadoArs + c.ndArs - c.ncArs,
+      usd: c.facturadoUsd + c.ndUsd - c.ncUsd,
+    }))
     .sort((a, b) => b.ultimo.localeCompare(a.ultimo) || a.nombre.localeCompare(b.nombre))
 }
 
@@ -274,14 +349,50 @@ export function situacionDe(c: Cliente): string {
  * pasó. Cuando no hay pesos, el dólar es el importe principal.
  */
 export function montoPrincipal(c: Cliente): { valor: number; moneda: 'ars' | 'usd' } {
-  if (c.ars === 0 && c.usd > 0) return { valor: c.usd, moneda: 'usd' }
+  if (c.ars === 0 && c.usd !== 0) return { valor: c.usd, moneda: 'usd' }
   return { valor: c.ars, moneda: 'ars' }
 }
 
-/** El importe secundario, si es que hay dos monedas de verdad. */
+/**
+ * El importe secundario, si es que hay dos monedas de verdad.
+ *
+ * "De verdad" es que las dos tengan movimiento, no que las dos sean
+ * positivas: un cliente con pesos en negativo y dólares en positivo tiene las
+ * dos cifras y las dos importan.
+ */
 export function montoSecundario(c: Cliente): { valor: number; moneda: 'ars' | 'usd' } | null {
-  if (c.ars > 0 && c.usd > 0) return { valor: c.usd, moneda: 'usd' }
+  if (c.ars !== 0 && c.usd !== 0) return { valor: c.usd, moneda: 'usd' }
   return null
+}
+
+/** ¿El total lleva notas adentro? Decide si vale la pena mostrar el desglose. */
+export function tieneNotas(c: Cliente): boolean {
+  return c.ncArs !== 0 || c.ncUsd !== 0 || c.ndArs !== 0 || c.ndUsd !== 0
+}
+
+export type DesgloseMoneda = {
+  moneda: 'ars' | 'usd'
+  facturado: number
+  nd: number
+  nc: number
+  /** facturado + nd − nc, dentro de ESA moneda. */
+  total: number
+}
+
+/**
+ * El desglose del total, una entrada por moneda.
+ *
+ * Existe porque un cliente puede tener la factura en una moneda y la nota en
+ * la otra —pasa hoy, en datos reales— y entonces no hay una resta única que
+ * mostrar. Devuelve sólo las monedas en las que efectivamente hubo algo: si
+ * alguien opera únicamente en pesos, no aparece un bloque de dólares en cero.
+ */
+export function desglosePorMoneda(c: Cliente): DesgloseMoneda[] {
+  const filas: DesgloseMoneda[] = [
+    { moneda: 'ars', facturado: c.facturadoArs, nd: c.ndArs, nc: c.ncArs, total: c.ars },
+    { moneda: 'usd', facturado: c.facturadoUsd, nd: c.ndUsd, nc: c.ncUsd, total: c.usd },
+  ]
+  return filas.filter(f => f.facturado !== 0 || f.nd !== 0 || f.nc !== 0)
 }
 
 /** Cuántas cosas tiene, para la segunda línea de la fila. */

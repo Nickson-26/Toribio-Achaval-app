@@ -15,7 +15,7 @@ import assert from 'node:assert/strict'
 
 import {
   routeToPath, pathToRoute, rutasDeSeccion, navegacionPara, puedeAcceder,
-  RUTAS, SECCIONES, DESTINOS,
+  itemActivo, RUTAS, SECCIONES, DESTINOS,
   type AppRoute,
 } from '../src/lib/navigation.ts'
 
@@ -99,9 +99,10 @@ test('rutasDeSeccion filtra por rol', () => {
   assert.deepEqual(rutasDeSeccion('analisis', 'admin').map(r => r.id), ['informe'])
   assert.deepEqual(rutasDeSeccion('analisis', 'editor'), [])
 
-  // Principal es igual para los tres roles.
+  // Principal es igual para los tres roles. "Documentos" (la ruta `nc`) vive
+  // acá desde que NC y ND comparten pantalla: son los seis módulos juntos.
   const principal = rutasDeSeccion('principal', 'viewer').map(r => r.id)
-  assert.deepEqual(principal, ['inicio', 'facturas', 'recibos', 'clientes', 'reservas'])
+  assert.deepEqual(principal, ['inicio', 'facturas', 'recibos', 'clientes', 'reservas', 'nc'])
   assert.deepEqual(rutasDeSeccion('principal', 'admin').map(r => r.id), principal)
 })
 
@@ -121,17 +122,46 @@ test('navegacionPara no devuelve grupos vacíos', () => {
       assert.ok(g.rutas.length > 0, `${role}: el grupo ${g.seccion.id} vino vacío`)
     }
   }
-  // admin ve los 4 grupos; editor y viewer sólo Principal y Documentos.
-  assert.equal(navegacionPara('admin').length, 4)
-  assert.equal(navegacionPara('editor').length, 2)
-  assert.equal(navegacionPara('viewer').length, 2)
-  assert.equal(navegacionPara(null).length, 2)
+  // admin ve Principal, Análisis y Administración; el resto sólo Principal.
+  // La sección "Documentos" quedó sin rutas —su única entrada se mudó a
+  // Principal— y `navegacionPara` descarta los grupos vacíos.
+  assert.equal(navegacionPara('admin').length, 3)
+  assert.equal(navegacionPara('editor').length, 1)
+  assert.equal(navegacionPara('viewer').length, 1)
+  assert.equal(navegacionPara(null).length, 1)
+  assert.ok(!navegacionPara('admin').some(g => g.seccion.id === 'documentos'),
+    'una sección sin rutas no puede llegar a la sidebar')
 })
 
-test('las 9 rutas están repartidas en los grupos, sin huérfanas', () => {
-  const enGrupos = navegacionPara('admin').flatMap(g => g.rutas.map(r => r.id))
-  assert.equal(enGrupos.length, Object.keys(RUTAS).length,
-    'hay rutas que no aparecen en ningún grupo de la sidebar')
+test('DECISIÓN DE PRODUCTO: una sola entrada "Documentos" para NC y ND', () => {
+  // El brief pedía una entrada visible con las dos clases adentro. Las rutas
+  // se conservan por compatibilidad, pero sólo una tiene ítem propio.
+  assert.equal(RUTAS.nc.label, 'Documentos')
+  assert.equal(RUTAS.nc.enNav, true)
+  assert.equal(RUTAS.nd.enNav, false, 'ND no puede tener su propio ítem')
+  // Las dos rutas siguen existiendo y con su path de siempre.
+  assert.equal(routeToPath({ to: 'nc' }), '/notas-credito')
+  assert.equal(routeToPath({ to: 'nd' }), '/notas-debito')
+  assert.deepEqual(pathToRoute('/notas-debito'), { to: 'nd' })
+  // Y las dos resaltan la misma entrada.
+  assert.equal(itemActivo('nc'), 'nc')
+  assert.equal(itemActivo('nd'), 'nc', 'estando en ND se marca "Documentos"')
+  // Las demás rutas se representan a sí mismas.
+  for (const id of Object.keys(RUTAS)) {
+    if (id === 'nd') continue
+    assert.equal(itemActivo(id as any), id)
+  }
+})
+
+test('ninguna ruta queda huérfana: o tiene ítem, o la representa otra', () => {
+  const enGrupos = new Set(navegacionPara('admin').flatMap(g => g.rutas.map(r => r.id)))
+  for (const id of Object.keys(RUTAS) as (keyof typeof RUTAS)[]) {
+    const representante = itemActivo(id)
+    assert.ok(
+      enGrupos.has(representante),
+      `la ruta ${id} no aparece en la sidebar ni delega en una que sí aparezca`,
+    )
+  }
 })
 
 // ── Consistencia del registro ────────────────────────────────────────────────

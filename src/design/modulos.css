@@ -734,6 +734,18 @@ td.ta-fila__chev {
    listado es para consultar, y operar se hace desde el detalle. */
 .ta-movs { display: flex; flex-direction: column; min-width: 0; }
 
+/* `.ta-only-mobile { display: none }` vive en shell.css, que se importa ANTES
+   que este archivo: con la misma especificidad, `.ta-movs { display: flex }`
+   le ganaba por orden y la lista de teléfono quedaba dibujada debajo de la
+   tabla en escritorio. No se notaba porque las tablas son largas y quedaba
+   fuera de pantalla; con un filtro que deja una sola fila, aparece. Va acá y
+   con dos clases —no con !important— para no romper el `display: flex` que la
+   lista necesita cuando SÍ corresponde mostrarla. */
+.ta-movs.ta-only-mobile { display: none; }
+@media (max-width: 1023px) {
+  .ta-movs.ta-only-mobile { display: flex; }
+}
+
 .ta-mov {
   display: flex; flex-direction: column; gap: 3px;
   width: 100%; min-width: 0; padding: 13px 2px;
